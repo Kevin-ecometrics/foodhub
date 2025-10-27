@@ -39,7 +39,7 @@ export const tablesService = {
       .update({ 
         status,
         updated_at: new Date().toISOString()
-      })
+      } as never)
       .eq('id', tableId)
     
     if (error) throw error

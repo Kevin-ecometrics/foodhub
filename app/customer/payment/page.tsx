@@ -1,7 +1,7 @@
 // app/customer/payment/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import {
   FaArrowLeft,
@@ -20,12 +20,35 @@ interface PaymentSummary {
 
 export default function PaymentPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
   const { currentOrder, orderItems, currentTableId } = useOrder();
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  const [tableId, setTableId] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Obtener tableId de la URL usando useEffect de manera asíncrona
+  useEffect(() => {
+    // Marcar que estamos en el cliente
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsClient(true);
+
+    // Obtener parámetros de la URL
+    const getTableId = () => {
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get("table");
+      }
+      return null;
+    };
+
+    // Usar setTimeout para evitar la actualización síncrona
+    const timer = setTimeout(() => {
+      setTableId(getTableId());
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Calcular resumen de pago
   const calculatePaymentSummary = (): PaymentSummary => {
@@ -69,6 +92,18 @@ export default function PaymentPage() {
       currency: "MXN",
     }).format(amount);
   };
+
+  // Mostrar loading mientras se obtiene el tableId
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentOrder || orderItems.length === 0) {
     return (

@@ -1,4 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
+
+interface Product {
+  id: number
+  name: string
+  price: number
+}
 
 export interface OrderItem {
   id: string
@@ -10,6 +17,7 @@ export interface OrderItem {
   notes: string | null
   status: 'ordered' | 'preparing' | 'ready' | 'served'
   created_at: string
+  updated_at?: string
 }
 
 export const orderItemsService = {
@@ -30,12 +38,12 @@ export const orderItemsService = {
         quantity,
         notes: notes || null,
         status: 'ordered'
-      })
+      } as never)
       .select()
       .single()
     
     if (error) throw error
-    return data
+    return data as OrderItem
   },
 
   // Obtener items de una orden
@@ -47,24 +55,24 @@ export const orderItemsService = {
       .order('created_at', { ascending: true })
     
     if (error) throw error
-    return data || []
+    return (data as OrderItem[]) || []
   },
 
   // Actualizar cantidad de un item
-  async updateItemQuantity(itemId: string, quantity: number) {
+  async updateItemQuantity(itemId: string, quantity: number): Promise<void> {
     const { error } = await supabase
       .from('order_items')
       .update({ 
         quantity,
         updated_at: new Date().toISOString()
-      })
+      } as never)
       .eq('id', itemId)
     
     if (error) throw error
   },
 
   // Eliminar item de una orden
-  async removeItemFromOrder(itemId: string) {
+  async removeItemFromOrder(itemId: string): Promise<void> {
     const { error } = await supabase
       .from('order_items')
       .delete()
@@ -82,9 +90,8 @@ export const orderItemsService = {
     
     if (error) throw error
     
-    const total = data?.reduce((sum, item) => {
-      return sum + (item.price * item.quantity)
-    }, 0) || 0
+    const itemsData = data as { price: number; quantity: number }[] | null
+    const total = itemsData?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
     
     return total
   }

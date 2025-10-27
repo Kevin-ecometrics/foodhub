@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
 
 export const notificationsService = {
@@ -11,7 +12,7 @@ export const notificationsService = {
         type,
         message,
         status: 'pending'
-      })
+      } as any)
     
     if (error) throw error
   }

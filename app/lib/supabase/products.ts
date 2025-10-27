@@ -22,7 +22,9 @@ export const productsService = {
       .order('name')
     
     if (error) throw error
-    return data || []
+    
+    // Direct type assertion
+    return (data as Product[]) || []
   },
 
   // Obtener productos por categoría
@@ -35,7 +37,8 @@ export const productsService = {
       .order('name')
     
     if (error) throw error
-    return data || []
+    
+    return (data as Product[]) || []
   },
 
   // Obtener categorías únicas
@@ -48,7 +51,10 @@ export const productsService = {
     
     if (error) throw error
     
-    const uniqueCategories = [...new Set(data?.map(item => item.category) || [])]
+    // Type assertion para el objeto con categoría
+    const categoriesData = data as { category: string }[] | null
+    
+    const uniqueCategories = [...new Set(categoriesData?.map(item => item.category) || [])]
     return uniqueCategories
   }
 }

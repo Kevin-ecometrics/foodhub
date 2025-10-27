@@ -1,16 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import {
   FaHistory,
   FaUtensils,
-  FaCreditCard,
   FaBell,
   FaReceipt,
-  FaClock,
-  FaCheck,
   FaSpinner,
   FaExclamationTriangle,
   FaSync,
@@ -26,9 +23,7 @@ interface TaxCalculation {
 
 export default function HistoryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
-
+  const [tableId, setTableId] = useState<string | null>(null);
   const { currentOrder, orderItems, currentTableId } = useOrder();
 
   const [orderHistory, setOrderHistory] = useState<OrderWithItems[]>([]);
@@ -37,13 +32,21 @@ export default function HistoryPage() {
   const [billLoading, setBillLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Leer query params del cliente
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setTableId(params.get("table"));
+    }
+  }, []);
+
   // Calcular impuestos y totales
   const calculateTaxes = (items: typeof orderItems): TaxCalculation => {
     const subtotal = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    const taxRate = 0.16; // 16% de impuesto - puedes ajustar esto
+    const taxRate = 0.16;
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
 
@@ -57,6 +60,8 @@ export default function HistoryPage() {
   const currentOrderCalculations = calculateTaxes(orderItems);
 
   useEffect(() => {
+    if (tableId === null) return; // Esperar a que tableId esté disponible
+
     const loadData = async () => {
       const targetTableId = tableId || currentTableId;
 
@@ -75,38 +80,38 @@ export default function HistoryPage() {
 
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
-    if (targetTableId) {
-      console.log("🔔 Menu: Iniciando suscripción para mesa:", targetTableId);
+    if (!targetTableId) return;
 
-      const subscription = supabase
-        .channel(`customer-menu-table-${targetTableId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "waiter_notifications",
-            filter: `table_id=eq.${targetTableId}`,
-          },
-          (payload) => {
-            console.log("📨 Menu: Notificación recibida:", payload.new.type);
+    console.log("🔔 History: Iniciando suscripción para mesa:", targetTableId);
 
-            if (payload.new.type === "table_freed") {
-              console.log("🚨 Menu: Mesa liberada - Redirigiendo...");
-              alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
-              window.location.href = "/customer";
-            }
+    const subscription = supabase
+      .channel(`customer-history-table-${targetTableId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "waiter_notifications",
+          filter: `table_id=eq.${targetTableId}`,
+        },
+        (payload) => {
+          console.log("📨 History: Notificación recibida:", payload.new.type);
+
+          if (payload.new.type === "table_freed") {
+            console.log("🚨 History: Mesa liberada - Redirigiendo...");
+            alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
+            window.location.href = "/customer";
           }
-        )
-        .subscribe((status) => {
-          console.log("Menu: Estado de suscripción:", status);
-        });
+        }
+      )
+      .subscribe((status) => {
+        console.log("History: Estado de suscripción:", status);
+      });
 
-      return () => {
-        console.log("🧹 Menu: Limpiando suscripción");
-        subscription.unsubscribe();
-      };
-    }
+    return () => {
+      console.log("🧹 History: Limpiando suscripción");
+      subscription.unsubscribe();
+    };
   }, [tableId, currentTableId]);
 
   const loadHistory = async (tableId: number) => {
@@ -166,6 +171,18 @@ export default function HistoryPage() {
     }
   };
 
+  // Mostrar loading mientras se obtiene tableId
+  if (tableId === null) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -206,7 +223,10 @@ export default function HistoryPage() {
 
           <div className="flex gap-2">
             <button
-              onClick={() => loadHistory(parseInt(targetTableId.toString()))}
+              onClick={() => {
+                if (!targetTableId) return;
+                loadHistory(parseInt(targetTableId.toString()));
+              }}
               disabled={loading}
               className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition flex items-center gap-2 disabled:opacity-50"
             >
@@ -308,7 +328,7 @@ export default function HistoryPage() {
               {/* Footer del Ticket */}
               <div className="bg-gray-50 p-4 text-center text-sm text-gray-500">
                 <p>¡Gracias por su preferencia!</p>
-                <p>Para solicitar la cuenta, presione el botón "Cuenta"</p>
+                <p>Para solicitar la cuenta, presione el botón Cuenta</p>
               </div>
             </div>
           </div>

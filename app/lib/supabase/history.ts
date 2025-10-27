@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
 
 export interface OrderWithItems {
@@ -27,6 +28,18 @@ export interface OrderItemWithProduct {
     image_url: string | null
     preparation_time: number | null
   } | null
+}
+
+// Interface para las respuestas de Supabase
+interface OrderFromSupabase {
+  id: string
+  table_id: number
+  customer_name: string | null
+  status: 'active' | 'completed' | 'cancelled' | 'paid'
+  total_amount: number
+  created_at: string
+  updated_at: string
+  order_items: OrderItemWithProduct[]
 }
 
 export const historyService = {
@@ -59,7 +72,10 @@ export const historyService = {
     const { data, error } = await query
     
     if (error) throw error
-    return data || []
+    
+    // Type assertion para los datos de Supabase
+    const ordersData = data as OrderFromSupabase[] | null
+    return ordersData || []
   },
 
   // Obtener orden específica con sus items
@@ -81,11 +97,14 @@ export const historyService = {
       .single()
     
     if (error) return null
-    return data
+    
+    // Type assertion para el dato de Supabase
+    const orderData = data as OrderFromSupabase | null
+    return orderData
   },
 
   // Solicitar asistencia del mesero
-  async requestAssistance(tableId: number, message: string = 'Solicito asistencia') {
+  async requestAssistance(tableId: number, message: string = 'Solicito asistencia'): Promise<void> {
     const { error } = await supabase
       .from('waiter_notifications')
       .insert({
@@ -93,13 +112,13 @@ export const historyService = {
         type: 'assistance',
         message,
         status: 'pending'
-      })
+      } as any)
     
     if (error) throw error
   },
 
   // Solicitar la cuenta
-  async requestBill(tableId: number, orderId?: string) {
+  async requestBill(tableId: number, orderId?: string): Promise<void> {
     const { error } = await supabase
       .from('waiter_notifications')
       .insert({
@@ -108,7 +127,7 @@ export const historyService = {
         type: 'bill_request',
         message: 'Solicita la cuenta',
         status: 'pending'
-      })
+      } as any)
     
     if (error) throw error
   }

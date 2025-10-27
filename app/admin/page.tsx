@@ -42,6 +42,39 @@ interface PopularProduct {
   total_revenue: number;
 }
 
+// Interfaces para las respuestas de Supabase
+interface OrderItem {
+  quantity: number;
+  price: number;
+}
+
+interface OrderWithItems {
+  id: string;
+  total_amount: number;
+  created_at: string;
+  order_items: OrderItem[];
+}
+
+interface OrderTable {
+  table_id: number;
+}
+
+interface OrderWithItemsCount {
+  id: string;
+  table_id: number;
+  total_amount: number;
+  created_at: string;
+  status: string;
+  order_items: Array<{ id: string }>;
+}
+
+interface OrderItemForStats {
+  product_name: string;
+  quantity: number;
+  price: number;
+  created_at: string;
+}
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
@@ -55,10 +88,16 @@ export default function AdminPage() {
   const [popularProducts, setPopularProducts] = useState<PopularProduct[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // Obtener fecha de hoy
+  // Obtener fecha de hoy - corregido para evitar mutación
   const today = new Date();
-  const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-  const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+  const startOfDay = new Date(today);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(today);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const startOfDayISO = startOfDay.toISOString();
+  const endOfDayISO = endOfDay.toISOString();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +109,6 @@ export default function AdminPage() {
       password === ADMIN_CREDENTIALS.password
     ) {
       setIsAuthenticated(true);
-      loadDailyData();
     } else {
       setError("Credenciales incorrectas");
     }
@@ -94,120 +132,137 @@ export default function AdminPage() {
   };
 
   const loadDailyStats = async () => {
-    // Estadísticas generales del día
-    const { data: orders, error: ordersError } = await supabase
-      .from("orders")
-      .select(
-        "id, total_amount, created_at, order_items!inner(quantity, price)"
-      )
-      .gte("created_at", startOfDay)
-      .lte("created_at", endOfDay);
+    try {
+      // Estadísticas generales del día
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, total_amount, created_at, order_items(quantity, price)")
+        .gte("created_at", startOfDayISO)
+        .lte("created_at", endOfDayISO);
 
-    if (ordersError) throw ordersError;
+      if (ordersError) throw ordersError;
 
-    const totalOrders = orders?.length || 0;
-    const totalRevenue =
-      orders?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
-    const totalItemsSold =
-      orders?.reduce(
-        (sum, order) =>
-          sum +
-          (order.order_items?.reduce(
-            (itemSum: number, item: any) => itemSum + item.quantity,
-            0
-          ) || 0),
-        0
-      ) || 0;
+      const ordersData = orders as OrderWithItems[] | null;
+      const totalOrders = ordersData?.length || 0;
+      const totalRevenue =
+        ordersData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
 
-    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const totalItemsSold =
+        ordersData?.reduce(
+          (sum, order) =>
+            sum +
+            (order.order_items?.reduce(
+              (itemSum, item) => itemSum + item.quantity,
+              0
+            ) || 0),
+          0
+        ) || 0;
 
-    // Mesas activas hoy
-    const { data: activeTables, error: tablesError } = await supabase
-      .from("orders")
-      .select("table_id")
-      .gte("created_at", startOfDay)
-      .lte("created_at", endOfDay)
-      .not("status", "eq", "completed");
+      const averageOrderValue =
+        totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-    const uniqueTables = new Set(
-      activeTables?.map((order) => order.table_id) || []
-    );
+      // Mesas activas hoy
+      const { data: activeTables, error: tablesError } = await supabase
+        .from("orders")
+        .select("table_id")
+        .gte("created_at", startOfDayISO)
+        .lte("created_at", endOfDayISO)
+        .neq("status", "completed");
 
-    setDailyStats({
-      totalOrders,
-      totalRevenue,
-      totalItemsSold,
-      activeTables: uniqueTables.size,
-      averageOrderValue,
-    });
+      if (tablesError) throw tablesError;
+
+      const activeTablesData = activeTables as OrderTable[] | null;
+      const uniqueTables = new Set(
+        activeTablesData?.map((order) => order.table_id) || []
+      );
+
+      setDailyStats({
+        totalOrders,
+        totalRevenue,
+        totalItemsSold,
+        activeTables: uniqueTables.size,
+        averageOrderValue,
+      });
+    } catch (error) {
+      console.error("Error in loadDailyStats:", error);
+      throw error;
+    }
   };
 
   const loadTodayOrders = async () => {
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select(
-        `
-        id,
-        table_id,
-        total_amount,
-        created_at,
-        status,
-        order_items (id)
-      `
-      )
-      .gte("created_at", startOfDay)
-      .lte("created_at", endOfDay)
-      .order("created_at", { ascending: false });
+    try {
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select(
+          "id, table_id, total_amount, created_at, status, order_items(id)"
+        )
+        .gte("created_at", startOfDayISO)
+        .lte("created_at", endOfDayISO)
+        .order("created_at", { ascending: false });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const ordersWithCount =
-      orders?.map((order) => ({
-        id: order.id,
-        table_id: order.table_id,
-        total_amount: order.total_amount,
-        created_at: order.created_at,
-        status: order.status,
-        items_count: Array.isArray(order.order_items)
-          ? order.order_items.length
-          : 0,
-      })) || [];
+      const ordersData = orders as OrderWithItemsCount[] | null;
 
-    setTodayOrders(ordersWithCount);
+      const ordersWithCount: OrderSummary[] = (ordersData || []).map(
+        (order) => ({
+          id: order.id,
+          table_id: order.table_id,
+          total_amount: order.total_amount,
+          created_at: order.created_at,
+          status: order.status,
+          items_count: order.order_items?.length || 0,
+        })
+      );
+
+      setTodayOrders(ordersWithCount);
+    } catch (error) {
+      console.error("Error in loadTodayOrders:", error);
+      throw error;
+    }
   };
 
   const loadPopularProducts = async () => {
-    const { data: orderItems, error } = await supabase
-      .from("order_items")
-      .select("product_name, quantity, price")
-      .gte("created_at", startOfDay)
-      .lte("created_at", endOfDay);
+    try {
+      const { data: orderItems, error } = await supabase
+        .from("order_items")
+        .select("product_name, quantity, price, created_at")
+        .gte("created_at", startOfDayISO)
+        .lte("created_at", endOfDayISO);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const productMap = new Map();
+      const orderItemsData = orderItems as OrderItemForStats[] | null;
+      const productMap = new Map<
+        string,
+        { total_quantity: number; total_revenue: number }
+      >();
 
-    orderItems?.forEach((item) => {
-      const existing = productMap.get(item.product_name) || {
-        total_quantity: 0,
-        total_revenue: 0,
-      };
-      productMap.set(item.product_name, {
-        total_quantity: existing.total_quantity + item.quantity,
-        total_revenue: existing.total_revenue + item.price * item.quantity,
+      orderItemsData?.forEach((item) => {
+        const existing = productMap.get(item.product_name) || {
+          total_quantity: 0,
+          total_revenue: 0,
+        };
+        productMap.set(item.product_name, {
+          total_quantity: existing.total_quantity + item.quantity,
+          total_revenue: existing.total_revenue + item.price * item.quantity,
+        });
       });
-    });
 
-    const popular = Array.from(productMap.entries())
-      .map(([product_name, stats]) => ({
-        product_name,
-        total_quantity: stats.total_quantity,
-        total_revenue: stats.total_revenue,
-      }))
-      .sort((a, b) => b.total_quantity - a.total_quantity)
-      .slice(0, 10); // Top 10 productos
+      const popular: PopularProduct[] = Array.from(productMap.entries())
+        .map(([product_name, stats]) => ({
+          product_name,
+          total_quantity: stats.total_quantity,
+          total_revenue: stats.total_revenue,
+        }))
+        .sort((a, b) => b.total_quantity - a.total_quantity)
+        .slice(0, 10);
 
-    setPopularProducts(popular);
+      setPopularProducts(popular);
+    } catch (error) {
+      console.error("Error in loadPopularProducts:", error);
+      throw error;
+    }
   };
 
   const handleLogout = () => {
@@ -219,19 +274,26 @@ export default function AdminPage() {
     setPopularProducts([]);
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
       currency: "MXN",
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleTimeString("es-MX", {
       hour: "2-digit",
       minute: "2-digit",
     });
   };
+
+  // Cargar datos cuando se autentique
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDailyData();
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -301,7 +363,6 @@ export default function AdminPage() {
             </button>
           </form>
 
-          {/* Información de demo (puedes remover esto en producción) */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 text-center">
               <strong>Demo:</strong> usuario: <code>admin</code> / contraseña:{" "}
@@ -315,7 +376,6 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
@@ -356,7 +416,6 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
-            {/* Estadísticas Principales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 <div className="flex items-center gap-4">
@@ -416,7 +475,6 @@ export default function AdminPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Órdenes de Hoy */}
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <FaUtensils />
@@ -462,7 +520,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Productos Populares */}
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <FaChartBar />

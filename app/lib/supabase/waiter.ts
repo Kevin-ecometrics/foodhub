@@ -39,8 +39,11 @@ export interface TableWithOrder {
   }[]
 }
 
+// Helper function para type assertions
+const assertUpdate = <T>(data: T): never => data as never
+const assertInsert = <T>(data: T): never => data as never
+
 export const waiterService = {
-  // Obtener todas las notificaciones pendientes
   async getPendingNotifications(): Promise<WaiterNotification[]> {
     const { data, error } = await supabase
       .from('waiter_notifications')
@@ -53,10 +56,9 @@ export const waiterService = {
       .order('created_at', { ascending: false })
     
     if (error) throw error
-    return data || []
+    return (data as WaiterNotification[]) || []
   },
 
-  // Obtener todas las mesas con sus órdenes activas
   async getTablesWithOrders(): Promise<TableWithOrder[]> {
     const { data, error } = await supabase
       .from('tables')
@@ -80,94 +82,107 @@ export const waiterService = {
     
     if (error) throw error
     
-    // Filtrar solo órdenes activas
-    const tablesWithActiveOrders = data?.map(table => ({
+    const tablesData = data as TableWithOrder[] | null
+    
+    const tablesWithActiveOrders = (tablesData || []).map(table => ({
       ...table,
-      orders: table.orders
-        ?.filter(order => order.status === 'active')
+      orders: (table.orders || [])
+        .filter(order => order.status === 'active')
         .map(order => ({
           ...order,
           order_items: order.order_items || []
-        })) || []
-    })) || []
+        }))
+    }))
     
     return tablesWithActiveOrders
   },
 
-  // Marcar notificación como atendida
-  async acknowledgeNotification(notificationId: string) {
+  async acknowledgeNotification(notificationId: string): Promise<void> {
     const { error } = await supabase
       .from('waiter_notifications')
-      .update({ 
-        status: 'acknowledged'
-      })
+      .update(assertUpdate({ 
+        status: 'acknowledged',
+        updated_at: new Date().toISOString()
+      }))
       .eq('id', notificationId)
     
     if (error) throw error
   },
 
-  // Marcar notificación como completada
-  async completeNotification(notificationId: string) {
+  async completeNotification(notificationId: string): Promise<void> {
     const { error } = await supabase
       .from('waiter_notifications')
-      .update({ 
-        status: 'completed'
-      })
+      .update(assertUpdate({ 
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      }))
       .eq('id', notificationId)
     
     if (error) throw error
   },
 
-  // Actualizar estado de un item
-  async updateItemStatus(itemId: string, status: 'ordered' | 'preparing' | 'ready' | 'served') {
+  async updateItemStatus(itemId: string, status: 'ordered' | 'preparing' | 'ready' | 'served'): Promise<void> {
     const { error } = await supabase
       .from('order_items')
-      .update({ 
+      .update(assertUpdate({ 
         status,
         updated_at: new Date().toISOString()
-      })
+      }))
       .eq('id', itemId)
     
     if (error) throw error
   },
 
-  // Marcar orden como completada
-  async completeOrder(orderId: string) {
+  async completeOrder(orderId: string): Promise<void> {
     const { error } = await supabase
       .from('orders')
-      .update({ 
+      .update(assertUpdate({ 
         status: 'completed',
         updated_at: new Date().toISOString()
-      })
+      }))
       .eq('id', orderId)
     
     if (error) throw error
   },
-  
 
-  // Liberar mesa (volver a disponible)
-  async freeTable(tableId: number) {
+  async freeTable(tableId: number): Promise<void> {
     const { error } = await supabase
       .from('tables')
-      .update({ 
+      .update(assertUpdate({ 
         status: 'available',
         updated_at: new Date().toISOString()
-      })
+      }))
       .eq('id', tableId)
     
     if (error) throw error
   },
 
-  // Notificar que la mesa fue liberada (para redirigir clientes)
-  async notifyTableFreed(tableId: number) {
+  async notifyTableFreed(tableId: number): Promise<void> {
     const { error } = await supabase
       .from('waiter_notifications')
-      .insert({
+      .insert(assertInsert({
         table_id: tableId,
         type: 'table_freed',
         message: 'Mesa liberada - Redirigiendo clientes',
         status: 'pending'
-      })
+      }))
+    
+    if (error) throw error
+  },
+
+  async cleanAllNotifications(): Promise<void> {
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const { error } = await supabase
+      .from('waiter_notifications')
+      .update(assertUpdate({ 
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      }))
+      .gte('created_at', startOfDay.toISOString())
+      .eq('status', 'pending')
     
     if (error) throw error
   }

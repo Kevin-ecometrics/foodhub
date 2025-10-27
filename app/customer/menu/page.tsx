@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { ordersService } from "@/app/lib/supabase/orders";
@@ -9,7 +9,6 @@ import {
   FaShoppingCart,
   FaUtensils,
   FaHistory,
-  FaCreditCard,
   FaStar,
   FaPlus,
   FaMinus,
@@ -46,8 +45,7 @@ const CATEGORIES = [
 
 export default function MenuPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
+  const [tableId, setTableId] = useState<string | null>(null);
 
   const {
     currentOrder,
@@ -69,7 +67,17 @@ export default function MenuPage() {
   const [addingProduct, setAddingProduct] = useState<number | null>(null);
   const [showCart, setShowCart] = useState(false);
 
+  // Leer query params del cliente
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setTableId(params.get("table"));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tableId === null) return; // Esperar a que tableId esté disponible
+
     if (tableId) {
       loadInitialData(parseInt(tableId));
     } else if (currentTableId) {
@@ -101,39 +109,39 @@ export default function MenuPage() {
 
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
-    if (targetTableId) {
-      console.log("🔔 Menu: Iniciando suscripción para mesa:", targetTableId);
+    if (!targetTableId) return;
 
-      // Suscripción para detectar liberación de mesa
-      const subscription = supabase
-        .channel(`customer-menu-table-${targetTableId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "waiter_notifications",
-            filter: `table_id=eq.${targetTableId}`,
-          },
-          (payload) => {
-            console.log("📨 Menu: Notificación recibida:", payload.new.type);
+    console.log("🔔 Menu: Iniciando suscripción para mesa:", targetTableId);
 
-            if (payload.new.type === "table_freed") {
-              console.log("🚨 Menu: Mesa liberada - Redirigiendo...");
-              alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
-              window.location.href = "/customer";
-            }
+    // Suscripción para detectar liberación de mesa
+    const subscription = supabase
+      .channel(`customer-menu-table-${targetTableId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "waiter_notifications",
+          filter: `table_id=eq.${targetTableId}`,
+        },
+        (payload) => {
+          console.log("📨 Menu: Notificación recibida:", payload.new.type);
+
+          if (payload.new.type === "table_freed") {
+            console.log("🚨 Menu: Mesa liberada - Redirigiendo...");
+            alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
+            window.location.href = "/customer";
           }
-        )
-        .subscribe((status) => {
-          console.log("Menu: Estado de suscripción:", status);
-        });
+        }
+      )
+      .subscribe((status) => {
+        console.log("Menu: Estado de suscripción:", status);
+      });
 
-      return () => {
-        console.log("🧹 Menu: Limpiando suscripción");
-        subscription.unsubscribe();
-      };
-    }
+    return () => {
+      console.log("🧹 Menu: Limpiando suscripción");
+      subscription.unsubscribe();
+    };
   }, [tableId, currentTableId]);
 
   const loadInitialData = async (tableId: number) => {
@@ -142,7 +150,6 @@ export default function MenuPage() {
       await refreshOrder(tableId);
       const productsData = await productsService.getProducts();
       setProducts(productsData);
-      // Los recentItems se actualizarán automáticamente por el useEffect
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -154,7 +161,6 @@ export default function MenuPage() {
     setAddingProduct(product.id);
     try {
       await addToCart(product);
-      // No necesitamos actualizar recentItems manualmente porque el useEffect lo hará
     } catch (error) {
       console.error("Error adding to cart:", error);
     } finally {
@@ -218,6 +224,18 @@ export default function MenuPage() {
     return item ? item.quantity : 0;
   };
 
+  // Mostrar loading mientras se obtiene tableId
+  if (tableId === null) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Cargando menú...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -229,6 +247,8 @@ export default function MenuPage() {
     );
   }
 
+  const targetTableId = tableId || currentTableId;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-24">
       <header className="bg-white shadow-sm sticky top-0 z-30">
@@ -238,7 +258,7 @@ export default function MenuPage() {
               FoodHub Restaurant
             </h1>
             <p className="text-sm text-gray-500">
-              Mesa {tableId} • {currentOrder?.customer_name || "Invitado"}
+              Mesa {targetTableId} • {currentOrder?.customer_name || "Invitado"}
             </p>
           </div>
 
@@ -535,7 +555,9 @@ export default function MenuPage() {
             <span className="text-xs font-medium">Menu</span>
           </button>
           <button
-            onClick={() => router.push(`/customer/history?table=${tableId}`)}
+            onClick={() =>
+              router.push(`/customer/history?table=${targetTableId}`)
+            }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaHistory className="text-2xl mb-1" />
