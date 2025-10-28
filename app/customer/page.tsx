@@ -1,39 +1,47 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
-import { FaChair, FaSpinner, FaCheck } from "react-icons/fa";
+import { FaChair, FaSpinner, FaCheck, FaQrcode } from "react-icons/fa";
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isFromQR, setIsFromQR] = useState(false);
 
   // Cargar mesas al iniciar
   useEffect(() => {
     loadTables();
   }, []);
 
+  // Verificar parámetros de URL para mesa desde QR
   useEffect(() => {
-    // Verificar si viene de una redirección por mesa liberada
-    const searchParams = new URLSearchParams(window.location.search);
-    const redirected = searchParams.get("redirected");
+    const tableFromQR = searchParams.get("table");
 
-    if (redirected) {
-      // Limpiar la URL
-      window.history.replaceState({}, "", "/customer");
+    if (tableFromQR) {
+      const tableNumber = parseInt(tableFromQR);
+      if (!isNaN(tableNumber)) {
+        setIsFromQR(true);
+        setSelectedTable(tableNumber);
 
-      // Opcional: Mostrar mensaje de despedida
-      setTimeout(() => {
-        alert("👋 ¡Gracias por su visita! Esperamos verlo pronto.");
-      }, 500);
+        // También verificar si viene de redirección por mesa liberada
+        const redirected = searchParams.get("redirected");
+        if (redirected) {
+          window.history.replaceState({}, "", "/customer");
+          setTimeout(() => {
+            alert("👋 ¡Gracias por su visita! Esperamos verlo pronto.");
+          }, 500);
+        }
+      }
     }
-  }, []);
+  }, [searchParams]);
 
   const loadTables = async () => {
     try {
@@ -74,7 +82,9 @@ export default function HomePage() {
       await notificationsService.createNotification(
         table.id,
         "new_order",
-        `Nuevo cliente en Mesa ${table.number}`,
+        `Nuevo cliente en Mesa ${table.number}${
+          customerName ? ` - ${customerName}` : ""
+        }`,
         order.id
       );
 
@@ -118,18 +128,65 @@ export default function HomePage() {
     }
   };
 
+  // Encontrar la mesa seleccionada para mostrar su estado
+  const selectedTableData = tables.find((t) => t.number === selectedTable);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-4xl w-full">
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaChair className="text-3xl text-blue-600" />
+            {isFromQR ? (
+              <FaQrcode className="text-3xl text-blue-600" />
+            ) : (
+              <FaChair className="text-3xl text-blue-600" />
+            )}
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Bienvenido a FoodHub
           </h1>
-          <p className="text-gray-600">Selecciona tu mesa para comenzar</p>
+          <p className="text-gray-600">
+            {isFromQR
+              ? "Mesa preseleccionada desde QR"
+              : "Selecciona tu mesa para comenzar"}
+          </p>
         </div>
+
+        {/* Mostrar información de mesa QR */}
+        {isFromQR && selectedTable && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-blue-800">
+                  Mesa {selectedTable} seleccionada
+                </h3>
+                <p className="text-sm text-blue-600">
+                  Escaneaste el código QR de la mesa {selectedTable}
+                </p>
+                {selectedTableData && (
+                  <p
+                    className={`text-sm font-medium mt-1 ${
+                      selectedTableData.status === "available"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    Estado: {getTableStatusText(selectedTableData.status)}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setIsFromQR(false);
+                  setSelectedTable(null);
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Cambiar mesa
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Mostrar error */}
         {error && (
@@ -138,61 +195,63 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Selección de mesa */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Número de Mesa
-          </label>
-          <div className="grid grid-cols-5 gap-3">
-            {tables.map((table) => (
-              <button
-                key={table.id}
-                onClick={() => setSelectedTable(table.number)}
-                disabled={table.status !== "available"}
-                className={`
-                  relative w-12 h-12 rounded-xl border-2 font-semibold transition-all
-                  ${
-                    selectedTable === table.number
-                      ? "border-blue-600 bg-blue-600 text-white scale-110"
-                      : table.status === "available"
-                      ? "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
-                      : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-                  }
-                `}
-              >
-                {table.number}
+        {/* Selección de mesa (solo mostrar si no viene de QR o si el usuario quiere cambiar) */}
+        {!isFromQR && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Número de Mesa
+            </label>
+            <div className="grid grid-cols-5 gap-3">
+              {tables.map((table) => (
+                <button
+                  key={table.id}
+                  onClick={() => setSelectedTable(table.number)}
+                  disabled={table.status !== "available"}
+                  className={`
+                    relative w-12 h-12 rounded-xl border-2 font-semibold transition-all
+                    ${
+                      selectedTable === table.number
+                        ? "border-blue-600 bg-blue-600 text-white scale-110"
+                        : table.status === "available"
+                        ? "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
+                        : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }
+                  `}
+                >
+                  {table.number}
 
-                {/* Indicador de estado */}
-                <div
-                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getTableStatusColor(
-                    table.status
-                  )}`}
-                  title={getTableStatusText(table.status)}
-                />
-              </button>
-            ))}
-          </div>
+                  {/* Indicador de estado */}
+                  <div
+                    className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getTableStatusColor(
+                      table.status
+                    )}`}
+                    title={getTableStatusText(table.status)}
+                  />
+                </button>
+              ))}
+            </div>
 
-          {/* Leyenda de estados */}
-          <div className="flex justify-center gap-4 mt-4 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span>Disponible</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span>Ocupada</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span>Reservada</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span>Limpieza</span>
+            {/* Leyenda de estados */}
+            <div className="flex justify-center gap-4 mt-4 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span>Disponible</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span>Ocupada</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <span>Reservada</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span>Limpieza</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Nombre opcional del cliente */}
         <div className="mb-6">
@@ -211,11 +270,17 @@ export default function HomePage() {
         {/* Botón de continuar */}
         <button
           onClick={handleTableSelect}
-          disabled={!selectedTable || loading}
+          disabled={
+            !selectedTable ||
+            loading ||
+            (selectedTableData && selectedTableData.status !== "available")
+          }
           className={`
             w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2
             ${
-              selectedTable && !loading
+              selectedTable &&
+              !loading &&
+              selectedTableData?.status === "available"
                 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }
@@ -227,10 +292,16 @@ export default function HomePage() {
               Creando orden...
             </>
           ) : selectedTable ? (
-            <>
-              <FaCheck />
-              Continuar a Menú - Mesa {selectedTable}
-            </>
+            selectedTableData?.status === "available" ? (
+              <>
+                <FaCheck />
+                {isFromQR
+                  ? `Continuar a Menú - Mesa ${selectedTable}`
+                  : `Continuar a Menú - Mesa ${selectedTable}`}
+              </>
+            ) : (
+              `Mesa ${selectedTable} no disponible`
+            )
           ) : (
             "Selecciona una mesa"
           )}
@@ -239,7 +310,9 @@ export default function HomePage() {
         {/* Información adicional */}
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
           <p className="text-sm text-blue-700 text-center">
-            💡 Si no encuentras tu mesa o tienes problemas, pregunta al mesero
+            {isFromQR
+              ? "💡 Mesa seleccionada desde QR. Solo ingresa tu nombre y continua al menú."
+              : "💡 Escanea el código QR en tu mesa o selecciona manualmente"}
           </p>
         </div>
       </div>
