@@ -213,22 +213,23 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-24">
       <header className="bg-white shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+          {/* Título y mesa */}
+          <div className="text-center md:text-left mb-4 md:mb-0">
             <h1 className="text-2xl font-bold text-gray-800">
               Historial de Pedidos
             </h1>
             <p className="text-sm text-gray-500">Mesa {targetTableId}</p>
           </div>
 
-          <div className="flex gap-2">
+          {/* Botones */}
+          <div className="flex flex-col sm:flex-row items-center w-full md:w-auto gap-2">
             <button
-              onClick={() => {
-                if (!targetTableId) return;
-                loadHistory(parseInt(targetTableId.toString()));
-              }}
+              onClick={() =>
+                targetTableId && loadHistory(parseInt(targetTableId.toString()))
+              }
               disabled={loading}
-              className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition flex items-center gap-2 disabled:opacity-50"
+              className="flex-1 md:flex-none bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <FaSync className={loading ? "animate-spin" : ""} />
               {loading ? "Actualizando..." : "Actualizar"}
@@ -237,7 +238,7 @@ export default function HistoryPage() {
             <button
               onClick={handleAssistanceRequest}
               disabled={assistanceLoading}
-              className="bg-yellow-500 text-white px-4 py-2 rounded-full hover:bg-yellow-600 transition flex items-center gap-2 disabled:opacity-50"
+              className="flex-1 md:flex-none bg-yellow-500 text-white px-4 py-2 rounded-full hover:bg-yellow-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <FaBell />
               {assistanceLoading ? "Enviando..." : "Ayuda"}
@@ -246,7 +247,7 @@ export default function HistoryPage() {
             <button
               onClick={handleBillRequest}
               disabled={billLoading}
-              className="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition flex items-center gap-2 disabled:opacity-50"
+              className="flex-1 md:flex-none bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <FaReceipt />
               {billLoading ? "Solicitando..." : "Cuenta"}
