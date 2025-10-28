@@ -333,58 +333,6 @@ export default function HistoryPage() {
             </div>
           </div>
         )}
-
-        {/* Historial de Órdenes Anteriores */}
-        {orderHistory.filter((order) => order.id !== currentOrder?.id).length >
-          0 && (
-          <div className="mt-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FaHistory />
-              Órdenes Anteriores
-            </h2>
-            <div className="space-y-4">
-              {orderHistory
-                .filter((order) => order.id !== currentOrder?.id)
-                .map((order) => {
-                  const orderCalculations = calculateTaxes(order.order_items);
-                  return (
-                    <div
-                      key={order.id}
-                      className="bg-white rounded-2xl shadow-sm p-6"
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-bold text-lg">
-                            Orden #{order.id.slice(-8)}
-                          </h3>
-                          <p className="text-gray-600 text-sm">
-                            {new Date(order.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-bold text-gray-800">
-                            ${orderCalculations.total.toFixed(2)}
-                          </p>
-                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                            Completada
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="text-sm text-gray-600 mb-3">
-                        <div className="flex justify-between">
-                          <span>Items: {order.order_items.length}</span>
-                          <span>
-                            Total: ${orderCalculations.total.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        )}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
