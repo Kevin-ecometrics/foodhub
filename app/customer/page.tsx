@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
@@ -8,7 +8,6 @@ import { FaChair, FaSpinner, FaCheck, FaQrcode } from "react-icons/fa";
 
 export default function HomePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const [customerName, setCustomerName] = useState("");
@@ -16,14 +15,17 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [isFromQR, setIsFromQR] = useState(false);
 
-  // Cargar mesas al iniciar
+  // Cargar mesas al iniciar y verificar parámetros de URL
   useEffect(() => {
     loadTables();
+    checkURLParams();
   }, []);
 
-  // Verificar parámetros de URL para mesa desde QR
-  useEffect(() => {
-    const tableFromQR = searchParams.get("table");
+  const checkURLParams = () => {
+    // Leer parámetros de la URL directamente desde window.location
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableFromQR = urlParams.get("table");
+    const redirected = urlParams.get("redirected");
 
     if (tableFromQR) {
       const tableNumber = parseInt(tableFromQR);
@@ -31,17 +33,23 @@ export default function HomePage() {
         setIsFromQR(true);
         setSelectedTable(tableNumber);
 
-        // También verificar si viene de redirección por mesa liberada
-        const redirected = searchParams.get("redirected");
-        if (redirected) {
-          window.history.replaceState({}, "", "/customer");
-          setTimeout(() => {
-            alert("👋 ¡Gracias por su visita! Esperamos verlo pronto.");
-          }, 500);
-        }
+        // Limpiar la URL sin recargar la página
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
       }
     }
-  }, [searchParams]);
+
+    if (redirected) {
+      // Limpiar la URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+
+      // Opcional: Mostrar mensaje de despedida
+      setTimeout(() => {
+        alert("👋 ¡Gracias por su visita! Esperamos verlo pronto.");
+      }, 500);
+    }
+  };
 
   const loadTables = async () => {
     try {
