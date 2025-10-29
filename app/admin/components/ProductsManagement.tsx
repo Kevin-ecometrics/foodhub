@@ -318,12 +318,12 @@ export default function ProductsManagement({
                         >
                           <FaCog />
                         </button>
-                        <button
+                        {/* <button
                           onClick={() => handleDeleteProduct(product.id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <FaTrash />
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>
