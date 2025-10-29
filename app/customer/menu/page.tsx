@@ -15,7 +15,7 @@ import {
   FaTrash,
   FaSpinner,
   FaCheck,
-  FaReceipt,
+  FaQrcode,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -562,6 +562,13 @@ export default function MenuPage() {
           >
             <FaHistory className="text-2xl mb-1" />
             <span className="text-xs font-medium">Historial</span>
+          </button>
+          <button
+            onClick={() => router.push(`/customer/qr?table=${targetTableId}`)}
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
+          >
+            <FaQrcode className="text-2xl mb-1" />
+            <span className="text-xs font-medium">Mi QR</span>
           </button>
         </div>
       </nav>
