@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
@@ -25,13 +25,17 @@ interface TaxCalculation {
 export default function HistoryPage() {
   const router = useRouter();
   const [tableId, setTableId] = useState<string | null>(null);
-  const { currentOrder, orderItems, currentTableId } = useOrder();
+  const { currentOrder, orderItems, currentTableId, refreshOrder } = useOrder();
 
   const [orderHistory, setOrderHistory] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
   const [billLoading, setBillLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Refs para prevenir loops infinitos
+  const isSubscribedRef = useRef(false);
+  const lastUpdateRef = useRef<number>(0);
 
   // Leer query params del cliente
   useEffect(() => {
@@ -60,32 +64,87 @@ export default function HistoryPage() {
 
   const currentOrderCalculations = calculateTaxes(orderItems);
 
+  const loadHistory = async (tableId: number) => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const history = await historyService.getCustomerOrderHistory(
+        tableId,
+        currentOrder?.id
+      );
+
+      setOrderHistory(history);
+    } catch (error) {
+      console.error("Error loading history:", error);
+      setError("Error cargando el historial");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadData = async () => {
+    const targetTableId = tableId || currentTableId;
+
+    if (targetTableId) {
+      await loadHistory(parseInt(targetTableId.toString()));
+      // También refrescar la orden actual para obtener los últimos items
+      if (currentTableId) {
+        await refreshOrder(currentTableId);
+      }
+    } else {
+      setError("No se encontró el número de mesa");
+      setTimeout(() => {
+        router.push("/customer");
+      }, 3000);
+    }
+  };
+
   useEffect(() => {
     if (tableId === null) return; // Esperar a que tableId esté disponible
-
-    const loadData = async () => {
-      const targetTableId = tableId || currentTableId;
-
-      if (targetTableId) {
-        await loadHistory(parseInt(targetTableId.toString()));
-      } else {
-        setError("No se encontró el número de mesa");
-        setTimeout(() => {
-          router.push("/customer");
-        }, 3000);
-      }
-    };
-
     loadData();
   }, [tableId, currentTableId, router]);
 
+  // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA - SIN LOOPS
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!targetTableId || isSubscribedRef.current) return;
 
-    console.log("🔔 History: Iniciando suscripción para mesa:", targetTableId);
+    console.log("🔔 History: Iniciando suscripción para cambios en órdenes");
+    isSubscribedRef.current = true;
 
-    const subscription = supabase
+    // Función debounced para prevenir actualizaciones rápidas
+    const debouncedUpdate = () => {
+      const now = Date.now();
+      if (now - lastUpdateRef.current > 2000) {
+        // Solo actualizar cada 2 segundos
+        lastUpdateRef.current = now;
+        loadData();
+      }
+    };
+
+    // Suscripción para cambios en órdenes - SOLO INSERT
+    const orderSubscription = supabase
+      .channel(`history-orders-${targetTableId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT", // SOLO INSERT para evitar loops
+          schema: "public",
+          table: "orders",
+          filter: `table_id=eq.${targetTableId}`,
+        },
+        async (payload) => {
+          console.log("📦 History: Nueva orden detectada");
+          debouncedUpdate();
+        }
+      )
+      .subscribe((status) => {
+        console.log("History: Estado de suscripción a órdenes:", status);
+      });
+
+    // Suscripción para notificaciones del mesero (mesa liberada)
+    const notificationSubscription = supabase
       .channel(`customer-history-table-${targetTableId}`)
       .on(
         "postgres_changes",
@@ -106,33 +165,16 @@ export default function HistoryPage() {
         }
       )
       .subscribe((status) => {
-        console.log("History: Estado de suscripción:", status);
+        console.log("History: Estado de suscripción a notificaciones:", status);
       });
 
     return () => {
-      console.log("🧹 History: Limpiando suscripción");
-      subscription.unsubscribe();
+      console.log("🧹 History: Limpiando suscripciones");
+      orderSubscription.unsubscribe();
+      notificationSubscription.unsubscribe();
+      isSubscribedRef.current = false;
     };
-  }, [tableId, currentTableId]);
-
-  const loadHistory = async (tableId: number) => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const history = await historyService.getCustomerOrderHistory(
-        tableId,
-        currentOrder?.id
-      );
-
-      setOrderHistory(history);
-    } catch (error) {
-      console.error("Error loading history:", error);
-      setError("Error cargando el historial");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [tableId, currentTableId]); // Removí refreshOrder de las dependencias
 
   const handleAssistanceRequest = async () => {
     const targetTableId = tableId || currentTableId;
@@ -169,6 +211,16 @@ export default function HistoryPage() {
       alert("❌ Error al solicitar la cuenta");
     } finally {
       setBillLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    await loadHistory(parseInt(targetTableId.toString()));
+    if (currentTableId) {
+      await refreshOrder(currentTableId);
     }
   };
 
@@ -226,9 +278,7 @@ export default function HistoryPage() {
           {/* Botones */}
           <div className="flex flex-col sm:flex-row items-center w-full md:w-auto gap-2">
             <button
-              onClick={() =>
-                targetTableId && loadHistory(parseInt(targetTableId.toString()))
-              }
+              onClick={handleRefresh}
               disabled={loading}
               className="flex-1 md:flex-none bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
@@ -293,6 +343,11 @@ export default function HistoryPage() {
                             <span className="font-semibold text-gray-800">
                               {item.product_name}
                             </span>
+                            {item.notes && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                Nota: {item.notes}
+                              </p>
+                            )}
                           </div>
                           <div className="text-right">
                             <div className="font-medium text-gray-800">
@@ -333,6 +388,18 @@ export default function HistoryPage() {
                 <p>Para solicitar la cuenta, presione el botón Cuenta</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {!currentOrder && orderHistory.length === 0 && (
+          <div className="text-center py-12">
+            <FaHistory className="text-6xl text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              No hay órdenes
+            </h3>
+            <p className="text-gray-500">
+              Aún no has realizado ningún pedido en esta mesa
+            </p>
           </div>
         )}
       </main>
