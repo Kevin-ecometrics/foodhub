@@ -5,15 +5,18 @@ export interface Table {
   number: number
   status: 'available' | 'occupied' | 'reserved' | 'cleaning'
   capacity: number
+  branch: string
   location: string | null
 }
 
 export const tablesService = {
   // Obtener todas las mesas
-  async getTables(): Promise<Table[]> {
+  async getTablesByBranch(branch: string): Promise<Table[]> {
     const { data, error } = await supabase
       .from('tables')
       .select('*')
+            .eq('branch', branch)
+
       .order('number')
     
     if (error) throw error

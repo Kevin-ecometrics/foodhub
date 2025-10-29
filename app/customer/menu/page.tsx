@@ -18,6 +18,7 @@ import {
   FaQrcode,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
+import { tablesService } from "@/app/lib/supabase/tables";
 
 const CATEGORIES = [
   {

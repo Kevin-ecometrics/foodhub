@@ -17,11 +17,35 @@ import {
   FaCheckCircle,
   FaReceipt,
   FaSync,
+  FaStore,
 } from "react-icons/fa";
+
+// Lista de sucursales disponibles
+const BRANCHES = [
+  "Hermosillo - Plaza Dila",
+  "Hermosillo - Plaza Valles",
+  "Hermosillo – Gallerías Mall",
+  "Hermosillo – Plaza Patio",
+  "Hermosillo - Plaza Progreso",
+  "Ciudad Obregón - Miguel Alemán",
+  "Ciudad Obregón - Plaza Bellavista",
+  "San Luis Río Colorado",
+  "Guaymas",
+  "Guasave",
+  "Los Mochis",
+  "Mexicali - Plaza San Pedro",
+  "Mexicali - Plaza Nuevo Mexicali",
+  "Tijuana - Plaza Paseo 2000",
+  "Tijuana - Plaza Río",
+  "Cabo San Lucas",
+  "La Paz",
+];
 
 export default function WaiterDashboard() {
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
+  const [filteredTables, setFilteredTables] = useState<TableWithOrder[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"notifications" | "tables">(
     "notifications"
   );
@@ -37,6 +61,18 @@ export default function WaiterDashboard() {
     };
   }, []);
 
+  // Filtrar mesas cuando cambia la sucursal seleccionada
+  useEffect(() => {
+    if (selectedBranch) {
+      const filtered = tables.filter(
+        (table) => table.branch === selectedBranch
+      );
+      setFilteredTables(filtered);
+    } else {
+      setFilteredTables(tables);
+    }
+  }, [selectedBranch, tables]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -46,6 +82,11 @@ export default function WaiterDashboard() {
       ]);
       setNotifications(notifsData);
       setTables(tablesData);
+
+      // Si no hay sucursal seleccionada, seleccionar la primera por defecto
+      if (!selectedBranch && tablesData.length > 0) {
+        setSelectedBranch(tablesData[0].branch);
+      }
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -103,7 +144,7 @@ export default function WaiterDashboard() {
     try {
       await waiterService.acknowledgeNotification(notificationId);
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error acknowledging notification:", error);
     } finally {
       setProcessing(null);
@@ -115,7 +156,7 @@ export default function WaiterDashboard() {
     try {
       await waiterService.completeNotification(notificationId);
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error completing notification:", error);
     } finally {
       setProcessing(null);
@@ -125,9 +166,9 @@ export default function WaiterDashboard() {
   const handleUpdateItemStatus = async (itemId: string, newStatus: string) => {
     setProcessing(itemId);
     try {
-      await waiterService.updateItemStatus(itemId, newStatus as any);
+      await waiterService.updateItemStatus(itemId, newStatus as never);
       await loadData();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating item status:", error);
     } finally {
       setProcessing(null);
@@ -155,9 +196,9 @@ export default function WaiterDashboard() {
 
       // 5. Recargar datos
       await loadData();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error freeing table:", error);
-      alert("Error al liberar la mesa: " + error.message);
+      alert("Error al liberar la mesa: " + error);
     } finally {
       setProcessing(null);
     }
@@ -212,6 +253,16 @@ export default function WaiterDashboard() {
     }
   };
 
+  // Filtrar notificaciones por sucursal seleccionada
+  const filteredNotifications = selectedBranch
+    ? notifications.filter(
+        (notification) =>
+          // Check if branch exists before comparing
+          "branch" in (notification.tables ?? {}) &&
+          (notification.tables as { branch?: string }).branch === selectedBranch
+      )
+    : notifications;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -227,23 +278,52 @@ export default function WaiterDashboard() {
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Panel del Mesero
-            </h1>
-            <p className="text-gray-600">Gestión de mesas y notificaciones</p>
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">
+                Panel del Mesero
+              </h1>
+              <p className="text-gray-600">Gestión de mesas y notificaciones</p>
+            </div>
+
+            {/* ✅ BOTÓN REFRESH */}
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-2 disabled:opacity-50"
+            >
+              <FaSync className={loading ? "animate-spin" : ""} />
+              {loading ? "Actualizando..." : "Actualizar"}
+            </button>
           </div>
 
-          {/* ✅ BOTÓN REFRESH */}
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-2 disabled:opacity-50"
-          >
-            <FaSync className={loading ? "animate-spin" : ""} />
-            {loading ? "Actualizando..." : "Actualizar"}
-          </button>
+          {/* Selector de Sucursal */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <FaStore className="text-blue-600" />
+              <label className="text-sm font-medium text-gray-700">
+                Sucursal:
+              </label>
+            </div>
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            >
+              <option value="">Todas las sucursales</option>
+              {BRANCHES.map((branch) => (
+                <option key={branch} value={branch}>
+                  {branch}
+                </option>
+              ))}
+            </select>
+            {selectedBranch && (
+              <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                {filteredTables.length} mesas en {selectedBranch}
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
@@ -260,7 +340,7 @@ export default function WaiterDashboard() {
               }`}
             >
               <FaBell className="inline mr-2" />
-              Notificaciones ({notifications.length})
+              Notificaciones ({filteredNotifications.length})
             </button>
             <button
               onClick={() => setActiveTab("tables")}
@@ -271,7 +351,8 @@ export default function WaiterDashboard() {
               }`}
             >
               <FaTable className="inline mr-2" />
-              Mesas ({tables.filter((t) => t.status === "occupied").length})
+              Mesas (
+              {filteredTables.filter((t) => t.status === "occupied").length})
             </button>
           </div>
         </div>
@@ -281,21 +362,29 @@ export default function WaiterDashboard() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "notifications" && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Notificaciones Pendientes
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Notificaciones Pendientes
+              </h2>
+              {selectedBranch && (
+                <span className="text-sm text-gray-500 bg-blue-100 px-3 py-1 rounded-full">
+                  Sucursal: {selectedBranch}
+                </span>
+              )}
+            </div>
 
-            {notifications.length === 0 ? (
+            {filteredNotifications.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
                 <FaCheckCircle className="text-4xl text-green-500 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   No hay notificaciones pendientes
+                  {selectedBranch && ` en ${selectedBranch}`}
                 </h3>
                 <p className="text-gray-500">Todo está bajo control</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {notifications.map((notification) => (
+                {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={`bg-white rounded-lg shadow border-l-4 ${getNotificationColor(
@@ -306,14 +395,21 @@ export default function WaiterDashboard() {
                       <div className="flex items-start space-x-3">
                         {getNotificationIcon(notification.type)}
                         <div>
-                          <h3 className="font-semibold text-gray-800">
-                            Mesa {notification.tables?.number}
-                            {notification.orders?.customer_name && (
-                              <span className="text-gray-600 ml-2">
-                                • {notification.orders.customer_name}
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-800">
+                              Mesa {notification.tables?.number}
+                            </h3>
+                            {notification.tables?.number && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                {notification.tables.number}
                               </span>
                             )}
-                          </h3>
+                          </div>
+                          {notification.orders?.customer_name && (
+                            <p className="text-gray-600">
+                              Cliente: {notification.orders.customer_name}
+                            </p>
+                          )}
                           <p className="text-gray-600 mt-1">
                             {notification.message}
                           </p>
@@ -370,12 +466,19 @@ export default function WaiterDashboard() {
 
         {activeTab === "tables" && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Estado de Mesas
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Estado de Mesas
+              </h2>
+              {selectedBranch && (
+                <span className="text-sm text-gray-500 bg-blue-100 px-3 py-1 rounded-full">
+                  Sucursal: {selectedBranch}
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tables.map((table) => (
+              {filteredTables.map((table) => (
                 <div
                   key={table.id}
                   className={`bg-white rounded-lg shadow p-4 ${
@@ -391,6 +494,9 @@ export default function WaiterDashboard() {
                       <h3 className="font-semibold text-lg">
                         Mesa {table.number}
                       </h3>
+                      <p className="text-xs text-gray-500 mb-1">
+                        {table.branch}
+                      </p>
                       <p
                         className={`text-sm ${
                           table.status === "occupied"

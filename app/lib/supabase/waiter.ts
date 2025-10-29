@@ -9,6 +9,7 @@ export interface WaiterNotification {
   status: 'pending' | 'acknowledged' | 'completed'
   created_at: string
   updated_at?: string
+  branch: string
   tables?: {
     number: number
   }
@@ -23,6 +24,7 @@ export interface TableWithOrder {
   number: number
   status: 'available' | 'occupied' | 'reserved' | 'cleaning'
   capacity: number
+  branch: string
   location: string | null
   orders: {
     id: string

@@ -1,86 +1,24 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/admin/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
+import { FaChartBar, FaTable, FaBox, FaSignOutAlt } from "react-icons/fa";
 import {
-  FaLock,
-  FaUser,
-  FaChartBar,
-  FaUtensils,
-  FaTable,
-  FaMoneyBillWave,
-  FaCalendarDay,
-  FaSignOutAlt,
-} from "react-icons/fa";
-
-// Credenciales fijas del administrador
-const ADMIN_CREDENTIALS = {
-  username: "admin",
-  password: "restaurant2024",
-};
-
-interface DailyStats {
-  totalOrders: number;
-  totalRevenue: number;
-  totalItemsSold: number;
-  activeTables: number;
-  averageOrderValue: number;
-}
-
-interface OrderSummary {
-  id: string;
-  table_id: number;
-  total_amount: number;
-  created_at: string;
-  status: string;
-  items_count: number;
-}
-
-interface PopularProduct {
-  product_name: string;
-  total_quantity: number;
-  total_revenue: number;
-}
-
-// Interfaces para las respuestas de Supabase
-interface OrderItem {
-  quantity: number;
-  price: number;
-}
-
-interface OrderWithItems {
-  id: string;
-  total_amount: number;
-  created_at: string;
-  order_items: OrderItem[];
-}
-
-interface OrderTable {
-  table_id: number;
-}
-
-interface OrderWithItemsCount {
-  id: string;
-  table_id: number;
-  total_amount: number;
-  created_at: string;
-  status: string;
-  order_items: Array<{ id: string }>;
-}
-
-interface OrderItemForStats {
-  product_name: string;
-  quantity: number;
-  price: number;
-  created_at: string;
-}
+  AdminSection,
+  DailyStats,
+  OrderSummary,
+  PopularProduct,
+} from "./types";
+import LoginForm from "./components/LoginForm";
+import Dashboard from "./components/Dashboard";
+import TablesManagement from "./components/TablesManagement";
+import ProductsManagement from "./components/ProductsManagement";
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
 
   // Datos del dashboard
   const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
@@ -88,40 +26,23 @@ export default function AdminPage() {
   const [popularProducts, setPopularProducts] = useState<PopularProduct[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // Obtener fecha de hoy - corregido para evitar mutación
-  const today = new Date();
-  const startOfDay = new Date(today);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Estado para fecha seleccionada
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const endOfDay = new Date(today);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const startOfDayISO = startOfDay.toISOString();
-  const endOfDayISO = endOfDay.toISOString();
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    if (
-      username === ADMIN_CREDENTIALS.username &&
-      password === ADMIN_CREDENTIALS.password
-    ) {
-      setIsAuthenticated(true);
-    } else {
-      setError("Credenciales incorrectas");
-    }
-    setLoading(false);
+  // Función para manejar cambio de fecha
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date);
+    loadDailyData(date);
   };
 
-  const loadDailyData = async () => {
+  // Actualiza loadDailyData para aceptar fecha
+  const loadDailyData = async (date: Date = selectedDate) => {
     setDataLoading(true);
     try {
       await Promise.all([
-        loadDailyStats(),
-        loadTodayOrders(),
-        loadPopularProducts(),
+        loadDailyStats(date),
+        loadTodayOrders(date),
+        loadPopularProducts(date),
       ]);
     } catch (error) {
       console.error("Error loading daily data:", error);
@@ -131,9 +52,16 @@ export default function AdminPage() {
     }
   };
 
-  const loadDailyStats = async () => {
+  // Actualiza las funciones de carga para aceptar fecha
+  const loadDailyStats = async (date: Date) => {
     try {
-      // Estadísticas generales del día
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      const startOfDayISO = startOfDay.toISOString();
+      const endOfDayISO = endOfDay.toISOString();
+
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, total_amount, created_at, order_items(quantity, price)")
@@ -142,26 +70,26 @@ export default function AdminPage() {
 
       if (ordersError) throw ordersError;
 
-      const ordersData = orders as OrderWithItems[] | null;
-      const totalOrders = ordersData?.length || 0;
-      const totalRevenue =
-        ordersData?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
+      const ordersData = (orders || []) as any[];
+      const totalOrders = ordersData.length;
 
-      const totalItemsSold =
-        ordersData?.reduce(
-          (sum, order) =>
-            sum +
-            (order.order_items?.reduce(
-              (itemSum, item) => itemSum + item.quantity,
-              0
-            ) || 0),
-          0
-        ) || 0;
+      const totalRevenue = ordersData.reduce((sum: number, order: any) => {
+        return sum + (order.total_amount || 0);
+      }, 0);
+
+      const totalItemsSold = ordersData.reduce((sum: number, order: any) => {
+        const items = order.order_items || [];
+        return (
+          sum +
+          items.reduce((itemSum: number, item: any) => {
+            return itemSum + (item.quantity || 0);
+          }, 0)
+        );
+      }, 0);
 
       const averageOrderValue =
         totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-      // Mesas activas hoy
       const { data: activeTables, error: tablesError } = await supabase
         .from("orders")
         .select("table_id")
@@ -171,9 +99,9 @@ export default function AdminPage() {
 
       if (tablesError) throw tablesError;
 
-      const activeTablesData = activeTables as OrderTable[] | null;
+      const activeTablesData = (activeTables || []) as any[];
       const uniqueTables = new Set(
-        activeTablesData?.map((order) => order.table_id) || []
+        activeTablesData.map((order: any) => order.table_id)
       );
 
       setDailyStats({
@@ -189,8 +117,15 @@ export default function AdminPage() {
     }
   };
 
-  const loadTodayOrders = async () => {
+  const loadTodayOrders = async (date: Date) => {
     try {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      const startOfDayISO = startOfDay.toISOString();
+      const endOfDayISO = endOfDay.toISOString();
+
       const { data: orders, error } = await supabase
         .from("orders")
         .select(
@@ -202,18 +137,15 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      const ordersData = orders as OrderWithItemsCount[] | null;
-
-      const ordersWithCount: OrderSummary[] = (ordersData || []).map(
-        (order) => ({
-          id: order.id,
-          table_id: order.table_id,
-          total_amount: order.total_amount,
-          created_at: order.created_at,
-          status: order.status,
-          items_count: order.order_items?.length || 0,
-        })
-      );
+      const ordersData = (orders || []) as any[];
+      const ordersWithCount: OrderSummary[] = ordersData.map((order: any) => ({
+        id: order.id,
+        table_id: order.table_id,
+        total_amount: order.total_amount,
+        created_at: order.created_at,
+        status: order.status,
+        items_count: order.order_items?.length || 0,
+      }));
 
       setTodayOrders(ordersWithCount);
     } catch (error) {
@@ -222,8 +154,15 @@ export default function AdminPage() {
     }
   };
 
-  const loadPopularProducts = async () => {
+  const loadPopularProducts = async (date: Date) => {
     try {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      const startOfDayISO = startOfDay.toISOString();
+      const endOfDayISO = endOfDay.toISOString();
+
       const { data: orderItems, error } = await supabase
         .from("order_items")
         .select("product_name, quantity, price, created_at")
@@ -232,20 +171,21 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      const orderItemsData = orderItems as OrderItemForStats[] | null;
+      const orderItemsData = (orderItems || []) as any[];
       const productMap = new Map<
         string,
         { total_quantity: number; total_revenue: number }
       >();
 
-      orderItemsData?.forEach((item) => {
+      orderItemsData.forEach((item: any) => {
         const existing = productMap.get(item.product_name) || {
           total_quantity: 0,
           total_revenue: 0,
         };
         productMap.set(item.product_name, {
-          total_quantity: existing.total_quantity + item.quantity,
-          total_revenue: existing.total_revenue + item.price * item.quantity,
+          total_quantity: existing.total_quantity + (item.quantity || 0),
+          total_revenue:
+            existing.total_revenue + (item.price || 0) * (item.quantity || 0),
         });
       });
 
@@ -265,113 +205,30 @@ export default function AdminPage() {
     }
   };
 
+  // Cargar datos cuando cambie la sección o la fecha seleccionada
+  useEffect(() => {
+    if (isAuthenticated && activeSection === "dashboard") {
+      loadDailyData(selectedDate);
+    }
+  }, [isAuthenticated, activeSection, selectedDate]);
+
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setUsername("");
-    setPassword("");
     setDailyStats(null);
     setTodayOrders([]);
     setPopularProducts([]);
+    setActiveSection("dashboard");
+    setError("");
+    // Resetear a fecha actual al hacer logout
+    setSelectedDate(new Date());
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage);
   };
-
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleTimeString("es-MX", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  // Cargar datos cuando se autentique
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadDailyData();
-    }
-  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaLock className="text-2xl text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Panel Administrativo
-            </h1>
-            <p className="text-gray-600 mt-2">Ingrese sus credenciales</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Usuario
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaUser className="text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ingrese su usuario"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contraseña
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaLock className="text-gray-400" />
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ingrese su contraseña"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-800 text-sm">{error}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-semibold disabled:opacity-50"
-            >
-              {loading ? "Verificando..." : "Iniciar Sesión"}
-            </button>
-          </form>
-
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 text-center">
-              <strong>Demo:</strong> usuario: <code>admin</code> / contraseña:{" "}
-              <code>restaurant2024</code>
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoginForm onLogin={() => setIsAuthenticated(true)} />;
   }
 
   return (
@@ -388,7 +245,7 @@ export default function AdminPage() {
                   Dashboard Administrativo
                 </h1>
                 <p className="text-sm text-gray-500">
-                  {new Date().toLocaleDateString("es-MX", {
+                  {selectedDate.toLocaleDateString("es-MX", {
                     weekday: "long",
                     year: "numeric",
                     month: "long",
@@ -408,159 +265,68 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {dataLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Cargando datos del día...</p>
+      {/* Navegación entre secciones */}
+      <nav className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex space-x-8">
+            {[
+              {
+                id: "dashboard" as AdminSection,
+                name: "Dashboard",
+                icon: FaChartBar,
+              },
+              {
+                id: "tables" as AdminSection,
+                name: "Gestión de Mesas",
+                icon: FaTable,
+              },
+              {
+                id: "products" as AdminSection,
+                name: "Gestión de Productos",
+                icon: FaBox,
+              },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeSection === item.id
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <item.icon />
+                {item.name}
+              </button>
+            ))}
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FaUtensils className="text-blue-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total Órdenes</p>
-                    <p className="text-2xl font-bold text-gray-800">
-                      {dailyStats?.totalOrders || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
+        </div>
+      </nav>
 
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <FaMoneyBillWave className="text-green-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Ingresos Totales</p>
-                    <p className="text-2xl font-bold text-gray-800">
-                      {formatCurrency(dailyStats?.totalRevenue || 0)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
 
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <FaCalendarDay className="text-orange-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Items Vendidos</p>
-                    <p className="text-2xl font-bold text-gray-800">
-                      {dailyStats?.totalItemsSold || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
+        {activeSection === "dashboard" && (
+          <Dashboard
+            dailyStats={dailyStats}
+            todayOrders={todayOrders}
+            popularProducts={popularProducts}
+            dataLoading={dataLoading}
+            onDateChange={handleDateChange}
+            selectedDate={selectedDate}
+          />
+        )}
 
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <FaTable className="text-purple-600 text-xl" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Ticket Promedio</p>
-                    <p className="text-2xl font-bold text-gray-800">
-                      {formatCurrency(dailyStats?.averageOrderValue || 0)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {activeSection === "tables" && (
+          <TablesManagement onError={handleError} />
+        )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <FaUtensils />
-                  Órdenes de Hoy
-                </h2>
-                <div className="space-y-3">
-                  {todayOrders.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">
-                      No hay órdenes hoy
-                    </p>
-                  ) : (
-                    todayOrders.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            Mesa {order.table_id}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {formatDate(order.created_at)} • {order.items_count}{" "}
-                            items
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-800">
-                            {formatCurrency(order.total_amount)}
-                          </p>
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              order.status === "paid"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            {order.status === "paid" ? "Pagado" : "Activo"}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <FaChartBar />
-                  Productos Más Vendidos
-                </h2>
-                <div className="space-y-3">
-                  {popularProducts.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">
-                      No hay datos de ventas hoy
-                    </p>
-                  ) : (
-                    popularProducts.map((product, index) => (
-                      <div
-                        key={product.product_name}
-                        className="flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-blue-600">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">
-                              {product.product_name}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {product.total_quantity} vendidos
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-800">
-                            {formatCurrency(product.total_revenue)}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
+        {activeSection === "products" && (
+          <ProductsManagement onError={handleError} />
         )}
       </main>
     </div>
