@@ -4,34 +4,12 @@ import { useRouter } from "next/navigation";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
-import { FaChair, FaSpinner, FaCheck, FaQrcode, FaStore } from "react-icons/fa";
-
-// Lista de sucursales disponibles
-const BRANCHES = [
-  "Hermosillo - Plaza Dila",
-  "Hermosillo - Plaza Valles",
-  "Hermosillo – Gallerías Mall",
-  "Hermosillo – Plaza Patio",
-  "Hermosillo - Plaza Progreso",
-  "Ciudad Obregón - Miguel Alemán",
-  "Ciudad Obregón - Plaza Bellavista",
-  "San Luis Río Colorado",
-  "Guaymas",
-  "Guasave",
-  "Los Mochis",
-  "Mexicali - Plaza San Pedro",
-  "Mexicali - Plaza Nuevo Mexicali",
-  "Tijuana - Plaza Paseo 2000",
-  "Tijuana - Plaza Río",
-  "Cabo San Lucas",
-  "La Paz",
-];
+import { FaChair, FaSpinner, FaCheck, FaQrcode } from "react-icons/fa";
 
 export default function HomePage() {
   const router = useRouter();
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -40,30 +18,34 @@ export default function HomePage() {
 
   // Cargar mesas al iniciar y verificar parámetros de URL
   useEffect(() => {
+    loadAllTables();
     checkURLParams();
   }, []);
 
-  // Cargar mesas cuando se selecciona una sucursal
-  useEffect(() => {
-    if (selectedBranch) {
-      loadTables(selectedBranch);
-    } else {
-      setTables([]);
+  const loadAllTables = async () => {
+    setLoadingTables(true);
+    try {
+      // CORRECCIÓN: Usar getTablesByBranch() sin parámetros
+      const tablesData = await tablesService.getTablesByBranch();
+      setTables(tablesData);
+    } catch (err) {
+      setError("Error cargando mesas");
+      console.error(err);
+    } finally {
+      setLoadingTables(false);
     }
-  }, [selectedBranch]);
+  };
 
   const checkURLParams = () => {
     // Leer parámetros de la URL directamente desde window.location
     const urlParams = new URLSearchParams(window.location.search);
     const tableFromQR = urlParams.get("table");
-    const branchFromQR = urlParams.get("branch");
     const redirected = urlParams.get("redirected");
 
-    if (tableFromQR && branchFromQR) {
+    if (tableFromQR) {
       const tableNumber = parseInt(tableFromQR);
-      if (!isNaN(tableNumber) && BRANCHES.includes(branchFromQR)) {
+      if (!isNaN(tableNumber)) {
         setIsFromQR(true);
-        setSelectedBranch(branchFromQR);
         setSelectedTable(tableNumber);
 
         // Limpiar la URL sin recargar la página
@@ -84,32 +66,17 @@ export default function HomePage() {
     }
   };
 
-  const loadTables = async (branch: string) => {
-    setLoadingTables(true);
-    try {
-      const tablesData = await tablesService.getTablesByBranch(branch);
-      setTables(tablesData);
-    } catch (err) {
-      setError("Error cargando mesas de la sucursal");
-      console.error(err);
-    } finally {
-      setLoadingTables(false);
-    }
-  };
-
   const handleTableSelect = async () => {
-    if (!selectedTable || !selectedBranch) return;
+    if (!selectedTable) return;
 
     setLoading(true);
     setError("");
 
     try {
       // 1. Verificar que la mesa esté disponible
-      const table = tables.find(
-        (t) => t.number === selectedTable && t.branch === selectedBranch
-      );
+      const table = tables.find((t) => t.number === selectedTable);
       if (!table) {
-        setError("Mesa no encontrada en esta sucursal");
+        setError("Mesa no encontrada");
         return;
       }
 
@@ -128,14 +95,14 @@ export default function HomePage() {
       await notificationsService.createNotification(
         table.id,
         "new_order",
-        `Nuevo cliente en Mesa ${table.number} - ${selectedBranch}${
+        `Nuevo cliente en Mesa ${table.number}${
           customerName ? ` - ${customerName}` : ""
         }`,
         order.id
       );
 
       // 5. Redirigir al menú
-      router.push(`/customer/menu?table=${table.id}`);
+      router.push(`/customer/menu?table=${table.number}`);
     } catch (err) {
       setError("Error al crear la orden");
       console.error(err);
@@ -150,10 +117,9 @@ export default function HomePage() {
         return "bg-green-500";
       case "occupied":
         return "bg-red-500";
-      case "reserved":
-        return "bg-yellow-500";
-      case "cleaning":
-        return "bg-blue-500";
+      case "disabled":
+        return "bg-gray-500";
+
       default:
         return "bg-gray-500";
     }
@@ -165,19 +131,16 @@ export default function HomePage() {
         return "Disponible";
       case "occupied":
         return "Ocupada";
-      case "reserved":
-        return "Reservada";
-      case "cleaning":
-        return "Limpieza";
+      case "disabled":
+        return "Desabilitado";
+
       default:
         return status;
     }
   };
 
   // Encontrar la mesa seleccionada para mostrar su estado
-  const selectedTableData = tables.find(
-    (t) => t.number === selectedTable && t.branch === selectedBranch
-  );
+  const selectedTableData = tables.find((t) => t.number === selectedTable);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
@@ -196,43 +159,20 @@ export default function HomePage() {
           <p className="text-gray-600">
             {isFromQR
               ? "Mesa preseleccionada desde QR"
-              : "Selecciona tu sucursal y mesa para comenzar"}
+              : "Selecciona tu mesa para comenzar"}
           </p>
         </div>
 
-        {/* Selector de sucursal */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-            <FaStore className="text-blue-600" />
-            Sucursal
-          </label>
-          <select
-            value={selectedBranch}
-            onChange={(e) => {
-              setSelectedBranch(e.target.value);
-              setSelectedTable(null); // Resetear mesa al cambiar sucursal
-            }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-          >
-            <option value="">Selecciona una sucursal</option>
-            {BRANCHES.map((branch) => (
-              <option key={branch} value={branch}>
-                {branch}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Mostrar información de mesa QR */}
-        {isFromQR && selectedTable && selectedBranch && (
+        {isFromQR && selectedTable && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-blue-800">
-                  Mesa {selectedTable} - {selectedBranch}
+                  Mesa {selectedTable}
                 </h3>
                 <p className="text-sm text-blue-600">
-                  Escaneaste el código QR de la sucursal {selectedBranch}
+                  Escaneaste el código QR de la mesa {selectedTable}
                 </p>
                 {selectedTableData && (
                   <p
@@ -266,83 +206,75 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Selección de mesa (solo mostrar si hay sucursal seleccionada) */}
-        {selectedBranch && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Número de Mesa
-              </label>
-              {loadingTables && (
-                <span className="text-sm text-blue-600 flex items-center gap-1">
-                  <FaSpinner className="animate-spin" />
-                  Cargando mesas...
-                </span>
-              )}
-            </div>
-
-            {tables.length === 0 && !loadingTables ? (
-              <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
-                <FaChair className="text-4xl text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">
-                  No hay mesas disponibles en esta sucursal
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-5 gap-3">
-                  {tables.map((table) => (
-                    <button
-                      key={table.id}
-                      onClick={() => setSelectedTable(table.number)}
-                      disabled={table.status !== "available"}
-                      className={`
-                        relative w-12 h-12 rounded-xl border-2 font-semibold transition-all
-                        ${
-                          selectedTable === table.number
-                            ? "border-blue-600 bg-blue-600 text-white scale-110"
-                            : table.status === "available"
-                            ? "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
-                            : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-                        }
-                      `}
-                    >
-                      {table.number}
-
-                      {/* Indicador de estado */}
-                      <div
-                        className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getTableStatusColor(
-                          table.status
-                        )}`}
-                        title={getTableStatusText(table.status)}
-                      />
-                    </button>
-                  ))}
-                </div>
-
-                {/* Leyenda de estados */}
-                <div className="flex justify-center gap-4 mt-4 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span>Disponible</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span>Ocupada</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span>Reservada</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <span>Limpieza</span>
-                  </div>
-                </div>
-              </>
+        {/* Selección de mesa */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Número de Mesa
+            </label>
+            {loadingTables && (
+              <span className="text-sm text-blue-600 flex items-center gap-1">
+                <FaSpinner className="animate-spin" />
+                Cargando mesas...
+              </span>
             )}
           </div>
-        )}
+
+          {tables.length === 0 && !loadingTables ? (
+            <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
+              <FaChair className="text-4xl text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500">No hay mesas disponibles</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-5 gap-3">
+                {tables.map((table) => (
+                  <button
+                    key={table.id}
+                    onClick={() => setSelectedTable(table.number)}
+                    disabled={table.status !== "available"}
+                    className={`
+                      relative w-12 h-12 rounded-xl border-2 font-semibold transition-all
+                      ${
+                        selectedTable === table.number
+                          ? "border-blue-600 bg-blue-600 text-white scale-110"
+                          : table.status === "available"
+                          ? "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
+                          : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                      }
+                    `}
+                  >
+                    {table.number}
+
+                    {/* Indicador de estado */}
+                    <div
+                      className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getTableStatusColor(
+                        table.status
+                      )}`}
+                      title={getTableStatusText(table.status)}
+                    />
+                  </button>
+                ))}
+              </div>
+
+              {/* Leyenda de estados */}
+              <div className="flex justify-center gap-4 mt-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span>Disponible</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span>Ocupada</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                  <span>Desabilitado</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Nombre opcional del cliente */}
         <div className="mb-6">
@@ -363,7 +295,6 @@ export default function HomePage() {
           onClick={handleTableSelect}
           disabled={
             !selectedTable ||
-            !selectedBranch ||
             loading ||
             (selectedTableData && selectedTableData.status !== "available")
           }
@@ -371,7 +302,6 @@ export default function HomePage() {
             w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2
             ${
               selectedTable &&
-              selectedBranch &&
               !loading &&
               selectedTableData?.status === "available"
                 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
@@ -384,7 +314,7 @@ export default function HomePage() {
               <FaSpinner className="animate-spin" />
               Creando orden...
             </>
-          ) : selectedTable && selectedBranch ? (
+          ) : selectedTable ? (
             selectedTableData?.status === "available" ? (
               <>
                 <FaCheck />
@@ -396,7 +326,7 @@ export default function HomePage() {
               `Mesa ${selectedTable} no disponible`
             )
           ) : (
-            "Selecciona sucursal y mesa"
+            "Selecciona una mesa"
           )}
         </button>
 
@@ -405,8 +335,6 @@ export default function HomePage() {
           <p className="text-sm text-blue-700 text-center">
             {isFromQR
               ? "💡 Mesa seleccionada desde QR. Solo ingresa tu nombre y continua al menú."
-              : !selectedBranch
-              ? "💡 Primero selecciona tu sucursal para ver las mesas disponibles"
               : "💡 Escanea el código QR en tu mesa o selecciona manualmente"}
           </p>
         </div>

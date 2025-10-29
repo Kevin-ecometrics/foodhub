@@ -5,39 +5,39 @@ import { FaQrcode, FaUtensils, FaHistory } from "react-icons/fa";
 
 export default function QRSharePage() {
   const router = useRouter();
-  const [tableId, setTableId] = useState<string | null>(null);
+  const [tableNumber, setTableNumber] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
 
   useEffect(() => {
-    // Leer tableId de los query params de manera asíncrona
-    const readTableId = () => {
+    // Leer tableNumber de los query params
+    const readTableNumber = () => {
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
         const tableFromParams = params.get("table");
 
         // Usar setTimeout para evitar el setState síncrono
         setTimeout(() => {
-          setTableId(tableFromParams);
+          setTableNumber(tableFromParams);
         }, 0);
       }
     };
 
-    readTableId();
+    readTableNumber();
   }, []);
 
   useEffect(() => {
-    // Este efecto se ejecuta cuando tableId cambia
-    if (tableId) {
+    // Este efecto se ejecuta cuando tableNumber cambia
+    if (tableNumber) {
       const baseUrl = "https://foodhub-software.vercel.app";
-      const url = `${baseUrl}/customer/menu?table=${tableId}`;
+      const url = `${baseUrl}/customer/menu?table=${tableNumber}`;
 
       // Actualizar la URL de manera asíncrona
       setTimeout(() => {
         setCurrentUrl(url);
       }, 0);
     }
-  }, [tableId]);
+  }, [tableNumber]);
 
   const handleCopyLink = async () => {
     try {
@@ -79,7 +79,7 @@ export default function QRSharePage() {
     currentUrl
   )}`;
 
-  if (!tableId) {
+  if (!tableNumber) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -109,7 +109,7 @@ export default function QRSharePage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
           <div>
             <h1 className="text-xl font-bold">Compartir Mesa</h1>
-            <p className="text-sm">Mesa {tableId}</p>
+            <p className="text-sm">Mesa {tableNumber}</p>
           </div>
         </div>
       </header>
@@ -141,13 +141,44 @@ export default function QRSharePage() {
             </div>
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800 font-medium">
-                Mesa: <span className="font-bold text-lg">{tableId}</span>
+                Mesa: <span className="font-bold text-lg">{tableNumber}</span>
               </p>
               <p className="text-xs text-blue-600 mt-1">
                 Escanea para unirte a la orden
               </p>
             </div>
           </div>
+
+          {/* Botón de compartir */}
+          <button
+            onClick={handleShare}
+            className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-4"
+          >
+            {copied ? "¡Enlace Copiado!" : "Compartir Mesa"}
+          </button>
+
+          {/* Enlace de texto */}
+          <div className="bg-gray-100 rounded-lg p-3">
+            <p className="text-xs text-gray-600 text-left mb-2">
+              Enlace de la mesa:
+            </p>
+            <p className="text-xs text-gray-800 break-all bg-white p-2 rounded border">
+              {currentUrl || "Generando enlace..."}
+            </p>
+          </div>
+        </div>
+
+        {/* Instrucciones */}
+        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <h3 className="font-semibold text-yellow-800 mb-2">
+            ¿Cómo funciona?
+          </h3>
+          <ul className="text-sm text-yellow-700 space-y-1 text-left">
+            <li>• Comparte el QR con tus acompañantes</li>
+            <li>• Escaneen el código para unirse a la mesa {tableNumber}</li>
+            <li>• Todos podrán ver y modificar la misma orden</li>
+            <li>• Perfecto para pedidos grupales</li>
+          </ul>
         </div>
       </main>
 
@@ -155,7 +186,7 @@ export default function QRSharePage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
         <div className="max-w-7xl mx-auto flex justify-around py-3">
           <button
-            onClick={() => router.push(`/customer/menu?table=${tableId}`)}
+            onClick={() => router.push(`/customer/menu?table=${tableNumber}`)}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaUtensils className="text-2xl mb-1" />
@@ -163,7 +194,9 @@ export default function QRSharePage() {
           </button>
 
           <button
-            onClick={() => router.push(`/customer/history?table=${tableId}`)}
+            onClick={() =>
+              router.push(`/customer/history?table=${tableNumber}`)
+            }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaHistory className="text-2xl mb-1" />

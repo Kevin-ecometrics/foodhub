@@ -17,35 +17,11 @@ import {
   FaCheckCircle,
   FaReceipt,
   FaSync,
-  FaStore,
 } from "react-icons/fa";
-
-// Lista de sucursales disponibles
-const BRANCHES = [
-  "Hermosillo - Plaza Dila",
-  "Hermosillo - Plaza Valles",
-  "Hermosillo – Gallerías Mall",
-  "Hermosillo – Plaza Patio",
-  "Hermosillo - Plaza Progreso",
-  "Ciudad Obregón - Miguel Alemán",
-  "Ciudad Obregón - Plaza Bellavista",
-  "San Luis Río Colorado",
-  "Guaymas",
-  "Guasave",
-  "Los Mochis",
-  "Mexicali - Plaza San Pedro",
-  "Mexicali - Plaza Nuevo Mexicali",
-  "Tijuana - Plaza Paseo 2000",
-  "Tijuana - Plaza Río",
-  "Cabo San Lucas",
-  "La Paz",
-];
 
 export default function WaiterDashboard() {
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
-  const [filteredTables, setFilteredTables] = useState<TableWithOrder[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"notifications" | "tables">(
     "notifications"
   );
@@ -61,18 +37,6 @@ export default function WaiterDashboard() {
     };
   }, []);
 
-  // Filtrar mesas cuando cambia la sucursal seleccionada
-  useEffect(() => {
-    if (selectedBranch) {
-      const filtered = tables.filter(
-        (table) => table.branch === selectedBranch
-      );
-      setFilteredTables(filtered);
-    } else {
-      setFilteredTables(tables);
-    }
-  }, [selectedBranch, tables]);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -82,11 +46,6 @@ export default function WaiterDashboard() {
       ]);
       setNotifications(notifsData);
       setTables(tablesData);
-
-      // Si no hay sucursal seleccionada, seleccionar la primera por defecto
-      if (!selectedBranch && tablesData.length > 0) {
-        setSelectedBranch(tablesData[0].branch);
-      }
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -253,16 +212,6 @@ export default function WaiterDashboard() {
     }
   };
 
-  // Filtrar notificaciones por sucursal seleccionada
-  const filteredNotifications = selectedBranch
-    ? notifications.filter(
-        (notification) =>
-          // Check if branch exists before comparing
-          "branch" in (notification.tables ?? {}) &&
-          (notification.tables as { branch?: string }).branch === selectedBranch
-      )
-    : notifications;
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -297,33 +246,6 @@ export default function WaiterDashboard() {
               {loading ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
-
-          {/* Selector de Sucursal */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <FaStore className="text-blue-600" />
-              <label className="text-sm font-medium text-gray-700">
-                Sucursal:
-              </label>
-            </div>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-            >
-              <option value="">Todas las sucursales</option>
-              {BRANCHES.map((branch) => (
-                <option key={branch} value={branch}>
-                  {branch}
-                </option>
-              ))}
-            </select>
-            {selectedBranch && (
-              <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                {filteredTables.length} mesas en {selectedBranch}
-              </span>
-            )}
-          </div>
         </div>
       </header>
 
@@ -340,7 +262,7 @@ export default function WaiterDashboard() {
               }`}
             >
               <FaBell className="inline mr-2" />
-              Notificaciones ({filteredNotifications.length})
+              Notificaciones ({notifications.length})
             </button>
             <button
               onClick={() => setActiveTab("tables")}
@@ -351,8 +273,7 @@ export default function WaiterDashboard() {
               }`}
             >
               <FaTable className="inline mr-2" />
-              Mesas (
-              {filteredTables.filter((t) => t.status === "occupied").length})
+              Mesas ({tables.filter((t) => t.status === "occupied").length})
             </button>
           </div>
         </div>
@@ -366,25 +287,19 @@ export default function WaiterDashboard() {
               <h2 className="text-xl font-semibold text-gray-800">
                 Notificaciones Pendientes
               </h2>
-              {selectedBranch && (
-                <span className="text-sm text-gray-500 bg-blue-100 px-3 py-1 rounded-full">
-                  Sucursal: {selectedBranch}
-                </span>
-              )}
             </div>
 
-            {filteredNotifications.length === 0 ? (
+            {notifications.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
                 <FaCheckCircle className="text-4xl text-green-500 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   No hay notificaciones pendientes
-                  {selectedBranch && ` en ${selectedBranch}`}
                 </h3>
                 <p className="text-gray-500">Todo está bajo control</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredNotifications.map((notification) => (
+                {notifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={`bg-white rounded-lg shadow border-l-4 ${getNotificationColor(
@@ -470,15 +385,10 @@ export default function WaiterDashboard() {
               <h2 className="text-xl font-semibold text-gray-800">
                 Estado de Mesas
               </h2>
-              {selectedBranch && (
-                <span className="text-sm text-gray-500 bg-blue-100 px-3 py-1 rounded-full">
-                  Sucursal: {selectedBranch}
-                </span>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTables.map((table) => (
+              {tables.map((table) => (
                 <div
                   key={table.id}
                   className={`bg-white rounded-lg shadow p-4 ${
@@ -494,9 +404,6 @@ export default function WaiterDashboard() {
                       <h3 className="font-semibold text-lg">
                         Mesa {table.number}
                       </h3>
-                      <p className="text-xs text-gray-500 mb-1">
-                        {table.branch}
-                      </p>
                       <p
                         className={`text-sm ${
                           table.status === "occupied"

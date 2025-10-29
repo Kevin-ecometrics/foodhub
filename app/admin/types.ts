@@ -22,15 +22,21 @@ export interface PopularProduct {
   total_revenue: number;
 }
 
+// Interfaz para órdenes relacionadas
+export interface RelatedOrder {
+  id: string;
+  status: string;
+}
+
 export interface RestaurantTable {
   id: number;
   number: number;
   status: string;
   capacity: number;
   location: string;
-  branch: string;
   created_at: string;
   updated_at: string;
+  orders?: RelatedOrder[]; // Agregar esta línea
 }
 
 export interface Product {
@@ -52,7 +58,6 @@ export interface TableFormData {
   number: string;
   capacity: string;
   location: string;
-  branch: string;
 }
 
 export interface ProductFormData {
@@ -70,24 +75,3 @@ export const ADMIN_CREDENTIALS = {
   username: "admin",
   password: "restaurant2024",
 };
-
-// Lista de sucursales
-export const BRANCHES = [
-  "Hermosillo - Plaza Dila",
-  "Hermosillo - Plaza Valles",
-  "Hermosillo – Gallerías Mall",
-  "Hermosillo – Plaza Patio",
-  "Hermosillo - Plaza Progreso",
-  "Ciudad Obregón - Miguel Alemán",
-  "Ciudad Obregón - Plaza Bellavista",
-  "San Luis Río Colorado",
-  "Guaymas",
-  "Guasave",
-  "Los Mochis",
-  "Mexicali - Plaza San Pedro",
-  "Mexicali - Plaza Nuevo Mexicali",
-  "Tijuana - Plaza Paseo 2000",
-  "Tijuana - Plaza Río",
-  "Cabo San Lucas",
-  "La Paz",
-];

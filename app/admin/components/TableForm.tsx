@@ -1,7 +1,7 @@
 // app/admin/components/TableForm.tsx
 "use client";
 import { FaPlus, FaEdit } from "react-icons/fa";
-import { RestaurantTable, TableFormData, BRANCHES } from "../types";
+import { RestaurantTable, TableFormData } from "../types";
 
 interface TableFormProps {
   editingTable: RestaurantTable | null;
@@ -32,8 +32,8 @@ export default function TableForm({
         {editingTable ? "Editar Mesa" : "Nueva Mesa"}
       </h3>
       <form onSubmit={onSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Número de Mesa
             </label>
@@ -44,7 +44,7 @@ export default function TableForm({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Capacidad
@@ -69,23 +69,6 @@ export default function TableForm({
               placeholder="Ej: Terraza, Interior"
               required
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sucursal
-            </label>
-            <select
-              value={tableForm.branch}
-              onChange={(e) => handleChange("branch", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            >
-              {BRANCHES.map((branch) => (
-                <option key={branch} value={branch}>
-                  {branch}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
         <div className="flex gap-3">
