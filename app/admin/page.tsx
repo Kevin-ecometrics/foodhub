@@ -9,6 +9,8 @@ import {
   DailyStats,
   OrderSummary,
   PopularProduct,
+  SalesHistory,
+  SalesSummary,
 } from "./types";
 import LoginForm from "./components/LoginForm";
 import Dashboard from "./components/Dashboard";
@@ -26,13 +28,68 @@ export default function AdminPage() {
   const [popularProducts, setPopularProducts] = useState<PopularProduct[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
+  // NUEVOS ESTADOS PARA VENTAS
+  const [salesHistory, setSalesHistory] = useState<SalesHistory[]>([]);
+  const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
+
   // Estado para fecha seleccionada
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // NUEVA FUNCIÓN: Cargar datos de ventas históricas
+  const loadSalesData = async (date: Date = selectedDate) => {
+    try {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      const startOfDayISO = startOfDay.toISOString();
+      const endOfDayISO = endOfDay.toISOString();
+
+      // Cargar historial de ventas
+      const { data: sales, error: salesError } = await supabase
+        .from("sales_history")
+        .select("*")
+        .gte("closed_at", startOfDayISO)
+        .lte("closed_at", endOfDayISO)
+        .order("closed_at", { ascending: false });
+
+      if (salesError) throw salesError;
+
+      setSalesHistory(sales || []);
+
+      // Calcular resumen de ventas
+      const salesData = sales || [];
+      const totalSales = salesData.reduce(
+        (sum: number, sale: any) => sum + sale.total_amount,
+        0
+      );
+      const totalItems = salesData.reduce(
+        (sum: number, sale: any) => sum + sale.item_count,
+        0
+      );
+      const totalOrders = salesData.reduce(
+        (sum: number, sale: any) => sum + sale.order_count,
+        0
+      );
+
+      setSalesSummary({
+        totalSales,
+        totalItems,
+        totalOrders,
+        saleCount: salesData.length,
+        averageSale: salesData.length > 0 ? totalSales / salesData.length : 0,
+      });
+    } catch (error) {
+      console.error("Error loading sales data:", error);
+      setError("Error cargando los datos de ventas");
+    }
+  };
 
   // Función para manejar cambio de fecha
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
     loadDailyData(date);
+    loadSalesData(date);
   };
 
   // Actualiza loadDailyData para aceptar fecha
@@ -62,6 +119,7 @@ export default function AdminPage() {
       const startOfDayISO = startOfDay.toISOString();
       const endOfDayISO = endOfDay.toISOString();
 
+      // Cargar datos de orders (para comparar con sales_history)
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, total_amount, created_at, order_items(quantity, price)")
@@ -163,6 +221,45 @@ export default function AdminPage() {
       const startOfDayISO = startOfDay.toISOString();
       const endOfDayISO = endOfDay.toISOString();
 
+      // Primero intentar desde sales_items (datos históricos)
+      const { data: salesItems, error: salesError } = await supabase
+        .from("sales_items")
+        .select("product_name, quantity, price")
+        .gte("created_at", startOfDayISO)
+        .lte("created_at", endOfDayISO);
+
+      if (!salesError && salesItems && salesItems.length > 0) {
+        const productMap = new Map<
+          string,
+          { total_quantity: number; total_revenue: number }
+        >();
+
+        salesItems.forEach((item: any) => {
+          const existing = productMap.get(item.product_name) || {
+            total_quantity: 0,
+            total_revenue: 0,
+          };
+          productMap.set(item.product_name, {
+            total_quantity: existing.total_quantity + (item.quantity || 0),
+            total_revenue:
+              existing.total_revenue + (item.price || 0) * (item.quantity || 0),
+          });
+        });
+
+        const popular: PopularProduct[] = Array.from(productMap.entries())
+          .map(([product_name, stats]) => ({
+            product_name,
+            total_quantity: stats.total_quantity,
+            total_revenue: stats.total_revenue,
+          }))
+          .sort((a, b) => b.total_quantity - a.total_quantity)
+          .slice(0, 10);
+
+        setPopularProducts(popular);
+        return;
+      }
+
+      // Fallback a order_items si no hay datos en sales_items
       const { data: orderItems, error } = await supabase
         .from("order_items")
         .select("product_name, quantity, price, created_at")
@@ -209,6 +306,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthenticated && activeSection === "dashboard") {
       loadDailyData(selectedDate);
+      loadSalesData(selectedDate);
     }
   }, [isAuthenticated, activeSection, selectedDate]);
 
@@ -217,6 +315,8 @@ export default function AdminPage() {
     setDailyStats(null);
     setTodayOrders([]);
     setPopularProducts([]);
+    setSalesHistory([]);
+    setSalesSummary(null);
     setActiveSection("dashboard");
     setError("");
     // Resetear a fecha actual al hacer logout
@@ -318,6 +418,8 @@ export default function AdminPage() {
             dataLoading={dataLoading}
             onDateChange={handleDateChange}
             selectedDate={selectedDate}
+            salesSummary={salesSummary}
+            salesHistory={salesHistory}
           />
         )}
 

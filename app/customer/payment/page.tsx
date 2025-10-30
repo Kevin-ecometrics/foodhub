@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
+import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import {
   FaArrowLeft,
   FaCheck,
   FaReceipt,
   FaUtensils,
   FaClock,
+  FaSpinner,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 
 interface PaymentSummary {
@@ -18,22 +21,28 @@ interface PaymentSummary {
   taxRate: number;
 }
 
+interface OrderSummary {
+  order: OrderWithItems;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+}
+
 export default function PaymentPage() {
   const router = useRouter();
-  const { currentOrder, orderItems, currentTableId } = useOrder();
+  const { currentOrder, orderItems, currentTableId, refreshOrder } = useOrder();
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [tableId, setTableId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
+  const [error, setError] = useState("");
 
-  // Obtener tableId de la URL usando useEffect de manera asíncrona
+  // Obtener tableId de la URL
   useEffect(() => {
-    // Marcar que estamos en el cliente
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
-
-    // Obtener parámetros de la URL
     const getTableId = () => {
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
@@ -42,7 +51,6 @@ export default function PaymentPage() {
       return null;
     };
 
-    // Usar setTimeout para evitar la actualización síncrona
     const timer = setTimeout(() => {
       setTableId(getTableId());
     }, 0);
@@ -50,12 +58,69 @@ export default function PaymentPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Calcular resumen de pago
-  const calculatePaymentSummary = (): PaymentSummary => {
-    const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+  // Cargar todas las órdenes pendientes de pago
+  useEffect(() => {
+    const loadAllOrders = async () => {
+      const targetTableId = tableId || currentTableId;
+      if (!targetTableId) return;
+
+      try {
+        setLoading(true);
+        setError("");
+
+        // Obtener todas las órdenes de la mesa (activas + enviadas)
+        const orders = await historyService.getCustomerOrderHistory(
+          parseInt(targetTableId.toString())
+        );
+
+        // Filtrar solo órdenes pendientes de pago (active + sent)
+        const pendingOrders = orders.filter(
+          (order) => order.status === "active" || order.status === "sent"
+        );
+
+        setAllOrders(pendingOrders);
+
+        console.log("📊 Órdenes para pago:", {
+          total: orders.length,
+          pending: pendingOrders.length,
+          orders: pendingOrders.map((o) => ({
+            id: o.id.slice(-8),
+            status: o.status,
+            items: o.order_items.length,
+            total: o.order_items.reduce(
+              (sum, item) => sum + item.price * item.quantity,
+              0
+            ),
+          })),
+        });
+
+        if (pendingOrders.length === 0) {
+          setError("No hay órdenes pendientes de pago");
+        }
+      } catch (error) {
+        console.error("Error loading orders for payment:", error);
+        setError("Error cargando las órdenes para pago");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (tableId !== null) {
+      loadAllOrders();
+    }
+  }, [tableId, currentTableId]);
+
+  // Calcular resumen de TODAS las órdenes pendientes
+  const calculateTotalPaymentSummary = (): PaymentSummary => {
+    let subtotal = 0;
+
+    // Sumar todos los items de todas las órdenes pendientes
+    allOrders.forEach((order) => {
+      order.order_items.forEach((item) => {
+        subtotal += item.price * item.quantity;
+      });
+    });
+
     const taxRate = 0.16; // 16% de impuesto
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
@@ -68,7 +133,26 @@ export default function PaymentPage() {
     };
   };
 
-  const paymentSummary = calculatePaymentSummary();
+  // Calcular resumen por orden individual
+  const calculateOrderSummary = (order: OrderWithItems): OrderSummary => {
+    const subtotal = order.order_items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    const taxRate = 0.16;
+    const taxAmount = subtotal * taxRate;
+    const total = subtotal + taxAmount;
+
+    return {
+      order,
+      subtotal,
+      taxAmount,
+      total,
+    };
+  };
+
+  const paymentSummary = calculateTotalPaymentSummary();
+  const orderSummaries = allOrders.map(calculateOrderSummary);
 
   // Countdown para redirección después del pago
   useEffect(() => {
@@ -82,8 +166,20 @@ export default function PaymentPage() {
     }
   }, [paymentConfirmed, countdown, router]);
 
-  const handlePaymentConfirmation = () => {
-    setPaymentConfirmed(true);
+  const handlePaymentConfirmation = async () => {
+    try {
+      // Aquí podrías agregar lógica para marcar las órdenes como pagadas
+      // Por ahora solo confirmamos el pago visualmente
+      setPaymentConfirmed(true);
+
+      console.log(
+        "✅ Pago confirmado para órdenes:",
+        allOrders.map((o) => o.id)
+      );
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      alert("❌ Error al confirmar el pago. Intenta nuevamente.");
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -93,28 +189,61 @@ export default function PaymentPage() {
     }).format(amount);
   };
 
+  const getStatusText = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      active: "En preparación",
+      sent: "Enviada a cocina",
+      completed: "Completada",
+      paid: "Pagada",
+    };
+    return statusMap[status] || status;
+  };
+
   // Mostrar loading mientras se obtiene el tableId
-  if (!isClient) {
+  if (!isClient || loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Cargando ticket de pago...</p>
         </div>
       </div>
     );
   }
 
-  if (!currentOrder || orderItems.length === 0) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <FaUtensils className="text-4xl text-yellow-500 mx-auto mb-4" />
+          <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">{error}</h2>
+          <p className="text-gray-600 mb-4">
+            No hay órdenes pendientes de pago en esta mesa.
+          </p>
+          <button
+            onClick={() =>
+              router.push(`/customer/menu?table=${tableId || currentTableId}`)
+            }
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
+          >
+            Volver al Menú
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (allOrders.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaReceipt className="text-4xl text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">
-            No hay orden activa
+            No hay órdenes para pagar
           </h2>
           <p className="text-gray-600 mb-4">
-            No hay items para mostrar en el ticket.
+            Todas las órdenes de esta mesa ya han sido pagadas o no hay órdenes
+            activas.
           </p>
           <button
             onClick={() =>
@@ -148,10 +277,8 @@ export default function PaymentPage() {
 
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <p className="text-sm text-gray-600">
-              Orden:{" "}
-              <span className="font-semibold">
-                #{currentOrder.id.slice(-8)}
-              </span>
+              Órdenes pagadas:{" "}
+              <span className="font-semibold">{allOrders.length}</span>
             </p>
             <p className="text-sm text-gray-600">
               Total pagado:{" "}
@@ -184,7 +311,7 @@ export default function PaymentPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button
+              {/* <button
                 onClick={() =>
                   router.push(
                     `/customer/history?table=${tableId || currentTableId}`
@@ -193,13 +320,17 @@ export default function PaymentPage() {
                 className="p-2 hover:bg-gray-100 rounded-full transition"
               >
                 <FaArrowLeft className="text-xl text-gray-600" />
-              </button>
+              </button> */}
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">
-                  Ticket de Orden
+                  Ticket de Pago
                 </h1>
                 <p className="text-sm text-gray-500">
                   Mesa {tableId || currentTableId}
+                </p>
+                <p className="text-sm text-blue-600 font-medium">
+                  {allOrders.length} orden{allOrders.length > 1 ? "es" : ""}{" "}
+                  pendiente{allOrders.length > 1 ? "s" : ""}
                 </p>
               </div>
             </div>
@@ -214,7 +345,7 @@ export default function PaymentPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* Ticket de Orden */}
+        {/* Resumen de todas las órdenes */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
           {/* Header del Ticket */}
           <div className="bg-gray-800 text-white p-6 text-center">
@@ -223,52 +354,83 @@ export default function PaymentPage() {
               Mesa {tableId || currentTableId}
             </p>
             <p className="text-gray-300 text-sm">
-              Orden #: {currentOrder.id.slice(-8)}
-            </p>
-            <p className="text-gray-300 text-sm">
-              {new Date(currentOrder.created_at).toLocaleString()}
+              {allOrders.length} orden{allOrders.length > 1 ? "es" : ""} •{" "}
+              {new Date().toLocaleString()}
             </p>
           </div>
 
-          {/* Items de la Orden */}
+          {/* Lista de todas las órdenes */}
           <div className="p-6">
-            <div className="space-y-4 mb-6">
-              <h4 className="font-semibold text-gray-800 text-lg border-b pb-2">
-                Detalles de la Orden:
-              </h4>
-              {orderItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex justify-between items-start py-3 border-b border-gray-100"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="font-semibold text-gray-800">
-                          {item.product_name}
-                        </span>
-                        <div className="text-sm text-gray-500 mt-1">
-                          Cantidad: {item.quantity}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium text-gray-800">
-                          {formatCurrency(item.price * item.quantity)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {formatCurrency(item.price)} c/u
+            {orderSummaries.map((orderSummary, index) => (
+              <div key={orderSummary.order.id} className="mb-6 last:mb-0">
+                {/* Header de cada orden */}
+                <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+                  <div>
+                    <h4 className="font-semibold text-gray-800">
+                      Orden #{orderSummary.order.id.slice(-8)}
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      {getStatusText(orderSummary.order.status)} •{" "}
+                      {orderSummary.order.order_items.length} item
+                      {orderSummary.order.order_items.length > 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-800">
+                      {formatCurrency(orderSummary.total)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Subtotal: {formatCurrency(orderSummary.subtotal)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Items de cada orden */}
+                <div className="space-y-3 mb-4">
+                  {orderSummary.order.order_items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex justify-between items-start py-2 border-b border-gray-100"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="font-medium text-gray-800">
+                              {item.product_name}
+                            </span>
+                            <div className="text-sm text-gray-500 mt-1">
+                              Cantidad: {item.quantity}
+                            </div>
+                            {item.notes && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                Nota: {item.notes}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium text-gray-800">
+                              {formatCurrency(item.price * item.quantity)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatCurrency(item.price)} c/u
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Resumen de Pagos */}
+                {index < orderSummaries.length - 1 && (
+                  <div className="border-t border-gray-200 my-4"></div>
+                )}
+              </div>
+            ))}
+
+            {/* Resumen FINAL de todos los pagos */}
             <div className="border-t border-gray-200 pt-4 space-y-3">
               <div className="flex justify-between text-gray-600">
-                <span className="font-medium">Subtotal:</span>
+                <span className="font-medium">Subtotal total:</span>
                 <span className="font-medium">
                   {formatCurrency(paymentSummary.subtotal)}
                 </span>
@@ -280,7 +442,7 @@ export default function PaymentPage() {
                 </span>
               </div>
               <div className="flex justify-between text-xl font-bold text-gray-800 border-t border-gray-200 pt-3">
-                <span>TOTAL:</span>
+                <span>TOTAL GENERAL:</span>
                 <span>{formatCurrency(paymentSummary.total)}</span>
               </div>
             </div>

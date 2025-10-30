@@ -17,9 +17,11 @@ import {
   FaCheck,
   FaQrcode,
   FaHeart,
+  FaFire,
+  FaClock,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
-import { tablesService } from "@/app/lib/supabase/tables";
+import { OrderItem } from "@/app/lib/supabase/order-items";
 
 const CATEGORIES = [
   {
@@ -66,15 +68,21 @@ export default function MenuPage() {
     updateCartItem,
     removeFromCart,
     currentTableId,
+    clearCart,
+    createNewOrder,
+    getRecentOrdersItems,
   } = useOrder();
 
   const [selectedCategory, setSelectedCategory] = useState("favorites");
   const [products, setProducts] = useState<Product[]>([]);
   const [recentItems, setRecentItems] = useState<Product[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
+  const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingProduct, setAddingProduct] = useState<number | null>(null);
   const [showCart, setShowCart] = useState(false);
+  const [sendingOrder, setSendingOrder] = useState(false);
+  const [lastOrderSent, setLastOrderSent] = useState(false);
 
   // Leer query params del cliente
   useEffect(() => {
@@ -85,7 +93,7 @@ export default function MenuPage() {
   }, []);
 
   useEffect(() => {
-    if (tableId === null) return; // Esperar a que tableId esté disponible
+    if (tableId === null) return;
 
     if (tableId) {
       loadInitialData(parseInt(tableId));
@@ -96,25 +104,65 @@ export default function MenuPage() {
     }
   }, [tableId, currentTableId, router]);
 
-  // Actualizar items recientes y favoritos cuando cambien los productos
+  // Resetear lastOrderSent cuando se agregan nuevos items al carrito
   useEffect(() => {
-    updateRecentItems();
+    if (lastOrderSent && orderItems.length > 0) {
+      setLastOrderSent(false);
+    }
+  }, [orderItems.length, lastOrderSent]);
+
+  // Actualizar items recientes y favoritos
+  useEffect(() => {
     updateFavoriteItems();
   }, [orderItems, products]);
 
-  const updateRecentItems = () => {
-    if (orderItems.length === 0) {
-      setRecentItems([]);
-      return;
+  // Actualizar items recientes cuando cambia la mesa o productos
+  useEffect(() => {
+    const targetTableId = tableId || currentTableId;
+    if (targetTableId && products.length > 0) {
+      updateRecentItems();
     }
+  }, [tableId, currentTableId, products]);
 
-    // Obtener productos únicos de la orden actual
-    const uniqueProductIds = new Set(orderItems.map((item) => item.product_id));
-    const recentProducts = products.filter((product) =>
-      uniqueProductIds.has(product.id)
-    );
+  // Actualizar items recientes cuando se envía una orden
+  useEffect(() => {
+    if (lastOrderSent) {
+      setTimeout(() => {
+        updateRecentItems();
+      }, 1500);
+    }
+  }, [lastOrderSent]);
 
-    setRecentItems(recentProducts);
+  // Función para actualizar items recientes
+  const updateRecentItems = async () => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    try {
+      // Obtener items de órdenes recientes
+      const recentOrdersItems = await getRecentOrdersItems(
+        parseInt(targetTableId.toString())
+      );
+      setRecentOrderItems(recentOrdersItems);
+
+      // Obtener productos únicos de todas las órdenes recientes
+      const uniqueProductIds = new Set(
+        recentOrdersItems.map((item) => item.product_id)
+      );
+      const recentProducts = products.filter((product) =>
+        uniqueProductIds.has(product.id)
+      );
+
+      setRecentItems(recentProducts);
+
+      console.log("🔄 Repite Item actualizado:", {
+        totalItems: recentOrdersItems.length,
+        uniqueProducts: recentProducts.length,
+        productIds: Array.from(uniqueProductIds),
+      });
+    } catch (error) {
+      console.error("Error updating recent items:", error);
+    }
   };
 
   const updateFavoriteItems = () => {
@@ -122,13 +170,13 @@ export default function MenuPage() {
     setFavoriteItems(favorites);
   };
 
+  // Suscripción para detectar liberación de mesa
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
 
     console.log("🔔 Menu: Iniciando suscripción para mesa:", targetTableId);
 
-    // Suscripción para detectar liberación de mesa
     const subscription = supabase
       .channel(`customer-menu-table-${targetTableId}`)
       .on(
@@ -164,20 +212,10 @@ export default function MenuPage() {
       setIsLoading(true);
       await refreshOrder(tableId);
       const productsData = await productsService.getProducts();
-
-      // Debug: verificar los datos que llegan
-      console.log("Productos cargados:", productsData);
-      if (productsData.length > 0) {
-        console.log("Primer producto:", productsData[0]);
-        console.log(
-          "Rating del primer producto:",
-          productsData[0].rating,
-          "Tipo:",
-          typeof productsData[0].rating
-        );
-      }
-
       setProducts(productsData);
+
+      // Cargar items recientes después de cargar productos
+      await updateRecentItems();
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -189,6 +227,15 @@ export default function MenuPage() {
     setAddingProduct(product.id);
     try {
       await addToCart(product);
+
+      // Animación de confirmación
+      const button = document.getElementById(`product-${product.id}`);
+      if (button) {
+        button.classList.add("bg-green-500");
+        setTimeout(() => {
+          button.classList.remove("bg-green-500");
+        }, 500);
+      }
     } catch (error) {
       console.error("Error adding to cart:", error);
     } finally {
@@ -196,30 +243,72 @@ export default function MenuPage() {
     }
   };
 
+  // FUNCIÓN CORREGIDA: Enviar orden a cocina
   const handleSendOrder = async () => {
     if (!currentOrder || orderItems.length === 0) return;
 
+    setSendingOrder(true);
     try {
-      // 1. Enviar notificación a cocina
+      console.log("📤 Enviando orden a cocina...", {
+        orderId: currentOrder.id,
+        itemsCount: orderItems.length,
+        tableId: currentOrder.table_id,
+      });
+
+      // 1. Actualizar el estado de la orden a 'sent' en la base de datos
+      await ordersService.updateOrderStatus(currentOrder.id, "sent");
+
+      // 2. Enviar notificación a cocina
       await notificationsService.createNotification(
         currentOrder.table_id,
-        "order_updated",
-        `Nueva orden enviada desde Mesa ${tableId}`,
+        "new_order",
+        `Nueva orden enviada desde Mesa ${currentOrder.table_id}`,
         currentOrder.id
       );
 
-      // 2. LIMPIAR EL CARRITO LOCALMENTE - usando refreshOrder para recargar el estado
-      await refreshOrder(currentOrder.table_id);
+      // 3. Crear NUEVA orden para la mesa (carrito vacío listo para nuevos pedidos)
+      await createNewOrder();
 
-      // 3. Cerrar el modal del carrito
+      // 4. Marcar que se acaba de enviar una orden
+      setLastOrderSent(true);
+
+      // 5. Cerrar el modal del carrito
       setShowCart(false);
 
-      // 4. Redirigir al historial
-      const targetTableId = tableId || currentTableId;
-      router.push(`/customer/history?table=${targetTableId}`);
+      // 6. Mostrar confirmación
+      alert(
+        "✅ ¡Orden enviada a cocina! Tu carrito está listo para nuevos pedidos."
+      );
     } catch (error) {
       console.error("Error sending order:", error);
+      alert("❌ Error al enviar la orden. Intenta nuevamente.");
+    } finally {
+      setSendingOrder(false);
     }
+  };
+
+  // Calcular tiempo estimado de preparación
+  const getEstimatedTime = () => {
+    const totalTime = orderItems.reduce((total, item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      return total + (product?.preparation_time || 10) * item.quantity;
+    }, 0);
+
+    return Math.min(Math.max(totalTime, 15), 45); // Mínimo 15, máximo 45 minutos
+  };
+
+  // Obtener items populares
+  const getPopularItems = () => {
+    return products
+      .filter((product) => product.rating && product.rating >= 4.5)
+      .slice(0, 6);
+  };
+
+  // Obtener cantidad total de un producto en órdenes recientes
+  const getProductTotalQuantityInRecentOrders = (productId: number) => {
+    return recentOrderItems
+      .filter((item) => item.product_id === productId)
+      .reduce((total, item) => total + item.quantity, 0);
   };
 
   const getProductsByCategory = () => {
@@ -228,6 +317,8 @@ export default function MenuPage() {
         return favoriteItems;
       case "repite-item":
         return recentItems;
+      case "popular":
+        return getPopularItems();
       default:
         const categoryMap: { [key: string]: string } = {
           refill: "Refill",
@@ -253,28 +344,26 @@ export default function MenuPage() {
         return `${favoriteItems.length} productos destacados`;
       case "repite-item":
         if (recentItems.length === 0) {
-          return "Agrega items a tu orden para verlos aquí";
+          return "Tus pedidos anteriores aparecerán aquí";
         }
-        return `Tienes ${recentItems.length} items en tu orden actual`;
+        return `${recentItems.length} productos de tus órdenes anteriores`;
+      case "popular":
+        return "Los productos más pedidos por nuestros clientes";
       default:
         return category?.description || "";
     }
   };
 
-  // Verificar si un producto ya está en el carrito
   const isProductInCart = (productId: number) => {
     return orderItems.some((item) => item.product_id === productId);
   };
 
-  // Obtener la cantidad actual de un producto en el carrito
   const getProductQuantityInCart = (productId: number) => {
     const item = orderItems.find((item) => item.product_id === productId);
     return item ? item.quantity : 0;
   };
 
-  // Función para renderizar las estrellas del rating
   const renderStarRating = (rating: number) => {
-    // Si el rating es 0, mostrar sin rating
     if (rating === 0) {
       return (
         <div className="flex items-center gap-1">
@@ -294,19 +383,43 @@ export default function MenuPage() {
     );
   };
 
-  // Mostrar loading mientras se obtiene tableId
-  if (tableId === null) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando menú...</p>
-        </div>
-      </div>
-    );
-  }
+  // Componente para el badge del carrito mejorado
+  const CartBadge = () => (
+    <button
+      onClick={() => setShowCart(true)}
+      className="relative bg-blue-600 text-white px-4 py-3 rounded-full hover:bg-blue-700 transition shadow-lg flex items-center gap-2 group"
+    >
+      <FaShoppingCart className="text-xl" />
+      <span className="font-bold">{cartItemsCount}</span>
+      <span className="hidden sm:inline">• ${cartTotal.toFixed(2)}</span>
 
-  if (isLoading) {
+      {/* Badge animado mejorado */}
+      {cartItemsCount > 0 && (
+        <div className="absolute -top-1 -right-1">
+          <div className="relative">
+            <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white animate-pulse border-2 border-white">
+              {cartItemsCount}
+            </div>
+            <div className="absolute inset-0 rounded-full bg-red-400 animate-ping"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Indicador de orden recién enviada */}
+      {lastOrderSent && cartItemsCount === 0 && (
+        <div className="absolute -top-1 -right-1">
+          <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+        </div>
+      )}
+
+      {/* Tooltip */}
+      <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap">
+        Ver mi orden ({cartItemsCount} items)
+      </div>
+    </button>
+  );
+
+  if (tableId === null || isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -329,24 +442,45 @@ export default function MenuPage() {
             </h1>
             <p className="text-sm text-gray-500">
               Mesa {targetTableId} • {currentOrder?.customer_name || "Invitado"}
+              {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
             </p>
           </div>
 
-          <button
-            onClick={() => setShowCart(true)}
-            className="relative bg-blue-600 text-white px-4 py-3 rounded-full hover:bg-blue-700 transition shadow-lg flex items-center gap-2"
-          >
-            <FaShoppingCart className="text-xl" />
-            <span className="font-bold">{cartItemsCount}</span>
-            <span className="hidden sm:inline">• ${cartTotal.toFixed(2)}</span>
-
-            {/* PUNTO ROJO AGREGADO AQUÍ */}
-            {cartItemsCount > 0 && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse border-2 border-white"></div>
-            )}
-          </button>
+          <CartBadge />
         </div>
       </header>
+
+      {/* Banner de confirmación cuando se acaba de enviar una orden */}
+      {lastOrderSent && (
+        <div className="bg-green-50 border-b border-green-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-center gap-2 text-green-700">
+              <FaCheck className="text-green-500" />
+              <span className="font-semibold">¡Orden enviada a cocina!</span>
+              <span className="text-sm">Puedes seguir agregando más items</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sección de estado rápido */}
+      {orderItems.length > 0 && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 py-2">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1 text-green-600 font-semibold">
+                  <FaShoppingCart className="text-xs" />
+                  {orderItems.length} items en carrito
+                </span>
+              </div>
+              <span className="text-gray-600">
+                ⏱️ Tiempo estimado: ~{getEstimatedTime()} min
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white shadow-sm sticky top-16 z-20 overflow-x-auto">
         <div className="flex gap-2 px-4 py-4 max-w-7xl mx-auto">
@@ -396,10 +530,11 @@ export default function MenuPage() {
           <div className="text-center py-12 bg-white rounded-2xl shadow-sm">
             <div className="text-6xl mb-4">🔄</div>
             <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              Tu orden está vacía
+              Aún no has realizado pedidos
             </h3>
             <p className="text-gray-500">
-              Agrega items a tu orden para poder repetirlos fácilmente
+              Tus pedidos anteriores aparecerán aquí para que puedas repetirlos
+              fácilmente
             </p>
           </div>
         )}
@@ -408,12 +543,23 @@ export default function MenuPage() {
           {getProductsByCategory().map((product) => {
             const isInCart = isProductInCart(product.id);
             const currentQuantity = getProductQuantityInCart(product.id);
+            const totalRecentQuantity = getProductTotalQuantityInRecentOrders(
+              product.id
+            );
 
             return (
               <div
                 key={product.id}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group"
+                className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
               >
+                {/* Badge de popularidad */}
+                {product.rating && product.rating >= 4.5 && (
+                  <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+                    <FaFire className="text-xs" />
+                    Popular
+                  </div>
+                )}
+
                 {product.image_url ? (
                   <div className="relative overflow-hidden h-48">
                     <img
@@ -427,24 +573,40 @@ export default function MenuPage() {
                     <div className="absolute top-2 right-2 bg-white px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
                       {renderStarRating(product.rating || 0)}
                     </div>
+
+                    {/* Badge de favorito */}
                     {product.is_favorite && (
                       <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
                         <FaHeart className="text-xs" />
                         Favorito
                       </div>
                     )}
-                    {selectedCategory === "repite-item" && (
-                      <div className="absolute top-2 left-2 bg-blue-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold">
-                        En tu orden
-                      </div>
-                    )}
+
+                    {/* Badge de Repite Item */}
+                    {/* {selectedCategory === "repite-item" &&
+                      totalRecentQuantity > 0 && (
+                        // <div className="absolute top-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                        //   Pedido anterior
+                        // </div>
+                      )} */}
+
+                    {/* Badge de cantidad en órdenes recientes */}
+                    {selectedCategory === "repite-item" &&
+                      totalRecentQuantity > 0 && (
+                        <div className="absolute bottom-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                          {totalRecentQuantity}x en pedidos anteriores
+                        </div>
+                      )}
+
+                    {/* Badge de en carrito actual */}
                     {isInCart && (
-                      <div className="absolute bottom-2 left-2 bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold">
+                      <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
                         {currentQuantity} en carrito
                       </div>
                     )}
                   </div>
                 ) : null}
+
                 <div className="p-4">
                   <h3 className="text-lg font-bold text-gray-800 mb-1">
                     {product.name}
@@ -483,22 +645,33 @@ export default function MenuPage() {
                       )}
 
                       <button
+                        id={`product-${product.id}`}
                         onClick={() => handleAddToCart(product)}
                         disabled={addingProduct === product.id}
-                        className={`px-4 py-2 rounded-full transition shadow-md font-medium flex items-center gap-2 disabled:opacity-50 ${
+                        className={`px-4 py-2 rounded-full transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 ${
                           isInCart
-                            ? "bg-green-600 text-white hover:bg-green-700"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
+                            ? "bg-green-600 text-white hover:bg-green-700 scale-105"
+                            : "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
                         }`}
                       >
                         {addingProduct === product.id ? (
                           <FaSpinner className="animate-spin" />
                         ) : isInCart ? (
-                          <FaPlus />
+                          <>
+                            <FaPlus />
+                            <span className="hidden sm:inline">
+                              Agregar más
+                            </span>
+                            <span className="sm:hidden">
+                              +{currentQuantity}
+                            </span>
+                          </>
                         ) : (
-                          <FaPlus />
+                          <>
+                            <FaPlus />
+                            Agregar
+                          </>
                         )}
-                        {isInCart ? "Agregar más" : "Agregar"}
                       </button>
 
                       {isInCart && (
@@ -525,39 +698,85 @@ export default function MenuPage() {
           )}
       </main>
 
+      {/* MODAL DEL CARRITO MEJORADO */}
       {showCart && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-end">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-end animate-in slide-in-from-right">
           <div className="bg-white w-full max-w-md h-full overflow-y-auto">
             <div className="p-6 border-b sticky top-0 bg-white z-10">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-800">Tu Orden</h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    Tu Orden Actual
+                  </h2>
+                  {currentOrder?.id && (
+                    <p className="text-sm text-gray-500">
+                      Orden #{currentOrder.id.slice(0, 8)}
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowCart(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
                   ✕
                 </button>
               </div>
-              <p className="text-gray-600">
-                {cartItemsCount} items en la orden
-              </p>
+
+              {/* Resumen rápido */}
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {cartItemsCount}
+                  </div>
+                  <div className="text-xs text-gray-600">Items en carrito</div>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    ${cartTotal.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-600">Subtotal</div>
+                </div>
+              </div>
             </div>
 
             {orderItems.length === 0 ? (
               <div className="p-12 text-center">
                 <FaShoppingCart className="text-6xl text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-600 mb-2">
-                  Tu orden está vacía
+                  {lastOrderSent ? "¡Orden enviada! 🎉" : "Tu orden está vacía"}
                 </h3>
-                <p className="text-gray-500">
-                  Agrega algunos items deliciosos del menú
+                <p className="text-gray-500 mb-6">
+                  {lastOrderSent
+                    ? "Tu pedido está en camino. ¿Quieres agregar algo más?"
+                    : "Agrega algunos items deliciosos del menú"}
                 </p>
+                <button
+                  onClick={() => setShowCart(false)}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
+                >
+                  {lastOrderSent ? "Seguir Pidiendo" : "Explorar Menú"}
+                </button>
+
+                {lastOrderSent && (
+                  <button
+                    onClick={() =>
+                      router.push(`/customer/history?table=${targetTableId}`)
+                    }
+                    className="block w-full mt-4 bg-gray-100 text-gray-700 px-6 py-3 rounded-full hover:bg-gray-200 transition"
+                  >
+                    Ver Estado de mi Orden
+                  </button>
+                )}
               </div>
             ) : (
               <>
+                {/* Items actuales en carrito */}
                 <div className="divide-y max-h-96 overflow-y-auto">
                   {orderItems.map((item) => (
-                    <div key={item.id} className="p-6 flex items-center gap-4">
+                    <div
+                      key={item.id}
+                      className="p-6 flex items-center gap-4 hover:bg-gray-50 transition"
+                    >
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-800">
                           {item.product_name}
@@ -580,7 +799,7 @@ export default function MenuPage() {
                         >
                           <FaMinus className="text-sm" />
                         </button>
-                        <span className="font-semibold text-lg w-8 text-center">
+                        <span className="font-semibold text-lg w-8 text-center bg-blue-100 text-blue-600 rounded">
                           {item.quantity}
                         </span>
                         <button
@@ -593,7 +812,7 @@ export default function MenuPage() {
                         </button>
                         <button
                           onClick={() => removeFromCart(item.id)}
-                          className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition ml-4"
+                          className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition ml-2"
                         >
                           <FaTrash className="text-sm" />
                         </button>
@@ -602,8 +821,13 @@ export default function MenuPage() {
                   ))}
                 </div>
 
+                {/* Resumen y acciones */}
                 <div className="p-6 bg-gray-50 border-t sticky bottom-0">
                   <div className="space-y-2 mb-6">
+                    <div className="flex justify-between text-sm">
+                      <span>Items en carrito:</span>
+                      <span>{cartItemsCount}</span>
+                    </div>
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <span>${cartTotal.toFixed(2)}</span>
@@ -618,6 +842,14 @@ export default function MenuPage() {
                         ${(cartTotal * 1.08).toFixed(2)}
                       </span>
                     </div>
+
+                    {/* Tiempo estimado */}
+                    <div className="flex justify-between items-center text-sm text-gray-600 bg-white p-3 rounded-lg mt-3">
+                      <span>⏱️ Tiempo estimado:</span>
+                      <span className="font-semibold">
+                        ~{getEstimatedTime()} minutos
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
@@ -629,12 +861,21 @@ export default function MenuPage() {
                     </button>
                     <button
                       onClick={handleSendOrder}
-                      className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2"
+                      disabled={sendingOrder}
+                      className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <FaCheck />
-                      Enviar a Cocina
+                      {sendingOrder ? (
+                        <FaSpinner className="animate-spin" />
+                      ) : (
+                        <FaCheck />
+                      )}
+                      {sendingOrder ? "Enviando..." : "Enviar a Cocina"}
                     </button>
                   </div>
+
+                  <p className="text-xs text-gray-500 text-center mt-3">
+                    💡 Los nuevos items se agregarán a una nueva orden
+                  </p>
                 </div>
               </>
             )}

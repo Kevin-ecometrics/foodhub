@@ -5,7 +5,7 @@ export interface OrderWithItems {
   id: string
   table_id: number
   customer_name: string | null
-  status: 'active' | 'completed' | 'cancelled' | 'paid'
+  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid' // AGREGAR 'sent'
   total_amount: number
   created_at: string
   updated_at: string
@@ -35,7 +35,7 @@ interface OrderFromSupabase {
   id: string
   table_id: number
   customer_name: string | null
-  status: 'active' | 'completed' | 'cancelled' | 'paid'
+  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid'
   total_amount: number
   created_at: string
   updated_at: string
@@ -43,7 +43,7 @@ interface OrderFromSupabase {
 }
 
 export const historyService = {
-  // Obtener historial del cliente actual (solo su orden activa + completadas)
+  // Obtener historial del cliente actual (orden activa + enviadas + completadas)
   async getCustomerOrderHistory(tableId: number, currentOrderId?: string): Promise<OrderWithItems[]> {
     let query = supabase
       .from('orders')
@@ -61,20 +61,29 @@ export const historyService = {
       .eq('table_id', tableId)
       .order('created_at', { ascending: false })
 
-    // ✅ FILTRAR: Si hay orderId actual, mostrar esa + completadas
+    // ✅ FILTRAR CORREGIDO: Mostrar orden activa actual + enviadas + completadas
     if (currentOrderId) {
-      query = query.or(`id.eq.${currentOrderId},status.eq.completed`)
+      query = query.or(`id.eq.${currentOrderId},status.eq.sent,status.eq.completed,status.eq.paid`)
     } else {
-      // Si no hay orderId actual, mostrar solo completadas
-      query = query.eq('status', 'completed')
+      // Si no hay orderId actual, mostrar enviadas + completadas + pagadas
+      query = query.in('status', ['sent', 'completed', 'paid'])
     }
 
     const { data, error } = await query
     
-    if (error) throw error
+    if (error) {
+      console.error('Error getting customer order history:', error)
+      throw error
+    }
     
     // Type assertion para los datos de Supabase
     const ordersData = data as OrderFromSupabase[] | null
+    console.log('📊 HistoryService: Órdenes encontradas:', ordersData?.length)
+    if (ordersData) {
+      ordersData.forEach(order => {
+        console.log(`   - Orden ${order.id.slice(-8)}: ${order.status} con ${order.order_items.length} items`)
+      })
+    }
     return ordersData || []
   },
 
@@ -96,11 +105,74 @@ export const historyService = {
       .eq('id', orderId)
       .single()
     
-    if (error) return null
+    if (error) {
+      console.error('Error getting order with items:', error)
+      return null
+    }
     
     // Type assertion para el dato de Supabase
     const orderData = data as OrderFromSupabase | null
     return orderData
+  },
+
+  // Obtener solo la orden activa actual
+  async getCurrentActiveOrder(tableId: number): Promise<OrderWithItems | null> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          *,
+          products (
+            name,
+            image_url,
+            preparation_time
+          )
+        )
+      `)
+      .eq('table_id', tableId)
+      .eq('status', 'active')
+      .single()
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log('No active order found for table:', tableId)
+        return null
+      }
+      console.error('Error getting current active order:', error)
+      throw error
+    }
+    
+    const orderData = data as OrderFromSupabase | null
+    return orderData
+  },
+
+  // Obtener solo historial (sin orden activa)
+  async getOrderHistoryOnly(tableId: number): Promise<OrderWithItems[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          *,
+          products (
+            name,
+            image_url,
+            preparation_time
+          )
+        )
+      `)
+      .eq('table_id', tableId)
+      .in('status', ['sent', 'completed', 'paid'])
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error getting order history only:', error)
+      throw error
+    }
+    
+    const ordersData = data as OrderFromSupabase[] | null
+    return ordersData || []
   },
 
   // Solicitar asistencia del mesero
@@ -114,7 +186,12 @@ export const historyService = {
         status: 'pending'
       } as any)
     
-    if (error) throw error
+    if (error) {
+      console.error('Error requesting assistance:', error)
+      throw error
+    }
+    
+    console.log('✅ Asistencia solicitada para mesa:', tableId)
   },
 
   // Solicitar la cuenta
@@ -129,6 +206,44 @@ export const historyService = {
         status: 'pending'
       } as any)
     
-    if (error) throw error
+    if (error) {
+      console.error('Error requesting bill:', error)
+      throw error
+    }
+    
+    console.log('✅ Cuenta solicitada para mesa:', tableId, 'orden:', orderId)
+  },
+
+  // Nueva función: Obtener todas las órdenes de la mesa (para debugging)
+  async getAllTableOrders(tableId: number): Promise<OrderWithItems[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          *,
+          products (
+            name,
+            image_url,
+            preparation_time
+          )
+        )
+      `)
+      .eq('table_id', tableId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error getting all table orders:', error)
+      throw error
+    }
+    
+    const ordersData = data as OrderFromSupabase[] | null
+    console.log('🔍 All orders for table', tableId, ':', ordersData?.map(o => ({
+      id: o.id.slice(-8),
+      status: o.status,
+      items: o.order_items.length,
+      createdAt: o.created_at
+    })))
+    return ordersData || []
   }
 }

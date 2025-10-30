@@ -4,7 +4,7 @@ export interface Order {
   id: string
   table_id: number
   customer_name: string | null
-  status: 'active' | 'completed' | 'cancelled' | 'paid'
+  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid'
   total_amount: number
   created_at: string
 }
@@ -19,8 +19,7 @@ export const ordersService = {
         customer_name: customerName || null,
         status: 'active',
         total_amount: 0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any)
+      } as never)
       .select()
       .single()
     
@@ -52,5 +51,38 @@ export const ordersService = {
       .eq('id', orderId)
     
     if (error) throw error
+  },
+
+  // NUEVA FUNCIÓN: Actualizar estado de orden
+  async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ 
+        status: status,
+        updated_at: new Date().toISOString()
+      } as never)
+      .eq('id', orderId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // NUEVA FUNCIÓN: Crear nueva orden para la misma mesa
+  async createNewOrderForTable(tableId: number, customerName?: string): Promise<Order> {
+    const { data, error } = await supabase
+      .from('orders')
+      .insert({
+        table_id: tableId,
+        customer_name: customerName || null,
+        status: 'active',
+        total_amount: 0
+      } as never)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
   }
 }

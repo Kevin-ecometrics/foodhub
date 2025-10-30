@@ -12,6 +12,9 @@ import {
   FaExclamationTriangle,
   FaSync,
   FaQrcode,
+  FaCheck,
+  FaClock,
+  FaUtensilSpoon,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -21,6 +24,9 @@ interface TaxCalculation {
   taxAmount: number;
   total: number;
 }
+
+// Tipo para estado de orden
+type OrderStatus = "active" | "sent" | "completed" | "paid";
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -64,15 +70,54 @@ export default function HistoryPage() {
 
   const currentOrderCalculations = calculateTaxes(orderItems);
 
+  // Calcular totales para órdenes del historial
+  const calculateOrderTotal = (order: OrderWithItems): number => {
+    return order.order_items.reduce(
+      (total, item) => total + item.price * item.quantity,
+      0
+    );
+  };
+
+  // Obtener texto del estado de la orden
+  const getStatusText = (status: OrderStatus): string => {
+    const statusMap = {
+      active: "En preparación",
+      sent: "Enviada a cocina",
+      completed: "Completada",
+      paid: "Pagada",
+    };
+    return statusMap[status] || status;
+  };
+
+  // Obtener color del estado
+  const getStatusColor = (status: OrderStatus): string => {
+    const colorMap = {
+      active: "bg-yellow-100 text-yellow-800",
+      sent: "bg-blue-100 text-blue-800",
+      completed: "bg-green-100 text-green-800",
+      paid: "bg-purple-100 text-purple-800",
+    };
+    return colorMap[status] || "bg-gray-100 text-gray-800";
+  };
+
+  // Obtener ícono del estado
+  const getStatusIcon = (status: OrderStatus) => {
+    const iconMap = {
+      active: FaUtensilSpoon,
+      sent: FaClock,
+      completed: FaCheck,
+      paid: FaCheck,
+    };
+    return iconMap[status] || FaHistory;
+  };
+
   const loadHistory = async (tableId: number) => {
     try {
       setLoading(true);
       setError("");
 
-      const history = await historyService.getCustomerOrderHistory(
-        tableId,
-        currentOrder?.id
-      );
+      const history = await historyService.getCustomerOrderHistory(tableId);
+      console.log("📊 Historial cargado:", history.length, "órdenes");
 
       setOrderHistory(history);
     } catch (error) {
@@ -105,7 +150,7 @@ export default function HistoryPage() {
     loadData();
   }, [tableId, currentTableId, router]);
 
-  // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA - SIN LOOPS
+  // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId || isSubscribedRef.current) return;
@@ -117,30 +162,51 @@ export default function HistoryPage() {
     const debouncedUpdate = () => {
       const now = Date.now();
       if (now - lastUpdateRef.current > 2000) {
-        // Solo actualizar cada 2 segundos
         lastUpdateRef.current = now;
         loadData();
       }
     };
 
-    // Suscripción para cambios en órdenes - SOLO INSERT
+    // Suscripción para cambios en órdenes
     const orderSubscription = supabase
       .channel(`history-orders-${targetTableId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT", // SOLO INSERT para evitar loops
+          event: "*",
           schema: "public",
           table: "orders",
           filter: `table_id=eq.${targetTableId}`,
         },
         async (payload) => {
-          console.log("📦 History: Nueva orden detectada");
+          console.log(
+            "📦 History: Cambio en orden detectado:",
+            payload.eventType
+          );
           debouncedUpdate();
         }
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a órdenes:", status);
+      });
+
+    // Suscripción para cambios en items de orden
+    const orderItemsSubscription = supabase
+      .channel(`history-order-items-${targetTableId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+        },
+        async (payload) => {
+          console.log("📦 History: Cambio en items detectado");
+          debouncedUpdate();
+        }
+      )
+      .subscribe((status) => {
+        console.log("History: Estado de suscripción a items:", status);
       });
 
     // Suscripción para notificaciones del mesero (mesa liberada)
@@ -171,10 +237,11 @@ export default function HistoryPage() {
     return () => {
       console.log("🧹 History: Limpiando suscripciones");
       orderSubscription.unsubscribe();
+      orderItemsSubscription.unsubscribe();
       notificationSubscription.unsubscribe();
       isSubscribedRef.current = false;
     };
-  }, [tableId, currentTableId]); // Removí refreshOrder de las dependencias
+  }, [tableId, currentTableId]);
 
   const handleAssistanceRequest = async () => {
     const targetTableId = tableId || currentTableId;
@@ -205,7 +272,10 @@ export default function HistoryPage() {
         currentOrder?.id
       );
       alert("✅ Se ha solicitado la cuenta. El mesero te traerá tu factura.");
-      router.push(`/customer/payment?table=${targetTableId}`);
+
+      setTimeout(() => {
+        router.push(`/customer/payment?table=${targetTableId}`);
+      }, 2000);
     } catch (error) {
       console.error("Error requesting bill:", error);
       alert("❌ Error al solicitar la cuenta");
@@ -309,11 +379,14 @@ export default function HistoryPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6">
         {/* Orden Actual */}
-        {currentOrder && (
+        {currentOrder && orderItems.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <FaUtensils />
-              Orden Actual - Ticket
+              Orden Actual
+              <span className="text-sm font-normal bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                En preparación
+              </span>
             </h2>
 
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -391,6 +464,107 @@ export default function HistoryPage() {
           </div>
         )}
 
+        {/* Historial de Órdenes Enviadas */}
+        {orderHistory.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <FaHistory />
+              Órdenes Anteriores
+            </h2>
+
+            <div className="space-y-4">
+              {orderHistory.map((order) => {
+                const StatusIcon = getStatusIcon(order.status as OrderStatus);
+                const orderTotal = calculateOrderTotal(order);
+                const orderCalculations = {
+                  subtotal: orderTotal,
+                  taxAmount: orderTotal * 0.16,
+                  total: orderTotal * 1.16,
+                };
+
+                return (
+                  <div
+                    key={order.id}
+                    className="bg-white rounded-2xl shadow-sm overflow-hidden"
+                  >
+                    {/* Header de la Orden Histórica */}
+                    <div className="bg-blue-800 text-white p-4 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-bold">
+                          Orden #{order.id.slice(-8)}
+                        </h3>
+                        <p className="text-blue-200 text-sm">
+                          {new Date(order.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <div
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                          order.status as OrderStatus
+                        )}`}
+                      >
+                        <StatusIcon className="inline mr-1" size={12} />
+                        {getStatusText(order.status as OrderStatus)}
+                      </div>
+                    </div>
+
+                    {/* Items de la Orden Histórica */}
+                    <div className="p-4">
+                      <div className="space-y-3 mb-4">
+                        {order.order_items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex justify-between items-start py-2 border-b border-gray-100"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <span className="font-semibold text-gray-800">
+                                    {item.product_name}
+                                  </span>
+                                  {item.notes && (
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      Nota: {item.notes}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-medium text-gray-800">
+                                    ${(item.price * item.quantity).toFixed(2)}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    ${item.price.toFixed(2)} × {item.quantity}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Resumen de la Orden Histórica */}
+                      <div className="border-t border-gray-200 pt-3 space-y-2 text-sm">
+                        <div className="flex justify-between text-gray-600">
+                          <span>Subtotal:</span>
+                          <span>${orderCalculations.subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Impuestos (16%):</span>
+                          <span>${orderCalculations.taxAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-2">
+                          <span>Total:</span>
+                          <span>${orderCalculations.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Estado vacío */}
         {!currentOrder && orderHistory.length === 0 && (
           <div className="text-center py-12">
             <FaHistory className="text-6xl text-gray-300 mx-auto mb-4" />
@@ -400,6 +574,14 @@ export default function HistoryPage() {
             <p className="text-gray-500">
               Aún no has realizado ningún pedido en esta mesa
             </p>
+            <button
+              onClick={() =>
+                router.push(`/customer/menu?table=${targetTableId}`)
+              }
+              className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
+            >
+              Hacer mi primer pedido
+            </button>
           </div>
         )}
       </main>

@@ -22,6 +22,9 @@ interface OrderContextType {
   ) => Promise<void>;
   updateCartItem: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
+  clearCart: () => void;
+  createNewOrder: () => Promise<void>;
+  getRecentOrdersItems: (tableId: number) => Promise<OrderItem[]>; // NUEVA FUNCIÓN
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -71,6 +74,56 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // NUEVA FUNCIÓN: Obtener items de órdenes recientes
+  const getRecentOrdersItems = async (
+    tableId: number
+  ): Promise<OrderItem[]> => {
+    try {
+      // Obtener las últimas 3 órdenes enviadas/completadas
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `
+          id,
+          order_items (*)
+        `
+        )
+        .eq("table_id", tableId)
+        .in("status", ["sent", "completed", "paid"])
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error("Error getting recent orders:", error);
+        return [];
+      }
+
+      // Tipar explícitamente el resultado para evitar el error de 'never'
+      type OrderWithItems = {
+        id: string;
+        order_items: OrderItem[];
+      };
+
+      const allItems: OrderItem[] = [];
+      (data as OrderWithItems[] | null)?.forEach((order) => {
+        if (order.order_items) {
+          allItems.push(...order.order_items);
+        }
+      });
+
+      console.log("📦 Recent orders items:", {
+        ordersCount: data?.length,
+        totalItems: allItems.length,
+        uniqueProducts: new Set(allItems.map((item) => item.product_id)).size,
+      });
+
+      return allItems;
+    } catch (error) {
+      console.error("Error getting recent orders items:", error);
+      return [];
+    }
+  };
+
   const refreshOrder = async (tableId: number) => {
     setLoading(true);
     try {
@@ -85,22 +138,20 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         const items = await orderItemsService.getOrderItems(order.id);
         setOrderItems(items);
 
-        // ✅ CORRECCIÓN: Calcular el total localmente
+        // Calcular el total localmente
         const localTotal = items.reduce(
           (sum, item) => sum + item.price * item.quantity,
           0
         );
 
-        // ✅ CORRECCIÓN: Solo actualizar en BD si es diferente
+        // Solo actualizar en BD si es diferente
         if (localTotal !== order.total_amount) {
           await ordersService.updateOrderTotal(order.id, localTotal);
-
-          // ✅ ACTUALIZAR también el order local con el nuevo total
           setCurrentOrder((prev) =>
             prev ? { ...prev, total_amount: localTotal } : null
           );
         } else {
-          // ✅ Si ya está actualizado, asegurarse de que el estado local refleje el total correcto
+          // Si ya está actualizado, asegurarse de que el estado local refleje el total correcto
           setCurrentOrder((prev) =>
             prev ? { ...prev, total_amount: localTotal } : null
           );
@@ -133,11 +184,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
       setOrderItems((prev) => [...prev, newItem]);
 
-      // ✅ CORRECCIÓN: Calcular total localmente y actualizar estado inmediatamente
+      // Calcular total localmente y actualizar estado inmediatamente
       const newTotal = cartTotal + product.price * quantity;
       await ordersService.updateOrderTotal(currentOrder.id, newTotal);
 
-      // ✅ ACTUALIZAR el order local con el nuevo total
+      // ACTUALIZAR el order local con el nuevo total
       setCurrentOrder((prev) =>
         prev ? { ...prev, total_amount: newTotal } : null
       );
@@ -156,13 +207,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     try {
       await orderItemsService.updateItemQuantity(itemId, quantity);
 
-      // ✅ CORRECCIÓN: Actualizar estado local inmediatamente
+      // Actualizar estado local inmediatamente
       setOrderItems((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, quantity } : item))
       );
 
       if (currentOrder) {
-        // ✅ CORRECCIÓN: Calcular nuevo total y actualizar
+        // Calcular nuevo total y actualizar
         const newTotal = orderItems.reduce((total, item) => {
           if (item.id === itemId) {
             return total + item.price * quantity;
@@ -187,11 +238,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
       await orderItemsService.removeItemFromOrder(itemId);
 
-      // ✅ CORRECCIÓN: Actualizar estado local inmediatamente
+      // Actualizar estado local inmediatamente
       setOrderItems((prev) => prev.filter((item) => item.id !== itemId));
 
       if (currentOrder && itemToRemove) {
-        // ✅ CORRECCIÓN: Calcular nuevo total y actualizar
+        // Calcular nuevo total y actualizar
         const newTotal = cartTotal - itemToRemove.price * itemToRemove.quantity;
         await ordersService.updateOrderTotal(currentOrder.id, newTotal);
         setCurrentOrder((prev) =>
@@ -200,6 +251,30 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Error removing from cart:", error);
+      throw error;
+    }
+  };
+
+  const clearCart = () => {
+    setOrderItems([]);
+  };
+
+  const createNewOrder = async () => {
+    if (!currentTableId) throw new Error("No table selected");
+
+    try {
+      const newOrder = await ordersService.createNewOrderForTable(
+        currentTableId,
+        currentOrder?.customer_name || `Mesa ${currentTableId}`
+      );
+
+      setCurrentOrder(newOrder);
+      setOrderItems([]);
+
+      // Suscribirse a cambios en tiempo real de la nueva orden
+      subscribeToOrderUpdates(newOrder.id);
+    } catch (error) {
+      console.error("Error creating new order:", error);
       throw error;
     }
   };
@@ -213,7 +288,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     };
   }, [currentOrder]);
 
-  // En el OrderProvider, agregar este useEffect después de los existentes:
+  // Suscripción para detectar cuando la mesa es liberada
   useEffect(() => {
     if (currentTableId) {
       console.log(
@@ -221,7 +296,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         currentTableId
       );
 
-      // Suscripción para detectar cuando la mesa es liberada
       const tableFreedSubscription = supabase
         .channel(`table-freed-global-${currentTableId}`)
         .on(
@@ -271,6 +345,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         updateCartItem,
         removeFromCart,
+        clearCart,
+        createNewOrder,
+        getRecentOrdersItems, // NUEVA FUNCIÓN EXPORTADA
       }}
     >
       {children}

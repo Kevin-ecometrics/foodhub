@@ -22,6 +22,27 @@ export interface PopularProduct {
   total_revenue: number;
 }
 
+// NUEVAS INTERFACES PARA VENTAS
+export interface SalesHistory {
+  id: string;
+  table_id: number;
+  table_number: number;
+  customer_name: string | null;
+  total_amount: number;
+  order_count: number;
+  item_count: number;
+  created_at: string;
+  closed_at: string;
+}
+
+export interface SalesSummary {
+  totalSales: number;
+  totalItems: number;
+  totalOrders: number;
+  saleCount: number;
+  averageSale: number;
+}
+
 // Interfaz para órdenes relacionadas
 export interface RelatedOrder {
   id: string;
@@ -73,7 +94,6 @@ export interface ProductFormData {
   is_available: boolean;
   is_favorite: boolean;
   rating: string; 
-
 }
 
 // Credenciales fijas del administrador

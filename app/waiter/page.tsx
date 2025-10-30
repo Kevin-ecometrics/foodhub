@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
 import {
@@ -17,6 +18,8 @@ import {
   FaCheckCircle,
   FaReceipt,
   FaSync,
+  FaDollarSign,
+  FaTrash,
 } from "react-icons/fa";
 
 export default function WaiterDashboard() {
@@ -35,11 +38,9 @@ export default function WaiterDashboard() {
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
-    // Timer de actualización automática cada minuto
     const interval = setInterval(() => {
-      console.log("🔄 Actualización automática cada minuto");
       loadData();
-    }, 60000); // 60,000 ms = 1 minuto
+    }, 30000);
 
     return () => {
       unsubscribe();
@@ -54,6 +55,7 @@ export default function WaiterDashboard() {
         waiterService.getPendingNotifications(),
         waiterService.getTablesWithOrders(),
       ]);
+
       setNotifications(notifsData);
       setTables(tablesData);
     } catch (error) {
@@ -64,29 +66,51 @@ export default function WaiterDashboard() {
   };
 
   const setupRealtimeSubscription = () => {
-    // Suscripción a nuevas notificaciones
     const notificationsSub = supabase
       .channel("waiter-notifications")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "waiter_notifications",
         },
-        (payload) => {
-          // Solo agregar si está pendiente
-          if (payload.new.status === "pending") {
-            setNotifications((prev) => [
-              payload.new as WaiterNotification,
-              ...prev,
-            ]);
-          }
+        () => {
+          loadData();
         }
       )
       .subscribe();
 
-    // Suscripción a cambios en mesas
+    const ordersSub = supabase
+      .channel("waiter-orders")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    const orderItemsSub = supabase
+      .channel("waiter-order-items")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+        },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
     const tablesSub = supabase
       .channel("waiter-tables")
       .on(
@@ -104,6 +128,8 @@ export default function WaiterDashboard() {
 
     return () => {
       notificationsSub.unsubscribe();
+      ordersSub.unsubscribe();
+      orderItemsSub.unsubscribe();
       tablesSub.unsubscribe();
     };
   };
@@ -111,14 +137,7 @@ export default function WaiterDashboard() {
   const handleAcknowledgeNotification = async (notificationId: string) => {
     setProcessing(notificationId);
     try {
-      // Marcar la notificación como atendida en el estado local
       setAttendedNotifications((prev) => new Set(prev).add(notificationId));
-
-      // Aquí puedes agregar lógica adicional si necesitas actualizar algo en la base de datos
-      // Por ejemplo, cambiar el estado de la notificación a "attended" pero sin eliminarla
-      // await waiterService.markNotificationAsAttended(notificationId);
-
-      console.log(`Notificación ${notificationId} marcada como atendida`);
     } catch (error) {
       console.error("Error acknowledging notification:", error);
     } finally {
@@ -131,7 +150,6 @@ export default function WaiterDashboard() {
     try {
       await waiterService.completeNotification(notificationId);
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-      // También remover de las notificaciones atendidas si estaba ahí
       setAttendedNotifications((prev) => {
         const newSet = new Set(prev);
         newSet.delete(notificationId);
@@ -156,36 +174,43 @@ export default function WaiterDashboard() {
     }
   };
 
-  const handleFreeTable = async (tableId: number) => {
-    setProcessing(`table-${tableId}`);
+  const handleCobrarMesa = async (tableId: number, tableNumber: number) => {
+    const table = tables.find((t) => t.id === tableId);
+    const tableTotal = table ? calculateTableTotal(table) : 0;
+
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres COBRAR la Mesa ${tableNumber}?\n\n💰 Total: $${tableTotal.toFixed(
+          2
+        )}\n\n📊 Se guardará el historial de venta y se liberará la mesa.`
+      )
+    ) {
+      return;
+    }
+
+    setProcessing(`cobrar-${tableId}`);
     try {
-      // 1. Buscar la orden activa de esta mesa
-      const table = tables.find((t) => t.id === tableId);
-      if (table && table.orders.length > 0) {
-        // 2. Completar todas las órdenes activas de esta mesa
-        for (const order of table.orders) {
-          await waiterService.completeOrder(order.id);
-        }
-      }
+      console.log(`💵 Iniciando cobro para mesa ${tableNumber}`);
 
-      // 3. Liberar la mesa
-      await waiterService.freeTable(tableId);
+      // Usar la función actualizada que guarda el historial primero
+      await waiterService.freeTableAndClean(tableId, tableNumber);
 
-      // 4. ✅ CREAR NOTIFICACIÓN TABLE_FREED (IMPORTANTE)
-      console.log("Creando notificación table_freed para mesa:", tableId);
-      await waiterService.notifyTableFreed(tableId);
+      alert(
+        `✅ Mesa ${tableNumber} cobrada exitosamente!\n\n💰 Total: $${tableTotal.toFixed(
+          2
+        )}\n📈 Historial guardado correctamente`
+      );
 
-      // 5. Recargar datos
+      // Recargar datos
       await loadData();
-    } catch (error) {
-      console.error("Error freeing table:", error);
-      alert("Error al liberar la mesa: " + error);
+    } catch (error: any) {
+      console.error("Error cobrando mesa:", error);
+      alert(`❌ Error al cobrar la mesa ${tableNumber}:\n${error.message}`);
     } finally {
       setProcessing(null);
     }
   };
 
-  // Función para simular clic en el tab de mesas
   const handleGoToTables = () => {
     setActiveTab("tables");
   };
@@ -239,6 +264,48 @@ export default function WaiterDashboard() {
     }
   };
 
+  // Calcular total acumulado de TODAS las órdenes de la mesa
+  const calculateTableTotal = (table: TableWithOrder) => {
+    return table.orders.reduce((total, order) => total + order.total_amount, 0);
+  };
+
+  // Calcular total de items
+  const calculateTotalItems = (table: TableWithOrder) => {
+    return table.orders.reduce(
+      (total, order) =>
+        total + order.order_items.reduce((sum, item) => sum + item.quantity, 0),
+      0
+    );
+  };
+
+  // Calcular items por estado
+  const calculateItemsByStatus = (table: TableWithOrder) => {
+    const pending = table.orders.reduce(
+      (total, order) =>
+        total +
+        order.order_items.filter(
+          (item) => item.status === "ordered" || item.status === "preparing"
+        ).length,
+      0
+    );
+
+    const ready = table.orders.reduce(
+      (total, order) =>
+        total +
+        order.order_items.filter((item) => item.status === "ready").length,
+      0
+    );
+
+    const served = table.orders.reduce(
+      (total, order) =>
+        total +
+        order.order_items.filter((item) => item.status === "served").length,
+      0
+    );
+
+    return { pending, ready, served };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -260,13 +327,11 @@ export default function WaiterDashboard() {
               <h1 className="text-2xl font-bold text-gray-800">
                 Panel del Mesero
               </h1>
-              <p className="text-gray-600">Gestión de mesas y notificaciones</p>
-              {/* <p className="text-xs text-blue-600 mt-1">
-                🔄 Actualización automática cada minuto
-              </p> */}
+              <p className="text-gray-600">
+                Pedidos enviados y cuentas por mesa
+              </p>
             </div>
 
-            {/* ✅ BOTÓN REFRESH */}
             <button
               onClick={loadData}
               disabled={loading}
@@ -303,7 +368,8 @@ export default function WaiterDashboard() {
               }`}
             >
               <FaTable className="inline mr-2" />
-              Mesas ({tables.filter((t) => t.status === "occupied").length})
+              Mesas y Cuentas (
+              {tables.filter((t) => t.status === "occupied").length})
             </button>
           </div>
         </div>
@@ -381,12 +447,11 @@ export default function WaiterDashboard() {
                         </div>
 
                         <div className="flex space-x-2">
-                          {/* Solo mostrar botón "Atender" si no ha sido atendida */}
                           {!isAttended && (
                             <button
                               onClick={() => {
                                 handleAcknowledgeNotification(notification.id);
-                                handleGoToTables(); // Navegar al tab de mesas
+                                handleGoToTables();
                               }}
                               disabled={processing === notification.id}
                               className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center"
@@ -426,125 +491,244 @@ export default function WaiterDashboard() {
 
         {activeTab === "tables" && (
           <div>
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-800">
-                Estado de Mesas
+                Cuentas por Mesa
               </h2>
-              <p className="text-sm text-gray-600">
-                {tables.filter((t) => t.status === "occupied").length} mesas
-                ocupadas
-              </p>
+              <div className="text-sm text-gray-600">
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded mr-2">
+                  {tables.filter((t) => t.status === "occupied").length} mesas
+                  ocupadas
+                </span>
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  <FaDollarSign className="inline mr-1" />
+                  Total general: $
+                  {tables
+                    .reduce((sum, table) => sum + calculateTableTotal(table), 0)
+                    .toFixed(2)}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tables.map((table) => (
-                <div
-                  key={table.id}
-                  className={`bg-white rounded-lg shadow p-4 ${
-                    table.status === "occupied"
-                      ? "border-l-4 border-l-green-500"
-                      : table.status === "reserved"
-                      ? "border-l-4 border-l-yellow-500"
-                      : "border-l-4 border-l-gray-300"
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-lg">
-                        Mesa {table.number}
-                      </h3>
-                      <p
-                        className={`text-sm ${
-                          table.status === "occupied"
-                            ? "text-green-600"
-                            : table.status === "reserved"
-                            ? "text-yellow-600"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {table.status === "occupied"
-                          ? "🟢 Ocupada"
-                          : table.status === "reserved"
-                          ? "🟡 Reservada"
-                          : "⚪ Disponible"}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {table.location} • {table.capacity} personas
-                      </p>
+              {tables.map((table) => {
+                const tableTotal = calculateTableTotal(table);
+                const totalItems = calculateTotalItems(table);
+                const statusCounts = calculateItemsByStatus(table);
+
+                return (
+                  <div
+                    key={table.id}
+                    className={`bg-white rounded-lg shadow-lg p-4 transition-all duration-300 hover:shadow-xl ${
+                      table.status === "occupied"
+                        ? "border-l-4 border-l-green-500"
+                        : table.status === "reserved"
+                        ? "border-l-4 border-l-yellow-500"
+                        : "border-l-4 border-l-gray-300"
+                    }`}
+                  >
+                    {/* ENCABEZADO DE MESA CON TOTAL A PAGAR */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                          Mesa {table.number}
+                          {tableTotal > 0 && (
+                            <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                              ${tableTotal.toFixed(2)}
+                            </span>
+                          )}
+                        </h3>
+
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              table.status === "occupied"
+                                ? "bg-green-100 text-green-800"
+                                : table.status === "reserved"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {table.status === "occupied"
+                              ? "🟢 Ocupada"
+                              : table.status === "reserved"
+                              ? "🟡 Reservada"
+                              : "⚪ Disponible"}
+                          </span>
+
+                          {totalItems > 0 && (
+                            <>
+                              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                                {totalItems} productos
+                              </span>
+                              <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                                ⏱️ {statusCounts.pending} pendientes
+                              </span>
+                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                                ✅ {statusCounts.ready} listos
+                              </span>
+                              <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                                🍽️ {statusCounts.served} servidos
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <p className="text-sm text-gray-500 mt-1">
+                          {table.location} • {table.capacity} personas
+                        </p>
+                      </div>
+
+                      {table.status === "occupied" &&
+                        table.orders.length > 0 && (
+                          <button
+                            onClick={() =>
+                              handleCobrarMesa(table.id, table.number)
+                            }
+                            disabled={processing === `cobrar-${table.id}`}
+                            className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 disabled:opacity-50 whitespace-nowrap ml-2 flex items-center gap-1"
+                          >
+                            {processing === `cobrar-${table.id}` ? (
+                              <FaSpinner className="animate-spin" />
+                            ) : (
+                              <>
+                                <FaDollarSign />
+                                Cobrar
+                              </>
+                            )}
+                          </button>
+                        )}
                     </div>
 
-                    {table.status === "occupied" && table.orders.length > 0 && (
-                      <button
-                        onClick={() => handleFreeTable(table.id)}
-                        disabled={processing === `table-${table.id}`}
-                        className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 disabled:opacity-50"
+                    {/* DETALLE COMPLETO DE TODOS LOS PRODUCTOS */}
+                    {table.orders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="mt-4 pt-4 border-t border-gray-200"
                       >
-                        {processing === `table-${table.id}` ? (
-                          <FaSpinner className="animate-spin" />
-                        ) : (
-                          "Liberar"
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  {table.orders.map((order) => (
-                    <div key={order.id} className="mt-3 pt-3 border-t">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-medium">
-                            Orden #{order.id.slice(-8)}
-                          </p>
-                          {order.customer_name && (
-                            <p className="text-sm text-gray-600">
-                              Cliente: {order.customer_name}
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="font-medium text-sm text-gray-700">
+                              Orden #{order.id.slice(-8)}
                             </p>
-                          )}
-                          <p className="text-sm font-semibold text-green-600">
-                            Total: ${order.total_amount.toFixed(2)}
-                          </p>
+                            {order.customer_name && (
+                              <p className="text-xs text-gray-600">
+                                Cliente: {order.customer_name}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500">
+                              {new Date(order.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              order.status === "sent"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {order.status === "sent" ? "Enviada" : "Completada"}
+                          </span>
+                        </div>
+
+                        {/* LISTA DE TODOS LOS PRODUCTOS DE ESTA ORDEN */}
+                        <div className="space-y-2">
+                          {order.order_items.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex justify-between items-start text-sm bg-gray-50 p-2 rounded"
+                            >
+                              <div className="flex-1">
+                                <div className="flex justify-between">
+                                  <span className="font-medium">
+                                    {item.product_name} × {item.quantity}
+                                  </span>
+                                  <span className="font-semibold text-green-600">
+                                    ${(item.price * item.quantity).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center mt-1">
+                                  <span className="text-xs text-gray-500">
+                                    ${item.price.toFixed(2)} c/u
+                                  </span>
+                                  <div className="flex items-center space-x-2">
+                                    <select
+                                      value={item.status}
+                                      onChange={(e) =>
+                                        handleUpdateItemStatus(
+                                          item.id,
+                                          e.target.value
+                                        )
+                                      }
+                                      disabled={processing === item.id}
+                                      className={`text-xs rounded px-2 py-1 ${getStatusColor(
+                                        item.status
+                                      )}`}
+                                    >
+                                      <option value="ordered">Ordenado</option>
+                                      <option value="preparing">
+                                        Preparando
+                                      </option>
+                                      <option value="ready">Listo</option>
+                                      <option value="served">Servido</option>
+                                    </select>
+                                    {processing === item.id && (
+                                      <FaSpinner className="animate-spin text-blue-500" />
+                                    )}
+                                  </div>
+                                </div>
+                                {item.notes && (
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    <strong>Nota:</strong> {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* SUBTOTAL DE ESTA ORDEN */}
+                        <div className="mt-3 pt-2 border-t border-gray-200">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium">
+                              Subtotal esta orden:
+                            </span>
+                            <span className="font-bold text-blue-600">
+                              ${order.total_amount.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </div>
+                    ))}
 
-                      <div className="space-y-2">
-                        {order.order_items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between items-center text-sm"
-                          >
-                            <span className="flex-1">
-                              {item.product_name} × {item.quantity}
-                            </span>
-                            <div className="flex items-center space-x-2">
-                              <select
-                                value={item.status}
-                                onChange={(e) =>
-                                  handleUpdateItemStatus(
-                                    item.id,
-                                    e.target.value
-                                  )
-                                }
-                                disabled={processing === item.id}
-                                className={`text-xs rounded px-2 py-1 ${getStatusColor(
-                                  item.status
-                                )}`}
-                              >
-                                <option value="ordered">Ordenado</option>
-                                <option value="preparing">Preparando</option>
-                                <option value="ready">Listo</option>
-                                <option value="served">Servido</option>
-                              </select>
-                              {processing === item.id && (
-                                <FaSpinner className="animate-spin text-blue-500" />
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                    {/* TOTAL FINAL DE LA MESA */}
+                    {tableTotal > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-300">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-lg text-gray-800">
+                            TOTAL A PAGAR:
+                          </span>
+                          <span className="text-xl font-bold text-green-600">
+                            ${tableTotal.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 text-center">
+                          {table.orders.length} órdenes enviadas
+                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                    )}
+
+                    {/* ESTADO VACÍO */}
+                    {table.orders.length === 0 &&
+                      table.status === "occupied" && (
+                        <div className="text-center py-6 text-gray-500 text-sm">
+                          <FaUtensils className="text-2xl text-gray-300 mx-auto mb-2" />
+                          No hay pedidos enviados
+                        </div>
+                      )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
