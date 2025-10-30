@@ -32,7 +32,6 @@ export default function HomePage() {
   const loadAllTables = async () => {
     setLoadingTables(true);
     try {
-      // CORRECCIÓN: Usar getTablesByBranch() sin parámetros
       const tablesData = await tablesService.getTablesByBranch();
       setTables(tablesData);
     } catch (err) {
@@ -142,7 +141,7 @@ export default function HomePage() {
         order.id
       );
 
-      // 5. Redirigir al menú
+      // 5. Redirigir al menú (CORREGIDO)
       router.push(`/customer/menu?table=${table.number}`);
     } catch (err) {
       setError("Error al crear la orden");
@@ -160,7 +159,6 @@ export default function HomePage() {
         return "bg-red-500";
       case "disabled":
         return "bg-gray-500";
-
       default:
         return "bg-gray-500";
     }
@@ -173,8 +171,7 @@ export default function HomePage() {
       case "occupied":
         return "Ocupada";
       case "disabled":
-        return "Desabilitado";
-
+        return "Deshabilitado";
       default:
         return status;
     }
@@ -183,29 +180,22 @@ export default function HomePage() {
   // Encontrar la mesa seleccionada para mostrar su estado
   const selectedTableData = tables.find((t) => t.number === selectedTable);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-4xl w-full">
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            {isFromQR ? (
+  // Si es desde QR, mostrar solo el formulario de nombre sin selección de mesa
+  if (isFromQR && selectedTable) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaQrcode className="text-3xl text-blue-600" />
-            ) : (
-              <FaChair className="text-3xl text-blue-600" />
-            )}
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              Bienvenido a FoodHub
+            </h1>
+            <p className="text-gray-600">Ingresa tu nombre para comenzar</p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Bienvenido a FoodHub
-          </h1>
-          <p className="text-gray-600">
-            {isFromQR
-              ? "Mesa preseleccionada desde QR"
-              : "Selecciona tu mesa para comenzar"}
-          </p>
-        </div>
 
-        {/* Mostrar información de mesa QR */}
-        {isFromQR && selectedTable && (
+          {/* Información de mesa QR */}
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
             <div className="flex items-center justify-between">
               <div>
@@ -227,18 +217,110 @@ export default function HomePage() {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => {
-                  setIsFromQR(false);
-                  setSelectedTable(null);
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Cambiar mesa
-              </button>
             </div>
           </div>
-        )}
+
+          {/* Mostrar error general */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
+              <FaExclamationTriangle />
+              {error}
+            </div>
+          )}
+
+          {/* Nombre obligatorio del cliente */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tu nombre *
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: Juan Pérez"
+              value={customerName}
+              onChange={(e) => {
+                setCustomerName(e.target.value);
+                // Limpiar error de nombre cuando el usuario empiece a escribir
+                if (nameError && e.target.value.trim().length >= 2) {
+                  setNameError("");
+                }
+              }}
+              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+                nameError ? "border-red-500 bg-red-50" : "border-gray-300"
+              }`}
+            />
+            {nameError && (
+              <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+                <FaExclamationTriangle className="text-xs" />
+                {nameError}
+              </p>
+            )}
+          </div>
+
+          {/* Botón de continuar */}
+          <button
+            onClick={handleTableSelect}
+            disabled={
+              loading ||
+              !customerName.trim() ||
+              (selectedTableData && selectedTableData.status !== "available")
+            }
+            className={`
+              w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2
+              ${
+                customerName.trim() &&
+                !loading &&
+                selectedTableData?.status === "available"
+                  ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }
+            `}
+          >
+            {loading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                Creando orden...
+              </>
+            ) : customerName.trim() ? (
+              selectedTableData?.status === "available" ? (
+                <>
+                  <FaCheck />
+                  Continuar al Menú - Mesa {selectedTable}
+                </>
+              ) : (
+                `Mesa ${selectedTable} no disponible`
+              )
+            ) : (
+              "Ingresa tu nombre"
+            )}
+          </button>
+
+          {/* Información adicional */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <p className="text-sm text-blue-700 text-center">
+              💡 Ingresa tu nombre para continuar al menú de tu mesa.
+            </p>
+            <p className="text-xs text-blue-600 text-center mt-2">
+              * Campo obligatorio: Nombre
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Vista normal (no desde QR)
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-4xl w-full">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaChair className="text-3xl text-blue-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            Bienvenido a FoodHub
+          </h1>
+          <p className="text-gray-600">Selecciona tu mesa para comenzar</p>
+        </div>
 
         {/* Mostrar error general */}
         {error && (
@@ -314,7 +396,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-                  <span>Desabilitado</span>
+                  <span>Deshabilitado</span>
                 </div>
               </div>
             </>
@@ -379,9 +461,7 @@ export default function HomePage() {
             selectedTableData?.status === "available" ? (
               <>
                 <FaCheck />
-                {isFromQR
-                  ? `Continuar a Menú - Mesa ${selectedTable}`
-                  : `Continuar a Menú - Mesa ${selectedTable}`}
+                Continuar al Menú - Mesa {selectedTable}
               </>
             ) : (
               `Mesa ${selectedTable} no disponible`
@@ -394,12 +474,10 @@ export default function HomePage() {
         {/* Información adicional */}
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
           <p className="text-sm text-blue-700 text-center">
-            {isFromQR
-              ? "💡 Mesa seleccionada desde QR. Ingresa tu nombre para continuar al menú."
-              : "💡 Escanea el código QR en tu mesa o selecciona manualmente"}
+            💡 Escanea el código QR en tu mesa o selecciona manualmente
           </p>
           <p className="text-xs text-blue-600 text-center mt-2">
-            * Campos obligatorios: Mesa y Nombre
+            * Campo obligatorio: Nombre
           </p>
         </div>
       </div>
