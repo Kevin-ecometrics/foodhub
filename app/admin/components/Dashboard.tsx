@@ -63,11 +63,18 @@ export default function Dashboard({
     });
   };
 
+  const formatLongDateNextDay = (date: Date): string => {
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
+    return formatLongDate(nextDay);
+  };
+
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDateValue = e.target.value;
     setDateInput(newDateValue);
     if (newDateValue) {
-      const newDate = new Date(newDateValue);
+      const [year, month, day] = newDateValue.split("-").map(Number);
+      const newDate = new Date(year, month - 1, day);
       onDateChange(newDate);
     }
     setShowDateFilter(false);
@@ -131,7 +138,7 @@ export default function Dashboard({
                 Reporte del Día
               </h1>
               <p className="text-gray-600">
-                {isToday ? "Hoy" : formatLongDate(selectedDate)}
+                {isToday ? "Hoy" : formatLongDateNextDay(selectedDate)}
               </p>
             </div>
           </div>
