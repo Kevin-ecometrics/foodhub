@@ -16,11 +16,18 @@ import {
   FaSpinner,
   FaCheck,
   FaQrcode,
+  FaHeart,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { tablesService } from "@/app/lib/supabase/tables";
 
 const CATEGORIES = [
+  {
+    id: "favorites",
+    name: "Favoritos",
+    icon: "❤️",
+    description: "Los productos más populares",
+  },
   {
     id: "repite-item",
     name: "Repite Item",
@@ -61,9 +68,10 @@ export default function MenuPage() {
     currentTableId,
   } = useOrder();
 
-  const [selectedCategory, setSelectedCategory] = useState("repite-item");
+  const [selectedCategory, setSelectedCategory] = useState("favorites");
   const [products, setProducts] = useState<Product[]>([]);
   const [recentItems, setRecentItems] = useState<Product[]>([]);
+  const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingProduct, setAddingProduct] = useState<number | null>(null);
   const [showCart, setShowCart] = useState(false);
@@ -88,9 +96,10 @@ export default function MenuPage() {
     }
   }, [tableId, currentTableId, router]);
 
-  // Actualizar items recientes cuando cambien los orderItems
+  // Actualizar items recientes y favoritos cuando cambien los productos
   useEffect(() => {
     updateRecentItems();
+    updateFavoriteItems();
   }, [orderItems, products]);
 
   const updateRecentItems = () => {
@@ -106,6 +115,11 @@ export default function MenuPage() {
     );
 
     setRecentItems(recentProducts);
+  };
+
+  const updateFavoriteItems = () => {
+    const favorites = products.filter((product) => product.is_favorite);
+    setFavoriteItems(favorites);
   };
 
   useEffect(() => {
@@ -150,6 +164,19 @@ export default function MenuPage() {
       setIsLoading(true);
       await refreshOrder(tableId);
       const productsData = await productsService.getProducts();
+
+      // Debug: verificar los datos que llegan
+      console.log("Productos cargados:", productsData);
+      if (productsData.length > 0) {
+        console.log("Primer producto:", productsData[0]);
+        console.log(
+          "Rating del primer producto:",
+          productsData[0].rating,
+          "Tipo:",
+          typeof productsData[0].rating
+        );
+      }
+
       setProducts(productsData);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -173,45 +200,65 @@ export default function MenuPage() {
     if (!currentOrder || orderItems.length === 0) return;
 
     try {
+      // 1. Enviar notificación a cocina
       await notificationsService.createNotification(
         currentOrder.table_id,
         "order_updated",
         `Nueva orden enviada desde Mesa ${tableId}`,
         currentOrder.id
       );
+
+      // 2. LIMPIAR EL CARRITO LOCALMENTE - usando refreshOrder para recargar el estado
+      await refreshOrder(currentOrder.table_id);
+
+      // 3. Cerrar el modal del carrito
       setShowCart(false);
+
+      // 4. Redirigir al historial
+      const targetTableId = tableId || currentTableId;
+      router.push(`/customer/history?table=${targetTableId}`);
     } catch (error) {
       console.error("Error sending order:", error);
     }
   };
 
   const getProductsByCategory = () => {
-    if (selectedCategory === "repite-item") {
-      return recentItems;
+    switch (selectedCategory) {
+      case "favorites":
+        return favoriteItems;
+      case "repite-item":
+        return recentItems;
+      default:
+        const categoryMap: { [key: string]: string } = {
+          refill: "Refill",
+          combos: "Combos",
+          breakfast: "Breakfast",
+          lunch: "Lunch",
+          dinner: "Dinner",
+        };
+        return products.filter(
+          (product) => product.category === categoryMap[selectedCategory]
+        );
     }
-    return products.filter((product) => {
-      const categoryMap: { [key: string]: string } = {
-        refill: "Refill",
-        combos: "Combos",
-        breakfast: "Breakfast",
-        lunch: "Lunch",
-        dinner: "Dinner",
-      };
-      return product.category === categoryMap[selectedCategory];
-    });
   };
 
   const getCategoryDescription = () => {
     const category = CATEGORIES.find((cat) => cat.id === selectedCategory);
 
-    if (selectedCategory === "repite-item") {
-      if (recentItems.length === 0) {
-        return "Agrega items a tu orden para verlos aquí";
-      }
-      return `Tienes ${recentItems.length} items en tu orden actual`;
+    switch (selectedCategory) {
+      case "favorites":
+        if (favoriteItems.length === 0) {
+          return "No hay productos marcados como favoritos";
+        }
+        return `${favoriteItems.length} productos destacados`;
+      case "repite-item":
+        if (recentItems.length === 0) {
+          return "Agrega items a tu orden para verlos aquí";
+        }
+        return `Tienes ${recentItems.length} items en tu orden actual`;
+      default:
+        return category?.description || "";
     }
-
-    return category?.description || "";
   };
 
   // Verificar si un producto ya está en el carrito
@@ -223,6 +270,28 @@ export default function MenuPage() {
   const getProductQuantityInCart = (productId: number) => {
     const item = orderItems.find((item) => item.product_id === productId);
     return item ? item.quantity : 0;
+  };
+
+  // Función para renderizar las estrellas del rating
+  const renderStarRating = (rating: number) => {
+    // Si el rating es 0, mostrar sin rating
+    if (rating === 0) {
+      return (
+        <div className="flex items-center gap-1">
+          <FaStar className="text-gray-300 text-xs" />
+          <span className="text-xs font-semibold text-gray-400">
+            Sin rating
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1">
+        <FaStar className="text-yellow-400 text-xs" />
+        <span className="text-xs font-semibold">{rating.toFixed(1)}</span>
+      </div>
+    );
   };
 
   // Mostrar loading mientras se obtiene tableId
@@ -270,6 +339,11 @@ export default function MenuPage() {
             <FaShoppingCart className="text-xl" />
             <span className="font-bold">{cartItemsCount}</span>
             <span className="hidden sm:inline">• ${cartTotal.toFixed(2)}</span>
+
+            {/* PUNTO ROJO AGREGADO AQUÍ */}
+            {cartItemsCount > 0 && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse border-2 border-white"></div>
+            )}
           </button>
         </div>
       </header>
@@ -306,6 +380,18 @@ export default function MenuPage() {
           </span>
         </div>
 
+        {selectedCategory === "favorites" && favoriteItems.length === 0 && (
+          <div className="text-center py-12 bg-white rounded-2xl shadow-sm">
+            <div className="text-6xl mb-4">❤️</div>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              No hay productos favoritos
+            </h3>
+            <p className="text-gray-500">
+              Los productos marcados como favoritos aparecerán aquí
+            </p>
+          </div>
+        )}
+
         {selectedCategory === "repite-item" && recentItems.length === 0 && (
           <div className="text-center py-12 bg-white rounded-2xl shadow-sm">
             <div className="text-6xl mb-4">🔄</div>
@@ -328,31 +414,37 @@ export default function MenuPage() {
                 key={product.id}
                 className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group"
               >
-                <div className="relative overflow-hidden h-48">
-                  <img
-                    src={
-                      product.image_url ||
-                      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
-                    }
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  />
-                  <div className="absolute top-3 right-3 bg-white px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
-                    <FaStar className="text-yellow-400 text-sm" />
-                    <span className="text-sm font-semibold">4.5</span>
+                {product.image_url ? (
+                  <div className="relative overflow-hidden h-48">
+                    <img
+                      src={
+                        product.image_url ||
+                        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
+                      }
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-2 right-2 bg-white px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
+                      {renderStarRating(product.rating || 0)}
+                    </div>
+                    {product.is_favorite && (
+                      <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                        <FaHeart className="text-xs" />
+                        Favorito
+                      </div>
+                    )}
+                    {selectedCategory === "repite-item" && (
+                      <div className="absolute top-2 left-2 bg-blue-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold">
+                        En tu orden
+                      </div>
+                    )}
+                    {isInCart && (
+                      <div className="absolute bottom-2 left-2 bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold">
+                        {currentQuantity} en carrito
+                      </div>
+                    )}
                   </div>
-                  {selectedCategory === "repite-item" && (
-                    <div className="absolute top-3 left-3 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                      En tu orden
-                    </div>
-                  )}
-                  {isInCart && (
-                    <div className="absolute bottom-3 left-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                      {currentQuantity} en carrito
-                    </div>
-                  )}
-                </div>
-
+                ) : null}
                 <div className="p-4">
                   <h3 className="text-lg font-bold text-gray-800 mb-1">
                     {product.name}
@@ -423,6 +515,7 @@ export default function MenuPage() {
         </div>
 
         {getProductsByCategory().length === 0 &&
+          selectedCategory !== "favorites" &&
           selectedCategory !== "repite-item" && (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">

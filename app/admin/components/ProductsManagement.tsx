@@ -1,17 +1,18 @@
-// app/admin/components/ProductsManagement.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
-import { FaPlus, FaEdit, FaTrash, FaCog, FaSpinner } from "react-icons/fa";
+import { FaPlus, FaEdit, FaSpinner, FaStar } from "react-icons/fa";
 import { Product } from "../types";
 import ProductForm from "./ProductForm";
+import StarRating from "./StarRating";
 
 interface ProductsManagementProps {
   onError: (error: string) => void;
 }
 
 interface ProductUpdate {
-  is_available: boolean;
+  is_available?: boolean;
+  is_favorite?: boolean;
 }
 
 export default function ProductsManagement({
@@ -29,6 +30,8 @@ export default function ProductsManagement({
     image_url: "",
     preparation_time: "",
     is_available: true,
+    is_favorite: false,
+    rating: "0",
   });
 
   useEffect(() => {
@@ -41,8 +44,8 @@ export default function ProductsManagement({
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .order("is_favorite", { ascending: false }) // Favoritos primero
         .order("name", { ascending: true });
-
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
@@ -53,23 +56,46 @@ export default function ProductsManagement({
     }
   };
 
+  const uploadImage = async (file: File): Promise<string> => {
+    const fileName = `${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("product-images")
+      .upload(fileName, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from("product-images")
+      .getPublicUrl(fileName);
+    return data.publicUrl;
+  };
+
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let imageUrl = "";
+      if (productForm.image_url && typeof productForm.image_url !== "string") {
+        imageUrl = await uploadImage(productForm.image_url as File);
+      } else {
+        imageUrl = productForm.image_url as string;
+      }
+
       const productData = {
         name: productForm.name,
         description: productForm.description,
-        price: parseFloat(productForm.price),
+        price: parseInt(productForm.price),
         category: productForm.category,
-        image_url: productForm.image_url,
+        image_url: imageUrl,
         preparation_time: parseInt(productForm.preparation_time) || null,
         is_available: productForm.is_available,
+        is_favorite: productForm.is_favorite,
+        rating: parseFloat(productForm.rating) || 0,
+        rating_count: 0,
       };
 
       const { error } = await supabase
         .from("products")
-        .insert([productData] as never);
-
+        .insert([productData as never]);
       if (error) throw error;
 
       setShowProductForm(false);
@@ -81,6 +107,8 @@ export default function ProductsManagement({
         image_url: "",
         preparation_time: "",
         is_available: true,
+        is_favorite: false,
+        rating: "0",
       });
       await loadProducts();
     } catch (error) {
@@ -94,21 +122,27 @@ export default function ProductsManagement({
     if (!editingProduct) return;
 
     try {
+      let imageUrl = productForm.image_url as string | File;
+      if (productForm.image_url && typeof productForm.image_url !== "string") {
+        imageUrl = await uploadImage(productForm.image_url as File);
+      }
+
       const productData = {
         name: productForm.name,
         description: productForm.description,
-        price: parseFloat(productForm.price),
+        price: parseInt(productForm.price),
         category: productForm.category,
-        image_url: productForm.image_url,
+        image_url: typeof imageUrl === "string" ? imageUrl : "",
         preparation_time: parseInt(productForm.preparation_time) || null,
         is_available: productForm.is_available,
+        is_favorite: productForm.is_favorite,
+        rating: parseFloat(productForm.rating) || 0,
       };
 
       const { error } = await supabase
         .from("products")
         .update(productData as never)
         .eq("id", editingProduct.id);
-
       if (error) throw error;
 
       setShowProductForm(false);
@@ -121,6 +155,8 @@ export default function ProductsManagement({
         image_url: "",
         preparation_time: "",
         is_available: true,
+        is_favorite: false,
+        rating: "0",
       });
       await loadProducts();
     } catch (error) {
@@ -139,40 +175,43 @@ export default function ProductsManagement({
       image_url: product.image_url || "",
       preparation_time: product.preparation_time?.toString() || "",
       is_available: product.is_available,
+      is_favorite: product.is_favorite,
+      rating: product.rating.toString(),
     });
     setShowProductForm(true);
   };
 
-  const handleDeleteProduct = async (id: number) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este producto?"))
-      return;
-
-    try {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-
-      if (error) throw error;
-      await loadProducts();
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      onError("Error eliminando el producto");
-    }
-  };
   const toggleProductAvailability = async (product: Product) => {
     try {
       const updateData: ProductUpdate = {
         is_available: !product.is_available,
       };
-
       const { error } = await supabase
         .from("products")
         .update(updateData as never)
         .eq("id", product.id);
-
       if (error) throw error;
       await loadProducts();
     } catch (error) {
       console.error("Error updating product availability:", error);
       onError("Error actualizando la disponibilidad del producto");
+    }
+  };
+
+  const toggleProductFavorite = async (product: Product) => {
+    try {
+      const updateData: ProductUpdate = {
+        is_favorite: !product.is_favorite,
+      };
+      const { error } = await supabase
+        .from("products")
+        .update(updateData as never)
+        .eq("id", product.id);
+      if (error) throw error;
+      await loadProducts();
+    } catch (error) {
+      console.error("Error updating product favorite status:", error);
+      onError("Error actualizando el estado de favorito del producto");
     }
   };
 
@@ -200,6 +239,8 @@ export default function ProductsManagement({
               image_url: "",
               preparation_time: "",
               is_available: true,
+              is_favorite: false,
+              rating: "0",
             });
             setShowProductForm(true);
           }}
@@ -244,6 +285,12 @@ export default function ProductsManagement({
                     Precio
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Calificación
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Favorito
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Tiempo
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -256,7 +303,14 @@ export default function ProductsManagement({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
+                  <tr
+                    key={product.id}
+                    className={`hover:bg-gray-50 ${
+                      product.is_favorite
+                        ? "bg-yellow-50 hover:bg-yellow-100"
+                        : ""
+                    }`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {product.image_url && (
@@ -267,8 +321,11 @@ export default function ProductsManagement({
                           />
                         )}
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                             {product.name}
+                            {product.is_favorite && (
+                              <FaStar className="text-yellow-500 text-xs" />
+                            )}
                           </div>
                           <div className="text-sm text-gray-500 truncate max-w-xs">
                             {product.description}
@@ -284,21 +341,46 @@ export default function ProductsManagement({
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(product.price)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <StarRating
+                        rating={product.rating}
+                        readonly={true}
+                        size={14}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleProductFavorite(product)}
+                        className={`p-1 rounded-full transition-colors ${
+                          product.is_favorite
+                            ? "text-yellow-500 hover:text-yellow-600 bg-yellow-100"
+                            : "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50"
+                        }`}
+                        title={
+                          product.is_favorite
+                            ? "Quitar de favoritos"
+                            : "Marcar como favorito"
+                        }
+                      >
+                        <FaStar size={16} />
+                      </button>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {product.preparation_time
                         ? `${product.preparation_time} min`
                         : "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      <button
+                        onClick={() => toggleProductAvailability(product)}
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${
                           product.is_available
                             ? "bg-green-100 text-green-800"
                             : "bg-red-100 text-red-800"
                         }`}
                       >
                         {product.is_available ? "Disponible" : "No Disponible"}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
@@ -308,22 +390,6 @@ export default function ProductsManagement({
                         >
                           <FaEdit />
                         </button>
-                        <button
-                          onClick={() => toggleProductAvailability(product)}
-                          className={`${
-                            product.is_available
-                              ? "text-red-600 hover:text-red-900"
-                              : "text-green-600 hover:text-green-900"
-                          }`}
-                        >
-                          <FaCog />
-                        </button>
-                        {/* <button
-                          onClick={() => handleDeleteProduct(product.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <FaTrash />
-                        </button> */}
                       </div>
                     </td>
                   </tr>

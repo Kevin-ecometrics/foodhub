@@ -36,7 +36,7 @@ export interface RestaurantTable {
   location: string;
   created_at: string;
   updated_at: string;
-  orders?: RelatedOrder[]; // Agregar esta línea
+  orders?: RelatedOrder[]; 
 }
 
 export interface Product {
@@ -47,7 +47,10 @@ export interface Product {
   category: string;
   image_url: string;
   is_available: boolean;
+  is_favorite: boolean;
   preparation_time: number;
+  rating: number; 
+  rating_count: number; 
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +71,9 @@ export interface ProductFormData {
   image_url: string;
   preparation_time: string;
   is_available: boolean;
+  is_favorite: boolean;
+  rating: string; 
+
 }
 
 // Credenciales fijas del administrador

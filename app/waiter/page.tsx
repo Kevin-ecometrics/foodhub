@@ -27,13 +27,23 @@ export default function WaiterDashboard() {
   );
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [attendedNotifications, setAttendedNotifications] = useState<
+    Set<string>
+  >(new Set());
 
   useEffect(() => {
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
+    // Timer de actualización automática cada minuto
+    const interval = setInterval(() => {
+      console.log("🔄 Actualización automática cada minuto");
+      loadData();
+    }, 60000); // 60,000 ms = 1 minuto
+
     return () => {
       unsubscribe();
+      clearInterval(interval);
     };
   }, []);
 
@@ -101,8 +111,14 @@ export default function WaiterDashboard() {
   const handleAcknowledgeNotification = async (notificationId: string) => {
     setProcessing(notificationId);
     try {
-      await waiterService.acknowledgeNotification(notificationId);
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      // Marcar la notificación como atendida en el estado local
+      setAttendedNotifications((prev) => new Set(prev).add(notificationId));
+
+      // Aquí puedes agregar lógica adicional si necesitas actualizar algo en la base de datos
+      // Por ejemplo, cambiar el estado de la notificación a "attended" pero sin eliminarla
+      // await waiterService.markNotificationAsAttended(notificationId);
+
+      console.log(`Notificación ${notificationId} marcada como atendida`);
     } catch (error) {
       console.error("Error acknowledging notification:", error);
     } finally {
@@ -115,6 +131,12 @@ export default function WaiterDashboard() {
     try {
       await waiterService.completeNotification(notificationId);
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      // También remover de las notificaciones atendidas si estaba ahí
+      setAttendedNotifications((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
     } catch (error) {
       console.error("Error completing notification:", error);
     } finally {
@@ -161,6 +183,11 @@ export default function WaiterDashboard() {
     } finally {
       setProcessing(null);
     }
+  };
+
+  // Función para simular clic en el tab de mesas
+  const handleGoToTables = () => {
+    setActiveTab("tables");
   };
 
   const getNotificationIcon = (type: string) => {
@@ -234,6 +261,9 @@ export default function WaiterDashboard() {
                 Panel del Mesero
               </h1>
               <p className="text-gray-600">Gestión de mesas y notificaciones</p>
+              {/* <p className="text-xs text-blue-600 mt-1">
+                🔄 Actualización automática cada minuto
+              </p> */}
             </div>
 
             {/* ✅ BOTÓN REFRESH */}
@@ -299,81 +329,96 @@ export default function WaiterDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`bg-white rounded-lg shadow border-l-4 ${getNotificationColor(
-                      notification.type
-                    )} p-4`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
-                        {getNotificationIcon(notification.type)}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-800">
-                              Mesa {notification.tables?.number}
-                            </h3>
-                            {notification.tables?.number && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                                {notification.tables.number}
-                              </span>
+                {notifications.map((notification) => {
+                  const isAttended = attendedNotifications.has(notification.id);
+
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`bg-white rounded-lg shadow border-l-4 ${getNotificationColor(
+                        notification.type
+                      )} p-4 ${isAttended ? "opacity-70" : ""}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          {getNotificationIcon(notification.type)}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-gray-800">
+                                Mesa {notification.tables?.number}
+                              </h3>
+                              {notification.tables?.number && (
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                  {notification.tables.number}
+                                </span>
+                              )}
+                              {isAttended && (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                  Atendida
+                                </span>
+                              )}
+                            </div>
+                            {notification.orders?.customer_name && (
+                              <p className="text-gray-600">
+                                Cliente: {notification.orders.customer_name}
+                              </p>
+                            )}
+                            <p className="text-gray-600 mt-1">
+                              {notification.message}
+                            </p>
+                            <p className="text-sm text-gray-500 mt-1">
+                              {new Date(
+                                notification.created_at
+                              ).toLocaleString()}
+                            </p>
+                            {notification.orders?.total_amount && (
+                              <p className="text-sm font-semibold text-green-600 mt-1">
+                                Total: $
+                                {notification.orders.total_amount.toFixed(2)}
+                              </p>
                             )}
                           </div>
-                          {notification.orders?.customer_name && (
-                            <p className="text-gray-600">
-                              Cliente: {notification.orders.customer_name}
-                            </p>
+                        </div>
+
+                        <div className="flex space-x-2">
+                          {/* Solo mostrar botón "Atender" si no ha sido atendida */}
+                          {!isAttended && (
+                            <button
+                              onClick={() => {
+                                handleAcknowledgeNotification(notification.id);
+                                handleGoToTables(); // Navegar al tab de mesas
+                              }}
+                              disabled={processing === notification.id}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center"
+                            >
+                              {processing === notification.id ? (
+                                <FaSpinner className="animate-spin mr-1" />
+                              ) : (
+                                <FaEye className="mr-1" />
+                              )}
+                              Atender
+                            </button>
                           )}
-                          <p className="text-gray-600 mt-1">
-                            {notification.message}
-                          </p>
-                          <p className="text-sm text-gray-500 mt-1">
-                            {new Date(notification.created_at).toLocaleString()}
-                          </p>
-                          {notification.orders?.total_amount && (
-                            <p className="text-sm font-semibold text-green-600 mt-1">
-                              Total: $
-                              {notification.orders.total_amount.toFixed(2)}
-                            </p>
-                          )}
+
+                          <button
+                            onClick={() =>
+                              handleCompleteNotification(notification.id)
+                            }
+                            disabled={processing === notification.id}
+                            className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 disabled:opacity-50 flex items-center"
+                          >
+                            {processing === notification.id ? (
+                              <FaSpinner className="animate-spin mr-1" />
+                            ) : (
+                              <FaCheck className="mr-1" />
+                            )}
+                            Completar
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() =>
-                            handleAcknowledgeNotification(notification.id)
-                          }
-                          disabled={processing === notification.id}
-                          className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center"
-                        >
-                          {processing === notification.id ? (
-                            <FaSpinner className="animate-spin mr-1" />
-                          ) : (
-                            <FaEye className="mr-1" />
-                          )}
-                          Atender
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            handleCompleteNotification(notification.id)
-                          }
-                          disabled={processing === notification.id}
-                          className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 disabled:opacity-50 flex items-center"
-                        >
-                          {processing === notification.id ? (
-                            <FaSpinner className="animate-spin mr-1" />
-                          ) : (
-                            <FaCheck className="mr-1" />
-                          )}
-                          Completar
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -385,6 +430,10 @@ export default function WaiterDashboard() {
               <h2 className="text-xl font-semibold text-gray-800">
                 Estado de Mesas
               </h2>
+              <p className="text-sm text-gray-600">
+                {tables.filter((t) => t.status === "occupied").length} mesas
+                ocupadas
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

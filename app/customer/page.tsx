@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
-import { FaChair, FaSpinner, FaCheck, FaQrcode } from "react-icons/fa";
+import {
+  FaChair,
+  FaSpinner,
+  FaCheck,
+  FaQrcode,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,6 +21,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [isFromQR, setIsFromQR] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
+  const [nameError, setNameError] = useState("");
 
   // Cargar mesas al iniciar y verificar parámetros de URL
   useEffect(() => {
@@ -66,27 +73,63 @@ export default function HomePage() {
     }
   };
 
+  const validateForm = () => {
+    // Validar que se haya seleccionado una mesa
+    if (!selectedTable) {
+      setError("Por favor selecciona una mesa");
+      return false;
+    }
+
+    // Validar que la mesa esté disponible
+    const table = tables.find((t) => t.number === selectedTable);
+    if (!table) {
+      setError("Mesa no encontrada");
+      return false;
+    }
+
+    if (table.status !== "available") {
+      setError("Esta mesa no está disponible");
+      return false;
+    }
+
+    // Validar que el nombre no esté vacío
+    const trimmedName = customerName.trim();
+    if (!trimmedName) {
+      setNameError("El nombre es obligatorio");
+      return false;
+    }
+
+    if (trimmedName.length < 2) {
+      setNameError("El nombre debe tener al menos 2 caracteres");
+      return false;
+    }
+
+    // Limpiar errores si todo está bien
+    setError("");
+    setNameError("");
+    return true;
+  };
+
   const handleTableSelect = async () => {
-    if (!selectedTable) return;
+    // Validar el formulario antes de continuar
+    if (!validateForm()) {
+      return;
+    }
 
     setLoading(true);
-    setError("");
 
     try {
-      // 1. Verificar que la mesa esté disponible
       const table = tables.find((t) => t.number === selectedTable);
       if (!table) {
         setError("Mesa no encontrada");
         return;
       }
 
-      if (table.status !== "available") {
-        setError("Esta mesa no está disponible");
-        return;
-      }
-
       // 2. Crear orden en la base de datos
-      const order = await ordersService.createOrder(table.id, customerName);
+      const order = await ordersService.createOrder(
+        table.id,
+        customerName.trim()
+      );
 
       // 3. Actualizar estado de la mesa a "occupied"
       await tablesService.updateTableStatus(table.id, "occupied");
@@ -95,9 +138,7 @@ export default function HomePage() {
       await notificationsService.createNotification(
         table.id,
         "new_order",
-        `Nuevo cliente en Mesa ${table.number}${
-          customerName ? ` - ${customerName}` : ""
-        }`,
+        `Nuevo cliente en Mesa ${table.number} - ${customerName.trim()}`,
         order.id
       );
 
@@ -199,9 +240,10 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Mostrar error */}
+        {/* Mostrar error general */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
+            <FaExclamationTriangle />
             {error}
           </div>
         )}
@@ -210,7 +252,7 @@ export default function HomePage() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <label className="block text-sm font-medium text-gray-700">
-              Número de Mesa
+              Número de Mesa *
             </label>
             {loadingTables && (
               <span className="text-sm text-blue-600 flex items-center gap-1">
@@ -231,7 +273,10 @@ export default function HomePage() {
                 {tables.map((table) => (
                   <button
                     key={table.id}
-                    onClick={() => setSelectedTable(table.number)}
+                    onClick={() => {
+                      setSelectedTable(table.number);
+                      setError(""); // Limpiar error al seleccionar mesa
+                    }}
                     disabled={table.status !== "available"}
                     className={`
                       relative w-12 h-12 rounded-xl border-2 font-semibold transition-all
@@ -276,18 +321,32 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Nombre opcional del cliente */}
+        {/* Nombre obligatorio del cliente */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tu nombre (opcional)
+            Tu nombre *
           </label>
           <input
             type="text"
             placeholder="Ej: Juan Pérez"
             value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            onChange={(e) => {
+              setCustomerName(e.target.value);
+              // Limpiar error de nombre cuando el usuario empiece a escribir
+              if (nameError && e.target.value.trim().length >= 2) {
+                setNameError("");
+              }
+            }}
+            className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+              nameError ? "border-red-500 bg-red-50" : "border-gray-300"
+            }`}
           />
+          {nameError && (
+            <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+              <FaExclamationTriangle className="text-xs" />
+              {nameError}
+            </p>
+          )}
         </div>
 
         {/* Botón de continuar */}
@@ -296,15 +355,17 @@ export default function HomePage() {
           disabled={
             !selectedTable ||
             loading ||
+            !customerName.trim() ||
             (selectedTableData && selectedTableData.status !== "available")
           }
           className={`
             w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2
             ${
               selectedTable &&
+              customerName.trim() &&
               !loading &&
               selectedTableData?.status === "available"
-                ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
+                ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }
           `}
@@ -314,7 +375,7 @@ export default function HomePage() {
               <FaSpinner className="animate-spin" />
               Creando orden...
             </>
-          ) : selectedTable ? (
+          ) : selectedTable && customerName.trim() ? (
             selectedTableData?.status === "available" ? (
               <>
                 <FaCheck />
@@ -326,7 +387,7 @@ export default function HomePage() {
               `Mesa ${selectedTable} no disponible`
             )
           ) : (
-            "Selecciona una mesa"
+            "Completa los datos requeridos"
           )}
         </button>
 
@@ -334,8 +395,11 @@ export default function HomePage() {
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
           <p className="text-sm text-blue-700 text-center">
             {isFromQR
-              ? "💡 Mesa seleccionada desde QR. Solo ingresa tu nombre y continua al menú."
+              ? "💡 Mesa seleccionada desde QR. Ingresa tu nombre para continuar al menú."
               : "💡 Escanea el código QR en tu mesa o selecciona manualmente"}
+          </p>
+          <p className="text-xs text-blue-600 text-center mt-2">
+            * Campos obligatorios: Mesa y Nombre
           </p>
         </div>
       </div>

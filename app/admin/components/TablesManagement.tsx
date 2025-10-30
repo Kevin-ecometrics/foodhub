@@ -25,7 +25,6 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     null
   );
   const [tableForm, setTableForm] = useState({
-    number: "",
     capacity: "",
     location: "",
   });
@@ -40,7 +39,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       const { data, error } = await supabase
         .from("tables")
         .select("*")
-        .order("number", { ascending: true });
+        .order("created_at", { ascending: false }); // Ordenar por fecha de creación
 
       if (error) throw error;
       setTables(data || []);
@@ -55,36 +54,30 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const tableNumber = parseInt(tableForm.number);
-
-      // Verificar si ya existe una mesa con este número
-      const { data: existingTable } = await supabase
-        .from("tables")
-        .select("number")
-        .eq("number", tableNumber)
-        .single();
-
-      if (existingTable) {
-        onError(`Ya existe una mesa con el número ${tableNumber}`);
-        return;
-      }
-
       const tableData = {
-        number: tableNumber,
         capacity: parseInt(tableForm.capacity),
         location: tableForm.location,
         status: "available",
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("tables")
-        .insert([tableData] as never);
+        .insert([tableData] as never)
+        .select()
+        .single<RestaurantTable>();
 
       if (error) throw error;
 
+      // Ahora actualizamos el número de mesa para que sea igual al ID
+      const { error: updateError } = await supabase
+        .from("tables")
+        .update({ number: data?.id } as never)
+        .eq("id", data?.id);
+
+      if (updateError) throw updateError;
+
       setShowTableForm(false);
       setTableForm({
-        number: "",
         capacity: "",
         location: "",
       });
@@ -100,25 +93,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     if (!editingTable) return;
 
     try {
-      const tableNumber = parseInt(tableForm.number);
-
-      // Si cambió el número, verificar que no exista otro con ese número
-      if (tableNumber !== editingTable.number) {
-        const { data: existingTable } = await supabase
-          .from("tables")
-          .select("number")
-          .eq("number", tableNumber)
-          .neq("id", editingTable.id) // Excluir la mesa actual
-          .single();
-
-        if (existingTable) {
-          onError(`Ya existe otra mesa con el número ${tableNumber}`);
-          return;
-        }
-      }
-
       const tableData = {
-        number: tableNumber,
         capacity: parseInt(tableForm.capacity),
         location: tableForm.location,
       };
@@ -133,7 +108,6 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       setShowTableForm(false);
       setEditingTable(null);
       setTableForm({
-        number: "",
         capacity: "",
         location: "",
       });
@@ -147,21 +121,20 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   const handleEditTable = (table: RestaurantTable) => {
     setEditingTable(table);
     setTableForm({
-      number: table.number.toString(),
       capacity: table.capacity.toString(),
       location: table.location,
     });
     setShowTableForm(true);
   };
 
-  const handleDeleteTable = async (tableNumber: number) => {
+  const handleDeleteTable = async (tableId: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar esta mesa?")) return;
 
     try {
       const { error } = await supabase
         .from("tables")
         .delete()
-        .eq("number", tableNumber); // Eliminar por número en lugar de ID
+        .eq("id", tableId);
 
       if (error) throw error;
       await loadTables();
@@ -178,7 +151,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       const { error } = await supabase
         .from("tables")
         .update({ status: newStatus } as never)
-        .eq("number", table.number); // Actualizar por número
+        .eq("id", table.id);
 
       if (error) throw error;
       await loadTables();
@@ -231,11 +204,10 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Gestión de Mesas</h2>
-        {/* <button
+        <button
           onClick={() => {
             setEditingTable(null);
             setTableForm({
-              number: "",
               capacity: "",
               location: "",
             });
@@ -245,7 +217,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         >
           <FaPlus />
           Nueva Mesa
-        </button> */}
+        </button>
       </div>
 
       {showTableForm && (
@@ -278,76 +250,77 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
-              {tables.map((table) => (
-                <div
-                  key={table.number} // Usar número como key
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-bold text-lg text-gray-800">
-                        Mesa {table.number}
-                      </h3>
-                      <p className="text-sm text-gray-600">{table.location}</p>
+              {[...tables]
+                .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id))
+                .map((table) => (
+                  <div
+                    key={table.id}
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-bold text-lg text-gray-800">
+                          Mesa {table.number || table.id}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {table.location}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                          table.status
+                        )}`}
+                      >
+                        {getStatusText(table.status)}
+                      </span>
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        table.status
-                      )}`}
-                    >
-                      {getStatusText(table.status)}
-                    </span>
-                  </div>
 
-                  <div className="space-y-2 mb-4">
-                    <p className="text-sm text-gray-600">
-                      <strong>Capacidad:</strong> {table.capacity} personas
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong>ID Interno:</strong> {table.id}
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm text-gray-600">
+                        <strong>Capacidad:</strong> {table.capacity} personas
+                      </p>
+                      {/* <p className="text-sm text-gray-600">
+                      <strong>ID:</strong> {table.id}
                     </p>
                     <p className="text-sm text-gray-600">
                       <strong>Creada:</strong>{" "}
                       {new Date(table.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
+                    </p> */}
+                    </div>
 
-                  <div className="flex gap-2 flex-wrap">
-                    <button
-                      onClick={() => generateQRCode(table.number)}
-                      className="flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition"
-                    >
-                      <FaQrcode />
-                      QR
-                    </button>
-                    <button
-                      onClick={() => handleEditTable(table)}
-                      className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-sm hover:bg-yellow-200 transition"
-                    >
-                      <FaEdit />
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => toggleTableStatus(table)}
-                      className={`flex items-center gap-1 px-3 py-1 rounded text-sm transition ${
-                        table.status === "available"
-                          ? "bg-red-100 text-red-700 hover:bg-red-200"
-                          : "bg-green-100 text-green-700 hover:bg-green-200"
-                      }`}
-                    >
-                      <FaCog />
-                      {table.status === "available" ? "Deshab." : "Habilitar"}
-                    </button>
-                    {/* <button
-                      onClick={() => handleDeleteTable(table.number)}
-                      className="flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition"
-                    >
-                      <FaTrash />
-                      Eliminar
-                    </button> */}
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() =>
+                          generateQRCode(
+                            table.number || parseInt(table.id.toString())
+                          )
+                        }
+                        className="flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition"
+                      >
+                        <FaQrcode />
+                        QR
+                      </button>
+                      <button
+                        onClick={() => handleEditTable(table)}
+                        className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-sm hover:bg-yellow-200 transition"
+                      >
+                        <FaEdit />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => toggleTableStatus(table)}
+                        className={`flex items-center gap-1 px-3 py-1 rounded text-sm transition ${
+                          table.status === "available"
+                            ? "bg-red-100 text-red-700 hover:bg-red-200"
+                            : "bg-green-100 text-green-700 hover:bg-green-200"
+                        }`}
+                      >
+                        <FaCog />
+                        {table.status === "available" ? "Deshab." : "Habilitar"}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
 
 export interface Product {
@@ -8,7 +9,9 @@ export interface Product {
   category: string
   image_url: string | null
   is_available: boolean
+  is_favorite: boolean
   preparation_time: number | null
+  rating: number
 }
 
 export const productsService = {
@@ -18,13 +21,19 @@ export const productsService = {
       .from('products')
       .select('*')
       .eq('is_available', true)
+      .order('is_favorite', { ascending: false })
       .order('category')
       .order('name')
     
     if (error) throw error
     
-    // Direct type assertion
-    return (data as Product[]) || []
+    // Convertir el rating de string a number si es necesario
+    const products = (data as any[] || []).map(product => ({
+      ...product,
+      rating: parseFloat(product.rating) || 0, // Convertir a número
+    })) as Product[]
+    
+    return products
   },
 
   // Obtener productos por categoría
@@ -34,11 +43,39 @@ export const productsService = {
       .select('*')
       .eq('category', category)
       .eq('is_available', true)
+      .order('is_favorite', { ascending: false }) 
       .order('name')
     
     if (error) throw error
     
-    return (data as Product[]) || []
+    // Convertir el rating de string a number si es necesario
+    const products = (data as any[] || []).map(product => ({
+      ...product,
+      rating: parseFloat(product.rating) || 0,
+    })) as Product[]
+    
+    return products
+  },
+
+  // Obtener productos favoritos
+  async getFavoriteProducts(): Promise<Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_favorite', true)
+      .eq('is_available', true)
+      .order('rating', { ascending: false })
+      .order('name')
+    
+    if (error) throw error
+    
+    // Convertir el rating de string a number si es necesario
+    const products = (data as any[] || []).map(product => ({
+      ...product,
+      rating: parseFloat(product.rating) || 0,
+    })) as Product[]
+    
+    return products
   },
 
   // Obtener categorías únicas
@@ -51,9 +88,7 @@ export const productsService = {
     
     if (error) throw error
     
-    // Type assertion para el objeto con categoría
     const categoriesData = data as { category: string }[] | null
-    
     const uniqueCategories = [...new Set(categoriesData?.map(item => item.category) || [])]
     return uniqueCategories
   }
