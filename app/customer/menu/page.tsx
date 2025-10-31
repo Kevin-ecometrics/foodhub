@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { ordersService } from "@/app/lib/supabase/orders";
@@ -63,11 +63,6 @@ interface TableUser {
 
 export default function MenuPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
-  const userId = searchParams.get("user");
-  const orderId = searchParams.get("order");
-
   const {
     currentOrder,
     orderItems,
@@ -101,21 +96,42 @@ export default function MenuPage() {
   const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales cuando el contexto esté listo
   useEffect(() => {
-    if (tableId && orderId && userId) {
-      loadInitialData(parseInt(tableId), orderId, userId);
-    } else {
-      router.push("/customer");
-    }
-  }, [tableId, orderId, userId, router]);
+    const initializeData = async () => {
+      if (!currentTableId || !currentOrder?.id || !currentUserId) {
+        console.log("⏳ Menu: Esperando datos del contexto...");
+        return;
+      }
 
-  // Cargar usuarios de la mesa
-  useEffect(() => {
-    if (tableId) {
-      loadTableUsers(parseInt(tableId));
-    }
-  }, [tableId]);
+      try {
+        setIsLoading(true);
+        console.log("🚀 Menu: Inicializando datos con:", {
+          tableId: currentTableId,
+          orderId: currentOrder.id,
+          userId: currentUserId,
+        });
+
+        // Cargar productos
+        const productsData = await productsService.getProducts();
+        setProducts(productsData);
+
+        // Cargar usuarios de la mesa
+        await loadTableUsers(currentTableId);
+
+        // Cargar items recientes
+        await updateRecentItems();
+      } catch (error) {
+        console.error("Error loading data:", error);
+        alert("Error al cargar el menú. Redirigiendo...");
+        router.push(`/customer/select-user?table=${currentTableId}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [currentTableId, currentOrder?.id, currentUserId, router]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -123,32 +139,6 @@ export default function MenuPage() {
       setTableUsers(users);
     } catch (error) {
       console.error("Error loading table users:", error);
-    }
-  };
-
-  const loadInitialData = async (
-    tableId: number,
-    orderId: string,
-    userId: string
-  ) => {
-    try {
-      setIsLoading(true);
-
-      // Establecer la orden del usuario actual
-      await setCurrentUserOrder(orderId, userId);
-
-      // Cargar productos
-      const productsData = await productsService.getProducts();
-      setProducts(productsData);
-
-      // Cargar items recientes
-      await updateRecentItems();
-    } catch (error) {
-      console.error("Error loading data:", error);
-      alert("Error al cargar el menú. Redirigiendo...");
-      router.push("/customer/select-user?table=" + tableId);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -165,11 +155,10 @@ export default function MenuPage() {
   }, [orderItems, products]);
 
   useEffect(() => {
-    const targetTableId = tableId || currentTableId;
-    if (targetTableId && products.length > 0) {
+    if (currentTableId && products.length > 0) {
       updateRecentItems();
     }
-  }, [tableId, currentTableId, products]);
+  }, [currentTableId, products]);
 
   useEffect(() => {
     if (lastOrderSent) {
@@ -180,13 +169,10 @@ export default function MenuPage() {
   }, [lastOrderSent]);
 
   const updateRecentItems = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!currentTableId) return;
 
     try {
-      const recentOrdersItems = await getRecentOrdersItems(
-        parseInt(targetTableId.toString())
-      );
+      const recentOrdersItems = await getRecentOrdersItems(currentTableId);
       setRecentOrderItems(recentOrdersItems);
 
       const uniqueProductIds = new Set(
@@ -208,18 +194,17 @@ export default function MenuPage() {
 
   // Suscripción para detectar liberación de mesa
   useEffect(() => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!currentTableId) return;
 
     const subscription = supabase
-      .channel(`customer-menu-table-${targetTableId}`)
+      .channel(`customer-menu-table-${currentTableId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "waiter_notifications",
-          filter: `table_id=eq.${targetTableId}`,
+          filter: `table_id=eq.${currentTableId}`,
         },
         (payload) => {
           if (payload.new.type === "table_freed") {
@@ -233,7 +218,7 @@ export default function MenuPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [tableId, currentTableId]);
+  }, [currentTableId]);
 
   const handleAddToCart = async (product: Product) => {
     setAddingProduct(product.id);
@@ -281,21 +266,16 @@ export default function MenuPage() {
       // 3. IMPORTANTE: Crear NUEVA orden para el MISMO usuario (no crear nuevo comensal)
       const newOrderId = await createNewOrder(currentOrder.customer_name);
 
-      // 4. ACTUALIZAR URL con la nueva orden del mismo usuario
-      router.push(
-        `/customer/menu?table=${tableId}&user=${newOrderId}&order=${newOrderId}`
-      );
+      // 4. Actualizar lista de usuarios
+      await loadTableUsers(currentTableId!);
 
-      // 5. Actualizar lista de usuarios
-      await loadTableUsers(currentOrder.table_id);
-
-      // 6. Marcar que se acaba de enviar una orden
+      // 5. Marcar que se acaba de enviar una orden
       setLastOrderSent(true);
 
-      // 7. Cerrar el modal del carrito
+      // 6. Cerrar el modal del carrito
       setShowCart(false);
 
-      // 8. Mostrar confirmación
+      // 7. Mostrar confirmación
       alert(
         `✅ ¡Orden enviada a cocina, ${currentOrder.customer_name}! Tu carrito está listo para nuevos pedidos.`
       );
@@ -313,10 +293,10 @@ export default function MenuPage() {
       await switchUserOrder(user.orderId, user.id);
       setShowUserSwitch(false);
 
-      // Actualizar URL
-      router.push(
-        `/customer/menu?table=${tableId}&user=${user.id}&order=${user.orderId}`
-      );
+      // Recargar datos después de cambiar usuario
+      if (currentTableId) {
+        await refreshOrder(currentTableId);
+      }
     } catch (error) {
       console.error("Error switching user:", error);
       alert("Error al cambiar de usuario");
@@ -328,7 +308,7 @@ export default function MenuPage() {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
 
-    if (!tableId) {
+    if (!currentTableId) {
       alert("No se encontró la mesa");
       return;
     }
@@ -336,12 +316,12 @@ export default function MenuPage() {
     try {
       // Crear nueva orden para el nuevo usuario
       const newOrder = await ordersService.createOrder(
-        parseInt(tableId),
+        currentTableId,
         userName.trim()
       );
 
       // Actualizar lista de usuarios
-      await loadTableUsers(parseInt(tableId));
+      await loadTableUsers(currentTableId);
 
       // Cambiar al nuevo usuario
       await handleSwitchUser({
@@ -478,7 +458,18 @@ export default function MenuPage() {
     </button>
   );
 
-  if (tableId === null || isLoading) {
+  if (!currentTableId || !currentOrder?.id || !currentUserId) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Cargando datos de la mesa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -488,8 +479,6 @@ export default function MenuPage() {
       </div>
     );
   }
-
-  const targetTableId = tableId || currentTableId;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-24">
@@ -501,23 +490,10 @@ export default function MenuPage() {
                 FoodHub Restaurant
               </h1>
               <p className="text-sm text-gray-500">
-                Mesa {targetTableId} •{" "}
-                {currentOrder?.customer_name || "Invitado"}
-                {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
+                Mesa {currentTableId} • {currentOrder.customer_name}
+                {currentOrder.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
               </p>
             </div>
-
-            {/* Selector de usuario - Botón discreto */}
-            {/* <button
-              onClick={() => setShowUserSwitch(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200"
-              title="Cambiar de comensal"
-            >
-              <FaUsers className="text-blue-600 text-sm" />
-              <span className="text-sm font-medium text-blue-700">
-                {tableUsers.length}
-              </span>
-            </button> */}
           </div>
 
           <CartBadge />
@@ -546,7 +522,7 @@ export default function MenuPage() {
                 <span className="flex items-center gap-1 text-green-600 font-semibold">
                   <FaShoppingCart className="text-xs" />
                   {orderItems.length} items en carrito de{" "}
-                  {currentOrder?.customer_name}
+                  {currentOrder.customer_name}
                 </span>
               </div>
               <span className="text-gray-600">
@@ -781,7 +757,7 @@ export default function MenuPage() {
                   ✕
                 </button>
               </div>
-              <p className="text-gray-600">Mesa {targetTableId}</p>
+              <p className="text-gray-600">Mesa {currentTableId}</p>
             </div>
 
             <div className="p-6">
@@ -854,9 +830,9 @@ export default function MenuPage() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800">
-                    Orden de {currentOrder?.customer_name}
+                    Orden de {currentOrder.customer_name}
                   </h2>
-                  {currentOrder?.id && (
+                  {currentOrder.id && (
                     <p className="text-sm text-gray-500">
                       Orden #{currentOrder.id.slice(0, 8)}
                     </p>
@@ -909,7 +885,7 @@ export default function MenuPage() {
                   <button
                     onClick={() =>
                       router.push(
-                        `/customer/history?table=${targetTableId}&user=${userId}&order=${orderId}`
+                        `/customer/history?table=${currentTableId}&user=${currentUserId}&order=${currentOrder.id}`
                       )
                     }
                     className="block w-full mt-4 bg-gray-100 text-gray-700 px-6 py-3 rounded-full hover:bg-gray-200 transition"
@@ -1025,7 +1001,7 @@ export default function MenuPage() {
 
                   <p className="text-xs text-gray-500 text-center mt-3">
                     💡 Los nuevos items se agregarán a una nueva orden para{" "}
-                    {currentOrder?.customer_name}
+                    {currentOrder.customer_name}
                   </p>
                 </div>
               </>
@@ -1043,7 +1019,7 @@ export default function MenuPage() {
           <button
             onClick={() =>
               router.push(
-                `/customer/history?table=${targetTableId}&user=${userId}&order=${orderId}`
+                `/customer/history?table=${currentTableId}&user=${currentUserId}&order=${currentOrder.id}`
               )
             }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
@@ -1053,7 +1029,9 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() =>
-              router.push(`/customer/qr?table=${targetTableId}&user=${userId}`)
+              router.push(
+                `/customer/qr?table=${currentTableId}&user=${currentUserId}`
+              )
             }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >

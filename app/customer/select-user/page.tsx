@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useOrder } from "@/app/context/OrderContext";
 import { ordersService } from "@/app/lib/supabase/orders";
 import {
   FaUser,
@@ -21,8 +22,7 @@ interface TableUser {
 
 export default function SelectUserPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
+  const { currentTableId, setCurrentUserOrder, getTableUsers } = useOrder();
 
   const [users, setUsers] = useState<TableUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,96 +30,48 @@ export default function SelectUserPage() {
   const [loadingUser, setLoadingUser] = useState<string | null>(null);
 
   useEffect(() => {
-    if (tableId) {
-      loadTableUsers(parseInt(tableId));
+    if (currentTableId) {
+      loadTableUsers(currentTableId);
     } else {
       setError("No se encontró la mesa");
       setLoading(false);
     }
-  }, [tableId]);
+  }, [currentTableId]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
       setLoading(true);
+      setError("");
 
-      // 1. Intentar cargar usuarios desde sessionStorage
-      const storedUsers = sessionStorage.getItem(`table_${tableId}_users`);
+      // Usar la función del contexto para cargar usuarios
+      const tableUsers = await getTableUsers(tableId);
 
-      if (storedUsers) {
-        const usersData: TableUser[] = JSON.parse(storedUsers);
+      // Enriquecer con información de órdenes
+      const enrichedUsers = await Promise.all(
+        tableUsers.map(async (user) => {
+          try {
+            const orderItems = await ordersService.getOrderItems(user.orderId);
+            const total = orderItems.reduce(
+              (sum, item) => sum + item.price * item.quantity,
+              0
+            );
 
-        // 2. Enriquecer con información actual de las órdenes
-        const enrichedUsers = await Promise.all(
-          usersData.map(async (user) => {
-            try {
-              const orderItems = await ordersService.getOrderItems(
-                user.orderId
-              );
-              const total = orderItems.reduce(
-                (sum, item) => sum + item.price * item.quantity,
+            return {
+              ...user,
+              orderItemsCount: orderItems.reduce(
+                (count, item) => count + item.quantity,
                 0
-              );
+              ),
+              orderTotal: total,
+            };
+          } catch (error) {
+            console.error(`Error loading order for user ${user.name}:`, error);
+            return { ...user, orderItemsCount: 0, orderTotal: 0 };
+          }
+        })
+      );
 
-              return {
-                ...user,
-                orderItemsCount: orderItems.reduce(
-                  (count, item) => count + item.quantity,
-                  0
-                ),
-                orderTotal: total,
-              };
-            } catch (error) {
-              console.error(
-                `Error loading order for user ${user.name}:`,
-                error
-              );
-              return { ...user, orderItemsCount: 0, orderTotal: 0 };
-            }
-          })
-        );
-
-        setUsers(enrichedUsers);
-      } else {
-        // 3. Si no hay usuarios en sessionStorage, buscar órdenes activas de la mesa
-        const activeOrders = await ordersService.getActiveOrdersByTable(
-          tableId
-        );
-        const usersFromOrders: TableUser[] = activeOrders.map((order) => ({
-          id: order.id, // Usamos el orderId como ID temporal
-          name: order.customer_name,
-          orderId: order.id,
-          orderItemsCount: 0, // Lo cargaremos después
-          orderTotal: order.total_amount,
-        }));
-
-        // Enriquecer con items count
-        const enrichedUsers = await Promise.all(
-          usersFromOrders.map(async (user) => {
-            try {
-              const orderItems = await ordersService.getOrderItems(
-                user.orderId
-              );
-              return {
-                ...user,
-                orderItemsCount: orderItems.reduce(
-                  (count, item) => count + item.quantity,
-                  0
-                ),
-              };
-            } catch (error) {
-              return { ...user, orderItemsCount: 0 };
-            }
-          })
-        );
-
-        setUsers(enrichedUsers);
-
-        // Guardar en sessionStorage para futuras visitas
-        sessionStorage.setItem(
-          `table_${tableId}_users`,
-          JSON.stringify(usersFromOrders)
-        );
-      }
+      setUsers(enrichedUsers);
     } catch (err) {
       console.error("Error loading table users:", err);
       setError("Error al cargar los usuarios de la mesa");
@@ -137,10 +89,11 @@ export default function SelectUserPage() {
         throw new Error("La orden no existe");
       }
 
-      // Redirigir al menú con los parámetros del usuario
-      router.push(
-        `/customer/menu?table=${tableId}&user=${user.id}&order=${user.orderId}`
-      );
+      // Establecer la orden del usuario en el contexto
+      await setCurrentUserOrder(user.orderId, user.id);
+
+      // Redirigir al menú
+      router.push(`/customer/menu`);
     } catch (error) {
       console.error("Error selecting user:", error);
       setError("Error al acceder al menú del usuario");
@@ -152,7 +105,7 @@ export default function SelectUserPage() {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
 
-    if (!tableId) {
+    if (!currentTableId) {
       setError("No se encontró la mesa");
       return;
     }
@@ -162,13 +115,13 @@ export default function SelectUserPage() {
 
       // Crear nueva orden para el nuevo usuario
       const newOrder = await ordersService.createOrder(
-        parseInt(tableId),
+        currentTableId,
         userName.trim()
       );
 
       // Crear nuevo objeto de usuario
       const newUser: TableUser = {
-        id: newOrder.id, // Usamos el orderId como ID
+        id: newOrder.id,
         name: userName.trim(),
         orderId: newOrder.id,
         orderItemsCount: 0,
@@ -179,22 +132,11 @@ export default function SelectUserPage() {
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
 
-      // Actualizar sessionStorage
-      sessionStorage.setItem(
-        `table_${tableId}_users`,
-        JSON.stringify(
-          updatedUsers.map((u) => ({
-            id: u.id,
-            name: u.name,
-            orderId: u.orderId,
-          }))
-        )
-      );
+      // Establecer la nueva orden en el contexto
+      await setCurrentUserOrder(newUser.orderId, newUser.id);
 
       // Redirigir al menú del nuevo usuario
-      router.push(
-        `/customer/menu?table=${tableId}&user=${newUser.id}&order=${newUser.orderId}`
-      );
+      router.push(`/customer/menu`);
     } catch (error) {
       console.error("Error adding new user:", error);
       setError("Error al agregar nuevo comensal");
@@ -205,6 +147,23 @@ export default function SelectUserPage() {
   const handleBack = () => {
     router.push("/customer");
   };
+
+  // Mostrar loading mientras se obtienen datos del contexto
+  if (!currentTableId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Cargando mesa...
+            </h2>
+            <p className="text-gray-600">Obteniendo información de la mesa</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -237,7 +196,7 @@ export default function SelectUserPage() {
             <h1 className="text-3xl font-bold text-gray-800">
               Selecciona tu perfil
             </h1>
-            <p className="text-gray-600">Mesa {tableId}</p>
+            <p className="text-gray-600">Mesa {currentTableId}</p>
           </div>
         </div>
 
@@ -277,7 +236,7 @@ export default function SelectUserPage() {
                       <h3 className="text-xl font-semibold text-gray-800">
                         {user.name}
                       </h3>
-                      {/* <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
                         {user.orderItemsCount && user.orderItemsCount > 0 ? (
                           <>
                             <span className="flex items-center gap-1">
@@ -292,7 +251,7 @@ export default function SelectUserPage() {
                         ) : (
                           <span className="text-gray-400">Sin pedidos aún</span>
                         )}
-                      </div> */}
+                      </div>
                     </div>
                   </div>
 
@@ -313,7 +272,7 @@ export default function SelectUserPage() {
         </div>
 
         {/* Agregar nuevo usuario */}
-        {/* <button
+        <button
           onClick={handleAddNewUser}
           disabled={loadingUser !== null}
           className="w-full p-6 border-2 border-dashed border-gray-300 rounded-2xl hover:border-green-500 hover:bg-green-50 transition-all duration-300 group"
@@ -332,7 +291,7 @@ export default function SelectUserPage() {
               </>
             )}
           </div>
-        </button> */}
+        </button>
 
         {/* Información */}
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">

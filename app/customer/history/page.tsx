@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import {
@@ -48,11 +48,6 @@ interface CustomerOrderSummary {
 
 export default function HistoryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
-  const userId = searchParams.get("user");
-  const orderId = searchParams.get("order");
-
   const {
     currentOrder,
     orderItems,
@@ -75,12 +70,47 @@ export default function HistoryPage() {
   const isSubscribedRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
 
-  // Cargar usuarios de la mesa
+  // Cargar datos iniciales cuando el contexto esté listo
   useEffect(() => {
-    if (tableId) {
-      loadTableUsers(parseInt(tableId));
-    }
-  }, [tableId]);
+    const initializeData = async () => {
+      if (!currentTableId || !currentOrder?.id || !currentUserId) {
+        console.log("⏳ History: Esperando datos del contexto...");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log("🚀 History: Inicializando datos con:", {
+          tableId: currentTableId,
+          orderId: currentOrder.id,
+          userId: currentUserId,
+        });
+
+        // Cargar usuarios de la mesa
+        await loadTableUsers(currentTableId);
+
+        // Cargar historial
+        await loadHistory(currentTableId);
+
+        // Refrescar orden actual
+        await refreshOrder(currentTableId);
+      } catch (error) {
+        console.error("Error initializing data:", error);
+        setError("Error al cargar el historial");
+
+        // Redirigir a select-user si hay error
+        if (currentTableId) {
+          router.push(`/customer/select-user?table=${currentTableId}`);
+        } else {
+          router.push("/customer");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [currentTableId, currentOrder?.id, currentUserId, router, refreshOrder]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -88,41 +118,6 @@ export default function HistoryPage() {
       setTableUsers(users);
     } catch (error) {
       console.error("Error loading table users:", error);
-    }
-  };
-
-  // Cargar datos iniciales
-  useEffect(() => {
-    if (tableId && orderId && userId) {
-      loadInitialData(parseInt(tableId), orderId, userId);
-    } else if (tableId) {
-      // Si solo tenemos la mesa, redirigir a select-user
-      router.push(`/customer/select-user?table=${tableId}`);
-    } else {
-      router.push("/customer");
-    }
-  }, [tableId, orderId, userId, router]);
-
-  const loadInitialData = async (
-    tableId: number,
-    orderId: string,
-    userId: string
-  ) => {
-    try {
-      setLoading(true);
-
-      // También refrescar la orden actual para obtener los últimos items
-      if (currentTableId) {
-        await refreshOrder(currentTableId);
-      }
-
-      await loadHistory(tableId);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      alert("Error al cargar el historial. Redirigiendo...");
-      router.push("/customer/select-user?table=" + tableId);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -256,10 +251,11 @@ export default function HistoryPage() {
       await switchUserOrder(user.orderId, user.id);
       setShowUserSwitch(false);
 
-      // Actualizar URL
-      router.push(
-        `/customer/history?table=${tableId}&user=${user.id}&order=${user.orderId}`
-      );
+      // Recargar datos después de cambiar usuario
+      if (currentTableId) {
+        await loadHistory(currentTableId);
+        await refreshOrder(currentTableId);
+      }
     } catch (error) {
       console.error("Error switching user:", error);
       alert("Error al cambiar de usuario");
@@ -271,7 +267,7 @@ export default function HistoryPage() {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
 
-    if (!tableId) {
+    if (!currentTableId) {
       alert("No se encontró la mesa");
       return;
     }
@@ -279,12 +275,12 @@ export default function HistoryPage() {
     try {
       // Crear nueva orden para el nuevo usuario
       const newOrder = await historyService.createOrder(
-        parseInt(tableId),
+        currentTableId,
         userName.trim()
       );
 
       // Actualizar lista de usuarios
-      await loadTableUsers(parseInt(tableId));
+      await loadTableUsers(currentTableId);
 
       // Cambiar al nuevo usuario
       await handleSwitchUser({
@@ -302,8 +298,7 @@ export default function HistoryPage() {
 
   // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
   useEffect(() => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId || isSubscribedRef.current) return;
+    if (!currentTableId || isSubscribedRef.current) return;
 
     console.log("🔔 History: Iniciando suscripción para cambios en órdenes");
     isSubscribedRef.current = true;
@@ -313,22 +308,20 @@ export default function HistoryPage() {
       const now = Date.now();
       if (now - lastUpdateRef.current > 2000) {
         lastUpdateRef.current = now;
-        if (targetTableId) {
-          loadHistory(parseInt(targetTableId.toString()));
-        }
+        loadHistory(currentTableId);
       }
     };
 
     // Suscripción para cambios en órdenes
     const orderSubscription = supabase
-      .channel(`history-orders-${targetTableId}`)
+      .channel(`history-orders-${currentTableId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "orders",
-          filter: `table_id=eq.${targetTableId}`,
+          filter: `table_id=eq.${currentTableId}`,
         },
         async (payload) => {
           console.log(
@@ -344,7 +337,7 @@ export default function HistoryPage() {
 
     // Suscripción para cambios en items de orden
     const orderItemsSubscription = supabase
-      .channel(`history-order-items-${targetTableId}`)
+      .channel(`history-order-items-${currentTableId}`)
       .on(
         "postgres_changes",
         {
@@ -363,14 +356,14 @@ export default function HistoryPage() {
 
     // Suscripción para notificaciones del mesero (mesa liberada)
     const notificationSubscription = supabase
-      .channel(`customer-history-table-${targetTableId}`)
+      .channel(`customer-history-table-${currentTableId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "waiter_notifications",
-          filter: `table_id=eq.${targetTableId}`,
+          filter: `table_id=eq.${currentTableId}`,
         },
         (payload) => {
           console.log("📨 History: Notificación recibida:", payload.new.type);
@@ -393,17 +386,14 @@ export default function HistoryPage() {
       notificationSubscription.unsubscribe();
       isSubscribedRef.current = false;
     };
-  }, [tableId, currentTableId]);
+  }, [currentTableId]);
 
   const handleAssistanceRequest = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!currentTableId) return;
 
     setAssistanceLoading(true);
     try {
-      await historyService.requestAssistance(
-        parseInt(targetTableId.toString())
-      );
+      await historyService.requestAssistance(currentTableId);
       alert("✅ El mesero ha sido notificado. Pronto te atenderá.");
     } catch (error) {
       console.error("Error requesting assistance:", error);
@@ -414,20 +404,16 @@ export default function HistoryPage() {
   };
 
   const handleBillRequest = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!currentTableId || !currentOrder?.id) return;
 
     setBillLoading(true);
     try {
-      await historyService.requestBill(
-        parseInt(targetTableId.toString()),
-        currentOrder?.id
-      );
+      await historyService.requestBill(currentTableId, currentOrder.id);
       alert("✅ Se ha solicitado la cuenta. El mesero te traerá tu factura.");
 
       setTimeout(() => {
         router.push(
-          `/customer/payment?table=${targetTableId}&user=${userId}&order=${orderId}`
+          `/customer/payment?table=${currentTableId}&user=${currentUserId}&order=${currentOrder.id}`
         );
       }, 1000);
     } catch (error) {
@@ -439,13 +425,10 @@ export default function HistoryPage() {
   };
 
   const handleRefresh = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!currentTableId) return;
 
-    await loadHistory(parseInt(targetTableId.toString()));
-    if (currentTableId) {
-      await refreshOrder(currentTableId);
-    }
+    await loadHistory(currentTableId);
+    await refreshOrder(currentTableId);
   };
 
   const formatCurrency = (amount: number) => {
@@ -455,13 +438,13 @@ export default function HistoryPage() {
     }).format(amount);
   };
 
-  // Mostrar loading mientras se obtiene tableId
-  if (tableId === null) {
+  // Mostrar loading mientras se obtienen datos del contexto
+  if (!currentTableId || !currentOrder?.id || !currentUserId) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando...</p>
+          <p className="text-gray-600">Cargando datos de la mesa...</p>
         </div>
       </div>
     );
@@ -484,15 +467,17 @@ export default function HistoryPage() {
         <div className="text-center">
           <FaExclamationTriangle className="text-4xl text-red-500 mx-auto mb-4" />
           <p className="text-gray-600">{error}</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Redirigiendo al inicio...
-          </p>
+          <button
+            onClick={() => router.push("/customer")}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            Volver al inicio
+          </button>
         </div>
       </div>
     );
   }
 
-  const targetTableId = tableId || currentTableId;
   const customerSummaries = groupOrdersByCustomer();
 
   return (
@@ -506,8 +491,7 @@ export default function HistoryPage() {
                 Historial de Pedidos
               </h1>
               <p className="text-sm text-gray-500">
-                Mesa {targetTableId} •{" "}
-                {currentOrder?.customer_name || "Invitado"}
+                Mesa {currentTableId} • {currentOrder.customer_name}
               </p>
               <p className="text-sm text-blue-600 font-medium">
                 {customerSummaries.length} comensal
@@ -515,18 +499,6 @@ export default function HistoryPage() {
                 {orderHistory.length} orden{orderHistory.length > 1 ? "es" : ""}
               </p>
             </div>
-
-            {/* Selector de usuario - Botón discreto */}
-            {/* <button
-              onClick={() => setShowUserSwitch(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200"
-              title="Cambiar de comensal"
-            >
-              <FaUsers className="text-blue-600 text-sm" />
-              <span className="text-sm font-medium text-blue-700">
-                {tableUsers.length}
-              </span>
-            </button> */}
           </div>
 
           {/* Botones */}
@@ -577,7 +549,7 @@ export default function HistoryPage() {
               {/* Header del Ticket */}
               <div className="bg-gray-800 text-white p-6 text-center">
                 <h3 className="text-xl font-bold">RESTAURANTE</h3>
-                <p className="text-gray-300 text-sm">Mesa {targetTableId}</p>
+                <p className="text-gray-300 text-sm">Mesa {currentTableId}</p>
                 <p className="text-gray-300 text-sm">
                   Cliente: {currentOrder.customer_name}
                 </p>
@@ -681,10 +653,6 @@ export default function HistoryPage() {
                             {customerSummary.customerName}
                           </h3>
                           <div className="flex items-center gap-3 text-blue-200 text-sm">
-                            {/* <span>
-                              {customerSummary.orders.length} orden
-                              {customerSummary.orders.length > 1 ? "es" : ""}
-                            </span> */}
                             <span>•</span>
                             <span>
                               {customerSummary.itemsCount} item
@@ -707,17 +675,7 @@ export default function HistoryPage() {
                         {/* Info de la orden individual */}
                         <div className="flex justify-between items-center mb-3 p-3 bg-gray-50 rounded-lg">
                           <div>
-                            <span className="font-medium text-gray-700">
-                              {/* Orden #{order.id.slice(-8)} */}
-                            </span>
                             <div className="flex items-center gap-2 mt-1">
-                              {/* <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                  order.status as OrderStatus
-                                )}`}
-                              >
-                                {getStatusText(order.status as OrderStatus)}
-                              </span> */}
                               <span className="text-xs text-gray-500">
                                 Hora del pedido:{" "}
                                 {new Date(order.created_at).toLocaleString()}
@@ -773,20 +731,6 @@ export default function HistoryPage() {
 
                     {/* Resumen del Cliente */}
                     <div className=" border-gray-200 pt-4 mt-4">
-                      {/* <div className="flex justify-between text-sm mb-2">
-                        <span className="font-medium text-gray-700">
-                          Subtotal de {customerSummary.customerName}:
-                        </span>
-                        <span className="font-medium text-gray-700">
-                          {formatCurrency(customerSummary.subtotal)}
-                        </span>
-                      </div> */}
-                      {/* <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Impuestos (16%):</span>
-                        <span className="text-gray-600">
-                          {formatCurrency(customerSummary.taxAmount)}
-                        </span>
-                      </div> */}
                       <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
                         <span>Total de {customerSummary.customerName}:</span>
                         <span>{formatCurrency(customerSummary.subtotal)}</span>
@@ -812,7 +756,9 @@ export default function HistoryPage() {
             <button
               onClick={() =>
                 router.push(
-                  `/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`
+                  `/customer/menu?table=${currentTableId}&user=${currentUserId}&order=${
+                    (currentOrder as { id: string })?.id
+                  }`
                 )
               }
               className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
@@ -839,7 +785,7 @@ export default function HistoryPage() {
                   ✕
                 </button>
               </div>
-              <p className="text-gray-600">Mesa {targetTableId}</p>
+              <p className="text-gray-600">Mesa {currentTableId}</p>
             </div>
 
             <div className="p-6">
@@ -909,7 +855,7 @@ export default function HistoryPage() {
           <button
             onClick={() =>
               router.push(
-                `/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`
+                `/customer/menu?table=${currentTableId}&user=${currentUserId}&order=${currentOrder?.id}`
               )
             }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
@@ -923,7 +869,9 @@ export default function HistoryPage() {
           </button>
           <button
             onClick={() =>
-              router.push(`/customer/qr?table=${targetTableId}&user=${userId}`)
+              router.push(
+                `/customer/qr?table=${currentTableId}&user=${currentUserId}`
+              )
             }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
