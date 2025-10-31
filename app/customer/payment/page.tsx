@@ -1,7 +1,7 @@
 // app/customer/payment/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import {
@@ -33,27 +33,30 @@ interface CustomerOrderSummary {
 
 export default function PaymentPage() {
   const router = useRouter();
-  const {
-    currentOrder,
-    orderItems,
-    currentTableId,
-    currentUserId,
-    refreshOrder,
-  } = useOrder();
+  const searchParams = useSearchParams();
+  const tableId = searchParams.get("table");
+  const userId = searchParams.get("user");
+  const orderId = searchParams.get("order");
+
+  const { currentOrder, orderItems, currentTableId, refreshOrder } = useOrder();
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
   const [error, setError] = useState("");
 
-  // Cargar todas las órdenes pendientes de pago cuando el contexto esté listo
+  // Obtener parámetros de la URL
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Cargar todas las órdenes pendientes de pago
   useEffect(() => {
     const loadAllOrders = async () => {
-      if (!currentTableId) {
-        console.log("⏳ Payment: Esperando tableId del contexto...");
-        return;
-      }
+      const targetTableId = tableId || currentTableId;
+      if (!targetTableId) return;
 
       try {
         setLoading(true);
@@ -61,7 +64,7 @@ export default function PaymentPage() {
 
         // Obtener todas las órdenes de la mesa (activas + enviadas)
         const orders = await historyService.getCustomerOrderHistory(
-          currentTableId
+          parseInt(targetTableId.toString())
         );
 
         // Filtrar solo órdenes pendientes de pago (active + sent)
@@ -97,8 +100,10 @@ export default function PaymentPage() {
       }
     };
 
-    loadAllOrders();
-  }, [currentTableId]);
+    if (tableId !== null) {
+      loadAllOrders();
+    }
+  }, [tableId, currentTableId]);
 
   // Agrupar órdenes por cliente
   const groupOrdersByCustomer = (): CustomerOrderSummary[] => {
@@ -180,7 +185,7 @@ export default function PaymentPage() {
     }
   }, [paymentConfirmed, countdown, router]);
 
-  // Método de confirmación de pago
+  //metodo de confirmacion de pago
   const handlePaymentConfirmation = async () => {
     try {
       // Aquí podrías agregar lógica para marcar las órdenes como pagadas
@@ -218,19 +223,8 @@ export default function PaymentPage() {
     return statusMap[status] || status;
   };
 
-  // Mostrar loading mientras se obtienen datos del contexto
-  if (!currentTableId || !currentOrder?.id || !currentUserId) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando datos de la mesa...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
+  // Mostrar loading mientras se obtiene el tableId
+  if (!isClient || loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -253,7 +247,7 @@ export default function PaymentPage() {
           <button
             onClick={() =>
               router.push(
-                `/customer/menu?table=${currentTableId}&user=${currentUserId}&order=${currentOrder.id}`
+                `/customer/menu?table=${tableId}&user=${userId}&order=${orderId}`
               )
             }
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
@@ -280,7 +274,7 @@ export default function PaymentPage() {
           <button
             onClick={() =>
               router.push(
-                `/customer/menu?table=${currentTableId}&user=${currentUserId}&order=${currentOrder.id}`
+                `/customer/menu?table=${tableId}&user=${userId}&order=${orderId}`
               )
             }
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
@@ -353,7 +347,9 @@ export default function PaymentPage() {
                 <h1 className="text-2xl font-bold text-gray-800">
                   Ticket de Pago
                 </h1>
-                <p className="text-sm text-gray-500">Mesa {currentTableId}</p>
+                <p className="text-sm text-gray-500">
+                  Mesa {tableId || currentTableId}
+                </p>
                 <p className="text-sm text-blue-600 font-medium">
                   {customerSummaries.length} comensal
                   {customerSummaries.length > 1 ? "es" : ""} •{" "}
@@ -377,7 +373,15 @@ export default function PaymentPage() {
           {/* Header del Ticket */}
           <div className="bg-gray-800 text-white p-6 text-center">
             <h3 className="text-2xl font-bold">RESTAURANTE</h3>
-            <p className="text-gray-300 text-sm">Mesa {currentTableId}</p>
+            <p className="text-gray-300 text-sm">
+              Mesa {tableId || currentTableId}
+            </p>
+            {/* <p className="text-gray-300 text-sm">
+              {customerSummaries.length} comensal
+              {customerSummaries.length > 1 ? "es" : ""} • {allOrders.length}{" "}
+              orden{allOrders.length > 1 ? "es" : ""} •{" "}
+              {new Date().toLocaleString()}
+            </p> */}
           </div>
 
           {/* Lista de órdenes agrupadas por cliente */}
@@ -398,6 +402,17 @@ export default function PaymentPage() {
                         <h4 className="text-lg font-semibold text-gray-800">
                           {customerSummary.customerName}
                         </h4>
+                        {/* <div className="flex items-center gap-3 text-sm text-gray-500">
+                          <span>
+                            {customerSummary.orders.length} orden
+                            {customerSummary.orders.length > 1 ? "es" : ""}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {customerSummary.itemsCount} item
+                            {customerSummary.itemsCount > 1 ? "s" : ""}
+                          </span>
+                        </div> */}
                       </div>
                     </div>
                   </div>
@@ -405,6 +420,9 @@ export default function PaymentPage() {
                     <p className="text-lg font-semibold text-gray-800">
                       {formatCurrency(customerSummary.subtotal)}
                     </p>
+                    {/* <p className="text-sm text-gray-500">
+                      Subtotal: {formatCurrency(customerSummary.subtotal)}
+                    </p> */}
                   </div>
                 </div>
 
@@ -414,7 +432,16 @@ export default function PaymentPage() {
                     <div key={order.id}>
                       {/* Info de la orden individual si hay más de una */}
                       {customerSummary.orders.length > 1 && (
-                        <div className="mb-3 p-3 bg-gray-50 rounded-lg"></div>
+                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                          {/* <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-gray-700">
+                              Orden #{order.id.slice(-8)}
+                            </span>
+                            <span className="text-gray-500">
+                              {getStatusText(order.status)}
+                            </span>
+                          </div> */}
+                        </div>
                       )}
 
                       {/* Items de esta orden */}
@@ -463,6 +490,20 @@ export default function PaymentPage() {
 
                 {/* Resumen del cliente */}
                 <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    {/* <span className="font-medium text-gray-700">
+                      Subtotal de {customerSummary.customerName}:
+                    </span> */}
+                    {/* <span className="font-medium text-gray-700">
+                      {formatCurrency(customerSummary.subtotal)}
+                    </span> */}
+                  </div>
+                  {/* <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Impuestos (16%):</span>
+                    <span className="text-gray-600">
+                      {formatCurrency(customerSummary.taxAmount)}
+                    </span>
+                  </div> */}
                   <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
                     <span>Total de {customerSummary.customerName}:</span>
                     <span>{formatCurrency(customerSummary.subtotal)}</span>
@@ -478,6 +519,18 @@ export default function PaymentPage() {
 
             {/* Resumen FINAL de todos los pagos */}
             <div className="border-t border-gray-200 pt-6 space-y-3">
+              <div className="flex justify-between text-gray-600">
+                {/* <span className="font-medium text-lg">Subtotal total:</span>
+                <span className="font-medium text-lg">
+                  {formatCurrency(paymentSummary.subtotal)}
+                </span> */}
+              </div>
+              {/* <div className="flex justify-between text-gray-600">
+                <span className="font-medium text-lg">Impuestos (16%):</span>
+                <span className="font-medium text-lg">
+                  {formatCurrency(paymentSummary.taxAmount)}
+                </span>
+              </div> */}
               <div className="flex justify-between text-2xl font-bold text-gray-800 border-t border-gray-200 pt-4">
                 <span>TOTAL GENERAL:</span>
                 <span>{formatCurrency(paymentSummary.subtotal)}</span>
