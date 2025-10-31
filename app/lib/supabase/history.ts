@@ -43,6 +43,42 @@ interface OrderFromSupabase {
 }
 
 export const historyService = {
+
+async createOrder(tableId: number, customerName: string): Promise<OrderWithItems> {
+  const { data, error } = await supabase
+    .from("orders")
+    .insert([
+      {
+        table_id: tableId,
+        customer_name: customerName,
+        status: "active",
+        total_amount: 0,
+      },
+    ] as never)
+    .select(`
+      *,
+      order_items (
+        *,
+        products (
+          name,
+          image_url,
+          preparation_time
+        )
+      )
+    `)
+    .single();
+
+  if (error) {
+    console.error("Error creating order:", error);
+    throw new Error(`Error al crear la orden: ${error.message}`);
+  }
+
+  console.log("✅ Nueva orden creada para:", customerName, "en mesa:", tableId);
+
+  return data as OrderWithItems;
+},
+
+
   // Obtener historial del cliente actual (orden activa + enviadas + completadas)
   async getCustomerOrderHistory(tableId: number, currentOrderId?: string): Promise<OrderWithItems[]> {
     let query = supabase

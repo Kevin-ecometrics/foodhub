@@ -20,7 +20,17 @@ import {
   FaSync,
   FaDollarSign,
   FaTrash,
+  FaUser,
 } from "react-icons/fa";
+
+interface CustomerOrderSummary {
+  customerName: string;
+  orders: any[];
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  itemsCount: number;
+}
 
 export default function WaiterDashboard() {
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
@@ -132,6 +142,50 @@ export default function WaiterDashboard() {
       orderItemsSub.unsubscribe();
       tablesSub.unsubscribe();
     };
+  };
+
+  // Agrupar órdenes por cliente para una mesa
+  const groupOrdersByCustomer = (
+    table: TableWithOrder
+  ): CustomerOrderSummary[] => {
+    const customerMap = new Map<string, CustomerOrderSummary>();
+
+    table.orders.forEach((order) => {
+      const customerName = order.customer_name || "Cliente";
+
+      if (!customerMap.has(customerName)) {
+        customerMap.set(customerName, {
+          customerName,
+          orders: [],
+          subtotal: 0,
+          taxAmount: 0,
+          total: 0,
+          itemsCount: 0,
+        });
+      }
+
+      const customerSummary = customerMap.get(customerName)!;
+      customerSummary.orders.push(order);
+
+      // Calcular subtotal de esta orden
+      const orderSubtotal = order.order_items.reduce(
+        (sum: number, item: any) => sum + item.price * item.quantity,
+        0
+      );
+
+      customerSummary.subtotal += orderSubtotal;
+      customerSummary.itemsCount += order.order_items.length;
+    });
+
+    // Calcular impuestos y totales para cada cliente
+    const taxRate = 0.16;
+    customerMap.forEach((customerSummary) => {
+      customerSummary.taxAmount = customerSummary.subtotal * taxRate;
+      customerSummary.total =
+        customerSummary.subtotal + customerSummary.taxAmount;
+    });
+
+    return Array.from(customerMap.values());
   };
 
   const handleAcknowledgeNotification = async (notificationId: string) => {
@@ -515,6 +569,7 @@ export default function WaiterDashboard() {
                 const tableTotal = calculateTableTotal(table);
                 const totalItems = calculateTotalItems(table);
                 const statusCounts = calculateItemsByStatus(table);
+                const customerSummaries = groupOrdersByCustomer(table);
 
                 return (
                   <div
@@ -600,103 +655,124 @@ export default function WaiterDashboard() {
                         )}
                     </div>
 
-                    {/* DETALLE COMPLETO DE TODOS LOS PRODUCTOS */}
-                    {table.orders.map((order) => (
+                    {/* DETALLE AGRUPADO POR CLIENTE */}
+                    {customerSummaries.map((customerSummary) => (
                       <div
-                        key={order.id}
+                        key={customerSummary.customerName}
                         className="mt-4 pt-4 border-t border-gray-200"
                       >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <p className="font-medium text-sm text-gray-700">
-                              Orden #{order.id.slice(-8)}
-                            </p>
-                            {order.customer_name && (
-                              <p className="text-xs text-gray-600">
-                                Cliente: {order.customer_name}
-                              </p>
-                            )}
-                            <p className="text-xs text-gray-500">
-                              {new Date(order.created_at).toLocaleString()}
-                            </p>
+                        {/* HEADER DEL CLIENTE */}
+                        <div className="flex items-center gap-3 mb-3 p-3 bg-blue-50 rounded-lg">
+                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                            <FaUser className="text-white text-sm" />
                           </div>
-                          <span
-                            className={`text-xs px-2 py-1 rounded ${
-                              order.status === "sent"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {order.status === "sent" ? "Enviada" : "Completada"}
-                          </span>
-                        </div>
-
-                        {/* LISTA DE TODOS LOS PRODUCTOS DE ESTA ORDEN */}
-                        <div className="space-y-2">
-                          {order.order_items.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex justify-between items-start text-sm bg-gray-50 p-2 rounded"
-                            >
-                              <div className="flex-1">
-                                <div className="flex justify-between">
-                                  <span className="font-medium">
-                                    {item.product_name} × {item.quantity}
-                                  </span>
-                                  <span className="font-semibold text-green-600">
-                                    ${(item.price * item.quantity).toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center mt-1">
-                                  <span className="text-xs text-gray-500">
-                                    ${item.price.toFixed(2)} c/u
-                                  </span>
-                                  <div className="flex items-center space-x-2">
-                                    <select
-                                      value={item.status}
-                                      onChange={(e) =>
-                                        handleUpdateItemStatus(
-                                          item.id,
-                                          e.target.value
-                                        )
-                                      }
-                                      disabled={processing === item.id}
-                                      className={`text-xs rounded px-2 py-1 ${getStatusColor(
-                                        item.status
-                                      )}`}
-                                    >
-                                      <option value="ordered">Ordenado</option>
-                                      <option value="preparing">
-                                        Preparando
-                                      </option>
-                                      <option value="ready">Listo</option>
-                                      <option value="served">Servido</option>
-                                    </select>
-                                    {processing === item.id && (
-                                      <FaSpinner className="animate-spin text-blue-500" />
-                                    )}
-                                  </div>
-                                </div>
-                                {item.notes && (
-                                  <p className="text-xs text-gray-600 mt-1">
-                                    <strong>Nota:</strong> {item.notes}
-                                  </p>
-                                )}
-                              </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-800">
+                              {customerSummary.customerName}
+                            </h4>
+                            <div className="flex items-center gap-3 text-xs text-gray-600">
+                              <span>
+                                {customerSummary.orders.length} pedido
+                                {customerSummary.orders.length > 1 ? "s" : ""}
+                              </span>
+                              <span>•</span>
+                              <span>
+                                {customerSummary.itemsCount} producto
+                                {customerSummary.itemsCount > 1 ? "s" : ""}
+                              </span>
+                              {/* <span>•</span> */}
+                              {/* <span className="font-semibold text-green-600">
+                                ${customerSummary.total.toFixed(2)}
+                              </span> */}
                             </div>
-                          ))}
+                          </div>
                         </div>
 
-                        {/* <div className="mt-3 pt-2 border-t border-gray-200">
-                          <div className="flex justify-between text-sm">
+                        {/* PRODUCTOS DE TODAS LAS ÓRDENES DEL CLIENTE */}
+                        <div className="space-y-2">
+                          {customerSummary.orders.flatMap((order) =>
+                            order.order_items.map((item: any) => (
+                              <div
+                                key={item.id}
+                                className="flex justify-between items-start text-sm bg-gray-50 p-2 rounded"
+                              >
+                                <div className="flex-1">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">
+                                      {item.product_name} × {item.quantity}
+                                    </span>
+                                    <span className="font-semibold text-green-600">
+                                      ${(item.price * item.quantity).toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center mt-1">
+                                    <span className="text-xs text-gray-500">
+                                      ${item.price.toFixed(2)} c/u
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                      <select
+                                        value={item.status}
+                                        onChange={(e) =>
+                                          handleUpdateItemStatus(
+                                            item.id,
+                                            e.target.value
+                                          )
+                                        }
+                                        disabled={processing === item.id}
+                                        className={`text-xs rounded px-2 py-1 ${getStatusColor(
+                                          item.status
+                                        )}`}
+                                      >
+                                        <option value="ordered">
+                                          Ordenado
+                                        </option>
+                                        <option value="preparing">
+                                          Preparando
+                                        </option>
+                                        <option value="ready">Listo</option>
+                                        <option value="served">Servido</option>
+                                      </select>
+                                      {processing === item.id && (
+                                        <FaSpinner className="animate-spin text-blue-500" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  {item.notes && (
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      <strong>Nota:</strong> {item.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* RESUMEN DEL CLIENTE */}
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          {/* <div className="flex justify-between text-sm">
                             <span className="font-medium">
-                              Subtotal esta orden:
+                              Subtotal de {customerSummary.customerName}:
                             </span>
                             <span className="font-bold text-blue-600">
-                              ${order.total_amount.toFixed(2)}
+                              ${customerSummary.subtotal.toFixed(2)}
                             </span>
-                          </div>
-                        </div> */}
+                          </div> */}
+                          {/* <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              Impuestos (16%):
+                            </span>
+                            <span className="text-gray-600">
+                              ${customerSummary.taxAmount.toFixed(2)}
+                            </span>
+                          </div> */}
+                          {/* <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
+                            <span>
+                              Total de {customerSummary.customerName}:
+                            </span>
+                            <span>${customerSummary.total.toFixed(2)}</span>
+                          </div> */}
+                        </div>
                       </div>
                     ))}
 
@@ -712,7 +788,11 @@ export default function WaiterDashboard() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1 text-center">
-                          {table.orders.length} órdenes enviadas
+                          {customerSummaries.length} comensal
+                          {customerSummaries.length > 1 ? "es" : ""} •{" "}
+                          {table.orders.length} pedido
+                          {table.orders.length > 1 ? "s" : ""} enviado
+                          {table.orders.length > 1 ? "s" : ""}
                         </p>
                       </div>
                     )}

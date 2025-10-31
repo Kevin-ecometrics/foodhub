@@ -8,13 +8,18 @@ import { supabase } from "@/app/lib/supabase/client";
 import { Product } from "@/app/lib/supabase/products";
 
 interface OrderContextType {
+  // Estado actual
   currentOrder: Order | null;
   orderItems: OrderItem[];
   cartTotal: number;
   cartItemsCount: number;
   loading: boolean;
   currentTableId: number | null;
-  refreshOrder: (tableId: number) => Promise<void>;
+  currentUserId: string | null;
+
+  // Métodos principales
+  refreshOrder: (tableId: number, orderId?: string) => Promise<void>;
+  setCurrentUserOrder: (orderId: string, userId: string) => Promise<void>;
   addToCart: (
     product: Product,
     quantity?: number,
@@ -23,8 +28,14 @@ interface OrderContextType {
   updateCartItem: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => void;
-  createNewOrder: () => Promise<void>;
-  getRecentOrdersItems: (tableId: number) => Promise<OrderItem[]>; // NUEVA FUNCIÓN
+  createNewOrder: (customerName?: string) => Promise<string>; // Retorna orderId
+
+  // Métodos para múltiples usuarios
+  getRecentOrdersItems: (tableId: number) => Promise<OrderItem[]>;
+  getTableUsers: (
+    tableId: number
+  ) => Promise<{ id: string; name: string; orderId: string }[]>;
+  switchUserOrder: (orderId: string, userId: string) => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -34,6 +45,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentTableId, setCurrentTableId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const cartTotal = orderItems.reduce(
     (total, item) => total + item.price * item.quantity,
@@ -44,8 +56,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     0
   );
 
-  // Función para suscribirse a cambios en tiempo real
+  // Suscripción a cambios en tiempo real de la orden actual
   const subscribeToOrderUpdates = (orderId: string) => {
+    console.log("🔔 Suscribiendo a orden:", orderId);
+
     const subscription = supabase
       .channel(`order-${orderId}`)
       .on(
@@ -57,10 +71,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
           filter: `order_id=eq.${orderId}`,
         },
         (payload) => {
+          console.log("📦 Cambio en order_items:", payload);
           refreshOrderItems(orderId);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Estado suscripción orden:", status);
+      });
 
     return subscription;
   };
@@ -69,71 +86,78 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     try {
       const items = await orderItemsService.getOrderItems(orderId);
       setOrderItems(items);
+
+      // Actualizar total de la orden
+      if (currentOrder) {
+        const newTotal = items.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+
+        if (newTotal !== currentOrder.total_amount) {
+          await ordersService.updateOrderTotal(orderId, newTotal);
+          setCurrentOrder((prev) =>
+            prev ? { ...prev, total_amount: newTotal } : null
+          );
+        }
+      }
     } catch (error) {
       console.error("Error refreshing order items:", error);
     }
   };
 
-  // NUEVA FUNCIÓN: Obtener items de órdenes recientes
-  const getRecentOrdersItems = async (
-    tableId: number
-  ): Promise<OrderItem[]> => {
+  // NUEVO: Cambiar a una orden de usuario específico
+  const setCurrentUserOrder = async (orderId: string, userId: string) => {
+    setLoading(true);
     try {
-      // Obtener las últimas 3 órdenes enviadas/completadas
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          `
-          id,
-          order_items (*)
-        `
-        )
-        .eq("table_id", tableId)
-        .in("status", ["sent", "completed", "paid"])
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (error) {
-        console.error("Error getting recent orders:", error);
-        return [];
+      const order = await ordersService.getOrder(orderId);
+      if (!order) {
+        throw new Error("Orden no encontrada");
       }
 
-      // Tipar explícitamente el resultado para evitar el error de 'never'
-      type OrderWithItems = {
-        id: string;
-        order_items: OrderItem[];
-      };
+      setCurrentOrder(order);
+      setCurrentUserId(userId);
+      setCurrentTableId(order.table_id);
 
-      const allItems: OrderItem[] = [];
-      (data as OrderWithItems[] | null)?.forEach((order) => {
-        if (order.order_items) {
-          allItems.push(...order.order_items);
-        }
+      // Cargar items de la orden
+      const items = await orderItemsService.getOrderItems(orderId);
+      setOrderItems(items);
+
+      // Suscribirse a cambios
+      subscribeToOrderUpdates(orderId);
+
+      console.log("✅ Orden de usuario cargada:", {
+        userId,
+        orderId,
+        itemsCount: items.length,
       });
-
-      console.log("📦 Recent orders items:", {
-        ordersCount: data?.length,
-        totalItems: allItems.length,
-        uniqueProducts: new Set(allItems.map((item) => item.product_id)).size,
-      });
-
-      return allItems;
     } catch (error) {
-      console.error("Error getting recent orders items:", error);
-      return [];
+      console.error("Error setting user order:", error);
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const refreshOrder = async (tableId: number) => {
+  // ACTUALIZADO: Refresh order con soporte para orden específica
+  const refreshOrder = async (tableId: number, orderId?: string) => {
     setLoading(true);
     try {
       setCurrentTableId(tableId);
 
-      // Buscar orden activa para esta mesa
-      const order = await ordersService.getActiveOrderByTable(tableId);
-      setCurrentOrder(order);
+      let order: Order | null = null;
+
+      if (orderId) {
+        // Cargar orden específica
+        order = await ordersService.getOrder(orderId);
+      } else {
+        // Buscar primera orden activa (compatibilidad hacia atrás)
+        order = await ordersService.getActiveOrderByTable(tableId);
+      }
 
       if (order) {
+        setCurrentOrder(order);
+
         // Cargar items de la orden
         const items = await orderItemsService.getOrderItems(order.id);
         setOrderItems(items);
@@ -144,21 +168,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
           0
         );
 
-        // Solo actualizar en BD si es diferente
+        // Actualizar en BD si es diferente
         if (localTotal !== order.total_amount) {
           await ordersService.updateOrderTotal(order.id, localTotal);
           setCurrentOrder((prev) =>
             prev ? { ...prev, total_amount: localTotal } : null
           );
-        } else {
-          // Si ya está actualizado, asegurarse de que el estado local refleje el total correcto
-          setCurrentOrder((prev) =>
-            prev ? { ...prev, total_amount: localTotal } : null
-          );
         }
 
-        // Suscribirse a cambios en tiempo real
+        // Suscribirse a cambios
         subscribeToOrderUpdates(order.id);
+      } else {
+        setCurrentOrder(null);
+        setOrderItems([]);
       }
     } catch (error) {
       console.error("Error refreshing order:", error);
@@ -167,6 +189,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // NUEVO: Cambiar entre órdenes de usuarios
+  const switchUserOrder = async (orderId: string, userId: string) => {
+    await setCurrentUserOrder(orderId, userId);
+  };
+
+  // Métodos del carrito (sin cambios mayores)
   const addToCart = async (
     product: Product,
     quantity: number = 1,
@@ -184,11 +212,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
       setOrderItems((prev) => [...prev, newItem]);
 
-      // Calcular total localmente y actualizar estado inmediatamente
+      // Calcular total localmente y actualizar
       const newTotal = cartTotal + product.price * quantity;
       await ordersService.updateOrderTotal(currentOrder.id, newTotal);
 
-      // ACTUALIZAR el order local con el nuevo total
       setCurrentOrder((prev) =>
         prev ? { ...prev, total_amount: newTotal } : null
       );
@@ -207,13 +234,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     try {
       await orderItemsService.updateItemQuantity(itemId, quantity);
 
-      // Actualizar estado local inmediatamente
+      // Actualizar estado local
       setOrderItems((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, quantity } : item))
       );
 
       if (currentOrder) {
-        // Calcular nuevo total y actualizar
+        // Calcular nuevo total
         const newTotal = orderItems.reduce((total, item) => {
           if (item.id === itemId) {
             return total + item.price * quantity;
@@ -238,11 +265,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
       await orderItemsService.removeItemFromOrder(itemId);
 
-      // Actualizar estado local inmediatamente
       setOrderItems((prev) => prev.filter((item) => item.id !== itemId));
 
       if (currentOrder && itemToRemove) {
-        // Calcular nuevo total y actualizar
         const newTotal = cartTotal - itemToRemove.price * itemToRemove.quantity;
         await ordersService.updateOrderTotal(currentOrder.id, newTotal);
         setCurrentOrder((prev) =>
@@ -259,42 +284,88 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     setOrderItems([]);
   };
 
-  const createNewOrder = async () => {
+  // ACTUALIZADO: Crear nueva orden con nombre de cliente
+  const createNewOrder = async (customerName?: string): Promise<string> => {
     if (!currentTableId) throw new Error("No table selected");
 
     try {
-      const newOrder = await ordersService.createNewOrderForTable(
-        currentTableId,
-        currentOrder?.customer_name || `Mesa ${currentTableId}`
-      );
+      const name = customerName || `Usuario ${Date.now().toString().slice(-4)}`;
+      const newOrder = await ordersService.createOrder(currentTableId, name);
 
       setCurrentOrder(newOrder);
       setOrderItems([]);
 
-      // Suscribirse a cambios en tiempo real de la nueva orden
+      // Suscribirse a cambios
       subscribeToOrderUpdates(newOrder.id);
+
+      return newOrder.id;
     } catch (error) {
       console.error("Error creating new order:", error);
       throw error;
     }
   };
 
-  // Limpiar suscripción cuando el componente se desmonte
-  useEffect(() => {
-    return () => {
-      if (currentOrder) {
-        // Supabase automáticamente limpia las suscripciones cuando el canal se desmonta
-      }
-    };
-  }, [currentOrder]);
+  // NUEVO: Obtener usuarios de la mesa
+  const getTableUsers = async (tableId: number) => {
+    try {
+      const orders = await ordersService.getActiveOrdersByTable(tableId);
+      return orders.map((order) => ({
+        id: order.id, // Usamos orderId como userId temporal
+        name: order.customer_name,
+        orderId: order.id,
+      }));
+    } catch (error) {
+      console.error("Error getting table users:", error);
+      return [];
+    }
+  };
 
-  // Suscripción para detectar cuando la mesa es liberada
+  // Función existente para items recientes
+  const getRecentOrdersItems = async (
+    tableId: number
+  ): Promise<OrderItem[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `
+          id,
+          order_items (*)
+        `
+        )
+        .eq("table_id", tableId)
+        .in("status", ["sent", "completed", "paid"])
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error("Error getting recent orders:", error);
+        return [];
+      }
+
+      type OrderWithItems = {
+        id: string;
+        order_items: OrderItem[];
+      };
+
+      const allItems: OrderItem[] = [];
+      (data as OrderWithItems[] | null)?.forEach((order) => {
+        if (order.order_items) {
+          allItems.push(...order.order_items);
+        }
+      });
+
+      return allItems;
+    } catch (error) {
+      console.error("Error getting recent orders items:", error);
+      return [];
+    }
+  };
+
+  // Suscripción para liberación de mesa (sin cambios)
   useEffect(() => {
     if (currentTableId) {
-      console.log(
-        "🔔 OrderContext: Iniciando suscripción para mesa:",
-        currentTableId
-      );
+      console.log("🔔 OrderContext: Suscribiendo a mesa:", currentTableId);
 
       const tableFreedSubscription = supabase
         .channel(`table-freed-global-${currentTableId}`)
@@ -307,14 +378,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             filter: `table_id=eq.${currentTableId}`,
           },
           (payload) => {
-            console.log(
-              "📨 OrderContext: Notificación recibida:",
-              payload.new.type
-            );
+            console.log("📨 OrderContext: Notificación:", payload.new.type);
 
             if (payload.new.type === "table_freed") {
               console.log("🚨 OrderContext: Mesa liberada - Redirigiendo...");
-              // Redirigir a HP
               setTimeout(() => {
                 window.location.href = "/customer";
               }, 1000);
@@ -322,15 +389,22 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
           }
         )
         .subscribe((status) => {
-          console.log("OrderContext: Estado de suscripción:", status);
+          console.log("OrderContext: Estado suscripción mesa:", status);
         });
 
       return () => {
-        console.log("🧹 OrderContext: Limpiando suscripción");
+        console.log("🧹 OrderContext: Limpiando suscripción mesa");
         tableFreedSubscription.unsubscribe();
       };
     }
   }, [currentTableId]);
+
+  // Limpiar suscripciones
+  useEffect(() => {
+    return () => {
+      // Las suscripciones de Supabase se limpian automáticamente
+    };
+  }, []);
 
   return (
     <OrderContext.Provider
@@ -341,13 +415,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         cartItemsCount,
         loading,
         currentTableId,
+        currentUserId,
         refreshOrder,
+        setCurrentUserOrder,
         addToCart,
         updateCartItem,
         removeFromCart,
         clearCart,
         createNewOrder,
-        getRecentOrdersItems, // NUEVA FUNCIÓN EXPORTADA
+        getRecentOrdersItems,
+        getTableUsers,
+        switchUserOrder,
       }}
     >
       {children}

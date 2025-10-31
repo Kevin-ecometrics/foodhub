@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { ordersService } from "@/app/lib/supabase/orders";
@@ -19,6 +19,8 @@ import {
   FaHeart,
   FaFire,
   FaClock,
+  FaUser,
+  FaUsers,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
@@ -53,9 +55,18 @@ const CATEGORIES = [
   { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
 ];
 
+interface TableUser {
+  id: string;
+  name: string;
+  orderId: string;
+}
+
 export default function MenuPage() {
   const router = useRouter();
-  const [tableId, setTableId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const tableId = searchParams.get("table");
+  const userId = searchParams.get("user");
+  const orderId = searchParams.get("order");
 
   const {
     currentOrder,
@@ -63,14 +74,18 @@ export default function MenuPage() {
     cartTotal,
     cartItemsCount,
     loading,
+    currentTableId,
+    currentUserId,
+    setCurrentUserOrder,
     refreshOrder,
     addToCart,
     updateCartItem,
     removeFromCart,
-    currentTableId,
     clearCart,
     createNewOrder,
     getRecentOrdersItems,
+    getTableUsers,
+    switchUserOrder,
   } = useOrder();
 
   const [selectedCategory, setSelectedCategory] = useState("favorites");
@@ -83,26 +98,59 @@ export default function MenuPage() {
   const [showCart, setShowCart] = useState(false);
   const [sendingOrder, setSendingOrder] = useState(false);
   const [lastOrderSent, setLastOrderSent] = useState(false);
+  const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
+  const [showUserSwitch, setShowUserSwitch] = useState(false);
 
-  // Leer query params del cliente
+  // Cargar datos iniciales
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      setTableId(params.get("table"));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (tableId === null) return;
-
-    if (tableId) {
-      loadInitialData(parseInt(tableId));
-    } else if (currentTableId) {
-      loadInitialData(currentTableId);
+    if (tableId && orderId && userId) {
+      loadInitialData(parseInt(tableId), orderId, userId);
     } else {
       router.push("/customer");
     }
-  }, [tableId, currentTableId, router]);
+  }, [tableId, orderId, userId, router]);
+
+  // Cargar usuarios de la mesa
+  useEffect(() => {
+    if (tableId) {
+      loadTableUsers(parseInt(tableId));
+    }
+  }, [tableId]);
+
+  const loadTableUsers = async (tableId: number) => {
+    try {
+      const users = await getTableUsers(tableId);
+      setTableUsers(users);
+    } catch (error) {
+      console.error("Error loading table users:", error);
+    }
+  };
+
+  const loadInitialData = async (
+    tableId: number,
+    orderId: string,
+    userId: string
+  ) => {
+    try {
+      setIsLoading(true);
+
+      // Establecer la orden del usuario actual
+      await setCurrentUserOrder(orderId, userId);
+
+      // Cargar productos
+      const productsData = await productsService.getProducts();
+      setProducts(productsData);
+
+      // Cargar items recientes
+      await updateRecentItems();
+    } catch (error) {
+      console.error("Error loading data:", error);
+      alert("Error al cargar el menú. Redirigiendo...");
+      router.push("/customer/select-user?table=" + tableId);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Resetear lastOrderSent cuando se agregan nuevos items al carrito
   useEffect(() => {
@@ -116,7 +164,6 @@ export default function MenuPage() {
     updateFavoriteItems();
   }, [orderItems, products]);
 
-  // Actualizar items recientes cuando cambia la mesa o productos
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
     if (targetTableId && products.length > 0) {
@@ -124,7 +171,6 @@ export default function MenuPage() {
     }
   }, [tableId, currentTableId, products]);
 
-  // Actualizar items recientes cuando se envía una orden
   useEffect(() => {
     if (lastOrderSent) {
       setTimeout(() => {
@@ -133,33 +179,23 @@ export default function MenuPage() {
     }
   }, [lastOrderSent]);
 
-  // Función para actualizar items recientes
   const updateRecentItems = async () => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
 
     try {
-      // Obtener items de órdenes recientes
       const recentOrdersItems = await getRecentOrdersItems(
         parseInt(targetTableId.toString())
       );
       setRecentOrderItems(recentOrdersItems);
 
-      // Obtener productos únicos de todas las órdenes recientes
       const uniqueProductIds = new Set(
         recentOrdersItems.map((item) => item.product_id)
       );
       const recentProducts = products.filter((product) =>
         uniqueProductIds.has(product.id)
       );
-
       setRecentItems(recentProducts);
-
-      console.log("🔄 Repite Item actualizado:", {
-        totalItems: recentOrdersItems.length,
-        uniqueProducts: recentProducts.length,
-        productIds: Array.from(uniqueProductIds),
-      });
     } catch (error) {
       console.error("Error updating recent items:", error);
     }
@@ -175,8 +211,6 @@ export default function MenuPage() {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
 
-    console.log("🔔 Menu: Iniciando suscripción para mesa:", targetTableId);
-
     const subscription = supabase
       .channel(`customer-menu-table-${targetTableId}`)
       .on(
@@ -188,40 +222,18 @@ export default function MenuPage() {
           filter: `table_id=eq.${targetTableId}`,
         },
         (payload) => {
-          console.log("📨 Menu: Notificación recibida:", payload.new.type);
-
           if (payload.new.type === "table_freed") {
-            console.log("🚨 Menu: Mesa liberada - Redirigiendo...");
             alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
             window.location.href = "/customer";
           }
         }
       )
-      .subscribe((status) => {
-        console.log("Menu: Estado de suscripción:", status);
-      });
+      .subscribe();
 
     return () => {
-      console.log("🧹 Menu: Limpiando suscripción");
       subscription.unsubscribe();
     };
   }, [tableId, currentTableId]);
-
-  const loadInitialData = async (tableId: number) => {
-    try {
-      setIsLoading(true);
-      await refreshOrder(tableId);
-      const productsData = await productsService.getProducts();
-      setProducts(productsData);
-
-      // Cargar items recientes después de cargar productos
-      await updateRecentItems();
-    } catch (error) {
-      console.error("Error loading data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAddToCart = async (product: Product) => {
     setAddingProduct(product.id);
@@ -243,7 +255,7 @@ export default function MenuPage() {
     }
   };
 
-  // FUNCIÓN CORREGIDA: Enviar orden a cocina
+  // FUNCIÓN CORREGIDA: Enviar orden a cocina (MANTIENE LA LÓGICA ORIGINAL)
   const handleSendOrder = async () => {
     if (!currentOrder || orderItems.length === 0) return;
 
@@ -262,22 +274,30 @@ export default function MenuPage() {
       await notificationsService.createNotification(
         currentOrder.table_id,
         "new_order",
-        `Nueva orden enviada desde Mesa ${currentOrder.table_id}`,
+        `Nueva orden de ${currentOrder.customer_name} desde Mesa ${currentOrder.table_id}`,
         currentOrder.id
       );
 
-      // 3. Crear NUEVA orden para la mesa (carrito vacío listo para nuevos pedidos)
-      await createNewOrder();
+      // 3. IMPORTANTE: Crear NUEVA orden para el MISMO usuario (no crear nuevo comensal)
+      const newOrderId = await createNewOrder(currentOrder.customer_name);
 
-      // 4. Marcar que se acaba de enviar una orden
+      // 4. ACTUALIZAR URL con la nueva orden del mismo usuario
+      router.push(
+        `/customer/menu?table=${tableId}&user=${newOrderId}&order=${newOrderId}`
+      );
+
+      // 5. Actualizar lista de usuarios
+      await loadTableUsers(currentOrder.table_id);
+
+      // 6. Marcar que se acaba de enviar una orden
       setLastOrderSent(true);
 
-      // 5. Cerrar el modal del carrito
+      // 7. Cerrar el modal del carrito
       setShowCart(false);
 
-      // 6. Mostrar confirmación
+      // 8. Mostrar confirmación
       alert(
-        "✅ ¡Orden enviada a cocina! Tu carrito está listo para nuevos pedidos."
+        `✅ ¡Orden enviada a cocina, ${currentOrder.customer_name}! Tu carrito está listo para nuevos pedidos.`
       );
     } catch (error) {
       console.error("Error sending order:", error);
@@ -287,24 +307,70 @@ export default function MenuPage() {
     }
   };
 
-  // Calcular tiempo estimado de preparación
+  // Cambiar de usuario
+  const handleSwitchUser = async (user: TableUser) => {
+    try {
+      await switchUserOrder(user.orderId, user.id);
+      setShowUserSwitch(false);
+
+      // Actualizar URL
+      router.push(
+        `/customer/menu?table=${tableId}&user=${user.id}&order=${user.orderId}`
+      );
+    } catch (error) {
+      console.error("Error switching user:", error);
+      alert("Error al cambiar de usuario");
+    }
+  };
+
+  // Agregar nuevo usuario
+  const handleAddNewUser = async () => {
+    const userName = prompt("Ingresa el nombre del nuevo comensal:");
+    if (!userName?.trim()) return;
+
+    if (!tableId) {
+      alert("No se encontró la mesa");
+      return;
+    }
+
+    try {
+      // Crear nueva orden para el nuevo usuario
+      const newOrder = await ordersService.createOrder(
+        parseInt(tableId),
+        userName.trim()
+      );
+
+      // Actualizar lista de usuarios
+      await loadTableUsers(parseInt(tableId));
+
+      // Cambiar al nuevo usuario
+      await handleSwitchUser({
+        id: newOrder.id,
+        name: userName.trim(),
+        orderId: newOrder.id,
+      });
+
+      alert(`✅ Bienvenido/a, ${userName.trim()}!`);
+    } catch (error) {
+      console.error("Error adding new user:", error);
+      alert("Error al agregar nuevo comensal");
+    }
+  };
+
   const getEstimatedTime = () => {
     const totalTime = orderItems.reduce((total, item) => {
       const product = products.find((p) => p.id === item.product_id);
       return total + (product?.preparation_time || 10) * item.quantity;
     }, 0);
-
-    return Math.min(Math.max(totalTime, 15), 45); // Mínimo 15, máximo 45 minutos
+    return Math.min(Math.max(totalTime, 15), 45);
   };
 
-  // Obtener items populares
   const getPopularItems = () => {
     return products
       .filter((product) => product.rating && product.rating >= 4.5)
       .slice(0, 6);
   };
 
-  // Obtener cantidad total de un producto en órdenes recientes
   const getProductTotalQuantityInRecentOrders = (productId: number) => {
     return recentOrderItems
       .filter((item) => item.product_id === productId)
@@ -393,7 +459,6 @@ export default function MenuPage() {
       <span className="font-bold">{cartItemsCount}</span>
       <span className="hidden sm:inline">• ${cartTotal.toFixed(2)}</span>
 
-      {/* Badge animado mejorado */}
       {cartItemsCount > 0 && (
         <div className="absolute -top-1 -right-1">
           <div className="relative">
@@ -405,17 +470,11 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* Indicador de orden recién enviada */}
       {lastOrderSent && cartItemsCount === 0 && (
         <div className="absolute -top-1 -right-1">
           <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
         </div>
       )}
-
-      {/* Tooltip */}
-      <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap">
-        Ver mi orden ({cartItemsCount} items)
-      </div>
     </button>
   );
 
@@ -436,14 +495,29 @@ export default function MenuPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-24">
       <header className="bg-white shadow-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              FoodHub Restaurant
-            </h1>
-            <p className="text-sm text-gray-500">
-              Mesa {targetTableId} • {currentOrder?.customer_name || "Invitado"}
-              {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">
+                FoodHub Restaurant
+              </h1>
+              <p className="text-sm text-gray-500">
+                Mesa {targetTableId} •{" "}
+                {currentOrder?.customer_name || "Invitado"}
+                {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
+              </p>
+            </div>
+
+            {/* Selector de usuario - Botón discreto */}
+            {/* <button
+              onClick={() => setShowUserSwitch(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200"
+              title="Cambiar de comensal"
+            >
+              <FaUsers className="text-blue-600 text-sm" />
+              <span className="text-sm font-medium text-blue-700">
+                {tableUsers.length}
+              </span>
+            </button> */}
           </div>
 
           <CartBadge />
@@ -471,7 +545,8 @@ export default function MenuPage() {
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1 text-green-600 font-semibold">
                   <FaShoppingCart className="text-xs" />
-                  {orderItems.length} items en carrito
+                  {orderItems.length} items en carrito de{" "}
+                  {currentOrder?.customer_name}
                 </span>
               </div>
               <span className="text-gray-600">
@@ -582,14 +657,6 @@ export default function MenuPage() {
                       </div>
                     )}
 
-                    {/* Badge de Repite Item */}
-                    {/* {selectedCategory === "repite-item" &&
-                      totalRecentQuantity > 0 && (
-                        // <div className="absolute top-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                        //   Pedido anterior
-                        // </div>
-                      )} */}
-
                     {/* Badge de cantidad en órdenes recientes */}
                     {selectedCategory === "repite-item" &&
                       totalRecentQuantity > 0 && (
@@ -698,7 +765,88 @@ export default function MenuPage() {
           )}
       </main>
 
-      {/* MODAL DEL CARRITO MEJORADO */}
+      {/* MODAL DE SELECCIÓN DE USUARIO */}
+      {showUserSwitch && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b sticky top-0 bg-white z-10">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Cambiar de comensal
+                </h2>
+                <button
+                  onClick={() => setShowUserSwitch(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-gray-600">Mesa {targetTableId}</p>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-3 mb-6">
+                {tableUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => handleSwitchUser(user)}
+                    className={`w-full p-4 rounded-xl border-2 text-left transition ${
+                      currentUserId === user.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            currentUserId === user.id
+                              ? "bg-blue-100"
+                              : "bg-gray-100"
+                          }`}
+                        >
+                          <FaUser
+                            className={
+                              currentUserId === user.id
+                                ? "text-blue-600"
+                                : "text-gray-600"
+                            }
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-800">
+                            {user.name}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {user.orderId === currentOrder?.id
+                              ? "Tú"
+                              : "Otro comensal"}
+                          </p>
+                        </div>
+                      </div>
+                      {currentUserId === user.id && (
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleAddNewUser}
+                className="w-full p-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-green-500 hover:bg-green-50 transition flex items-center justify-center gap-3"
+              >
+                <FaUser className="text-green-600" />
+                <span className="font-semibold text-green-600">
+                  Agregar nuevo comensal
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DEL CARRITO */}
       {showCart && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-end animate-in slide-in-from-right">
           <div className="bg-white w-full max-w-md h-full overflow-y-auto">
@@ -706,7 +854,7 @@ export default function MenuPage() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800">
-                    Tu Orden Actual
+                    Orden de {currentOrder?.customer_name}
                   </h2>
                   {currentOrder?.id && (
                     <p className="text-sm text-gray-500">
@@ -760,7 +908,9 @@ export default function MenuPage() {
                 {lastOrderSent && (
                   <button
                     onClick={() =>
-                      router.push(`/customer/history?table=${targetTableId}`)
+                      router.push(
+                        `/customer/history?table=${targetTableId}&user=${userId}&order=${orderId}`
+                      )
                     }
                     className="block w-full mt-4 bg-gray-100 text-gray-700 px-6 py-3 rounded-full hover:bg-gray-200 transition"
                   >
@@ -874,7 +1024,8 @@ export default function MenuPage() {
                   </div>
 
                   <p className="text-xs text-gray-500 text-center mt-3">
-                    💡 Los nuevos items se agregarán a una nueva orden
+                    💡 Los nuevos items se agregarán a una nueva orden para{" "}
+                    {currentOrder?.customer_name}
                   </p>
                 </div>
               </>
@@ -891,7 +1042,9 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() =>
-              router.push(`/customer/history?table=${targetTableId}`)
+              router.push(
+                `/customer/history?table=${targetTableId}&user=${userId}&order=${orderId}`
+              )
             }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
@@ -899,7 +1052,9 @@ export default function MenuPage() {
             <span className="text-xs font-medium">Historial</span>
           </button>
           <button
-            onClick={() => router.push(`/customer/qr?table=${targetTableId}`)}
+            onClick={() =>
+              router.push(`/customer/qr?table=${targetTableId}&user=${userId}`)
+            }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaQrcode className="text-2xl mb-1" />

@@ -30,7 +30,7 @@ export default function QRSharePage() {
     // Este efecto se ejecuta cuando tableNumber cambia
     if (tableNumber) {
       const baseUrl = "https://foodhub-software.vercel.app";
-      const url = `${baseUrl}/customer/menu?table=${tableNumber}`;
+      const url = `${baseUrl}/customer/select-user?table=${tableNumber}`;
 
       // Actualizar la URL de manera asíncrona
       setTimeout(() => {

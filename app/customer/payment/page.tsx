@@ -1,7 +1,7 @@
 // app/customer/payment/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import {
@@ -12,6 +12,7 @@ import {
   FaClock,
   FaSpinner,
   FaExclamationTriangle,
+  FaUser,
 } from "react-icons/fa";
 
 interface PaymentSummary {
@@ -21,41 +22,34 @@ interface PaymentSummary {
   taxRate: number;
 }
 
-interface OrderSummary {
-  order: OrderWithItems;
+interface CustomerOrderSummary {
+  customerName: string;
+  orders: OrderWithItems[];
   subtotal: number;
   taxAmount: number;
   total: number;
+  itemsCount: number;
 }
 
 export default function PaymentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tableId = searchParams.get("table");
+  const userId = searchParams.get("user");
+  const orderId = searchParams.get("order");
+
   const { currentOrder, orderItems, currentTableId, refreshOrder } = useOrder();
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [countdown, setCountdown] = useState(5);
-  const [tableId, setTableId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
   const [error, setError] = useState("");
 
-  // Obtener tableId de la URL
+  // Obtener parámetros de la URL
   useEffect(() => {
     setIsClient(true);
-    const getTableId = () => {
-      if (typeof window !== "undefined") {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get("table");
-      }
-      return null;
-    };
-
-    const timer = setTimeout(() => {
-      setTableId(getTableId());
-    }, 0);
-
-    return () => clearTimeout(timer);
   }, []);
 
   // Cargar todas las órdenes pendientes de pago
@@ -85,6 +79,7 @@ export default function PaymentPage() {
           pending: pendingOrders.length,
           orders: pendingOrders.map((o) => ({
             id: o.id.slice(-8),
+            customer: o.customer_name,
             status: o.status,
             items: o.order_items.length,
             total: o.order_items.reduce(
@@ -110,6 +105,48 @@ export default function PaymentPage() {
     }
   }, [tableId, currentTableId]);
 
+  // Agrupar órdenes por cliente
+  const groupOrdersByCustomer = (): CustomerOrderSummary[] => {
+    const customerMap = new Map<string, CustomerOrderSummary>();
+
+    allOrders.forEach((order) => {
+      const customerName = order.customer_name || "Cliente";
+
+      if (!customerMap.has(customerName)) {
+        customerMap.set(customerName, {
+          customerName,
+          orders: [],
+          subtotal: 0,
+          taxAmount: 0,
+          total: 0,
+          itemsCount: 0,
+        });
+      }
+
+      const customerSummary = customerMap.get(customerName)!;
+      customerSummary.orders.push(order);
+
+      // Calcular subtotal de esta orden
+      const orderSubtotal = order.order_items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+
+      customerSummary.subtotal += orderSubtotal;
+      customerSummary.itemsCount += order.order_items.length;
+    });
+
+    // Calcular impuestos y totales para cada cliente
+    const taxRate = 0.16;
+    customerMap.forEach((customerSummary) => {
+      customerSummary.taxAmount = customerSummary.subtotal * taxRate;
+      customerSummary.total =
+        customerSummary.subtotal + customerSummary.taxAmount;
+    });
+
+    return Array.from(customerMap.values());
+  };
+
   // Calcular resumen de TODAS las órdenes pendientes
   const calculateTotalPaymentSummary = (): PaymentSummary => {
     let subtotal = 0;
@@ -133,26 +170,8 @@ export default function PaymentPage() {
     };
   };
 
-  // Calcular resumen por orden individual
-  const calculateOrderSummary = (order: OrderWithItems): OrderSummary => {
-    const subtotal = order.order_items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-    const taxRate = 0.16;
-    const taxAmount = subtotal * taxRate;
-    const total = subtotal + taxAmount;
-
-    return {
-      order,
-      subtotal,
-      taxAmount,
-      total,
-    };
-  };
-
+  const customerSummaries = groupOrdersByCustomer();
   const paymentSummary = calculateTotalPaymentSummary();
-  const orderSummaries = allOrders.map(calculateOrderSummary);
 
   // Countdown para redirección después del pago
   useEffect(() => {
@@ -173,8 +192,12 @@ export default function PaymentPage() {
       setPaymentConfirmed(true);
 
       console.log(
-        "✅ Pago confirmado para órdenes:",
-        allOrders.map((o) => o.id)
+        "✅ Pago confirmado para clientes:",
+        customerSummaries.map((c) => ({
+          customer: c.customerName,
+          orders: c.orders.length,
+          total: c.total,
+        }))
       );
     } catch (error) {
       console.error("Error confirming payment:", error);
@@ -222,7 +245,9 @@ export default function PaymentPage() {
           </p>
           <button
             onClick={() =>
-              router.push(`/customer/menu?table=${tableId || currentTableId}`)
+              router.push(
+                `/customer/menu?table=${tableId}&user=${userId}&order=${orderId}`
+              )
             }
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
           >
@@ -247,7 +272,9 @@ export default function PaymentPage() {
           </p>
           <button
             onClick={() =>
-              router.push(`/customer/menu?table=${tableId || currentTableId}`)
+              router.push(
+                `/customer/menu?table=${tableId}&user=${userId}&order=${orderId}`
+              )
             }
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
           >
@@ -277,13 +304,17 @@ export default function PaymentPage() {
 
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <p className="text-sm text-gray-600">
+              Comensales:{" "}
+              <span className="font-semibold">{customerSummaries.length}</span>
+            </p>
+            <p className="text-sm text-gray-600">
               Órdenes pagadas:{" "}
               <span className="font-semibold">{allOrders.length}</span>
             </p>
             <p className="text-sm text-gray-600">
               Total pagado:{" "}
               <span className="font-semibold text-green-600">
-                {formatCurrency(paymentSummary.total)}
+                {formatCurrency(paymentSummary.subtotal)}
               </span>
             </p>
           </div>
@@ -311,16 +342,6 @@ export default function PaymentPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* <button
-                onClick={() =>
-                  router.push(
-                    `/customer/history?table=${tableId || currentTableId}`
-                  )
-                }
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-              >
-                <FaArrowLeft className="text-xl text-gray-600" />
-              </button> */}
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">
                   Ticket de Pago
@@ -329,14 +350,15 @@ export default function PaymentPage() {
                   Mesa {tableId || currentTableId}
                 </p>
                 <p className="text-sm text-blue-600 font-medium">
-                  {allOrders.length} orden{allOrders.length > 1 ? "es" : ""}{" "}
-                  pendiente{allOrders.length > 1 ? "s" : ""}
+                  {customerSummaries.length} comensal
+                  {customerSummaries.length > 1 ? "es" : ""} •{" "}
+                  {allOrders.length} orden{allOrders.length > 1 ? "es" : ""}
                 </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(paymentSummary.total)}
+                {formatCurrency(paymentSummary.subtotal)}
               </p>
               <p className="text-sm text-gray-500">Total a pagar</p>
             </div>
@@ -353,97 +375,164 @@ export default function PaymentPage() {
             <p className="text-gray-300 text-sm">
               Mesa {tableId || currentTableId}
             </p>
-            <p className="text-gray-300 text-sm">
-              {allOrders.length} orden{allOrders.length > 1 ? "es" : ""} •{" "}
+            {/* <p className="text-gray-300 text-sm">
+              {customerSummaries.length} comensal
+              {customerSummaries.length > 1 ? "es" : ""} • {allOrders.length}{" "}
+              orden{allOrders.length > 1 ? "es" : ""} •{" "}
               {new Date().toLocaleString()}
-            </p>
+            </p> */}
           </div>
 
-          {/* Lista de todas las órdenes */}
+          {/* Lista de órdenes agrupadas por cliente */}
           <div className="p-6">
-            {orderSummaries.map((orderSummary, index) => (
-              <div key={orderSummary.order.id} className="mb-6 last:mb-0">
-                {/* Header de cada orden */}
-                <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
-                  <div>
-                    <h4 className="font-semibold text-gray-800">
-                      Orden #{orderSummary.order.id.slice(-8)}
-                    </h4>
-                    <p className="text-sm text-gray-500">
-                      {getStatusText(orderSummary.order.status)} •{" "}
-                      {orderSummary.order.order_items.length} item
-                      {orderSummary.order.order_items.length > 1 ? "s" : ""}
-                    </p>
+            {customerSummaries.map((customerSummary, customerIndex) => (
+              <div
+                key={customerSummary.customerName}
+                className="mb-8 last:mb-0"
+              >
+                {/* Header del cliente */}
+                <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-200">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <FaUser className="text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-800">
+                          {customerSummary.customerName}
+                        </h4>
+                        {/* <div className="flex items-center gap-3 text-sm text-gray-500">
+                          <span>
+                            {customerSummary.orders.length} orden
+                            {customerSummary.orders.length > 1 ? "es" : ""}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {customerSummary.itemsCount} item
+                            {customerSummary.itemsCount > 1 ? "s" : ""}
+                          </span>
+                        </div> */}
+                      </div>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-800">
-                      {formatCurrency(orderSummary.total)}
+                    <p className="text-lg font-semibold text-gray-800">
+                      {formatCurrency(customerSummary.subtotal)}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Subtotal: {formatCurrency(orderSummary.subtotal)}
-                    </p>
+                    {/* <p className="text-sm text-gray-500">
+                      Subtotal: {formatCurrency(customerSummary.subtotal)}
+                    </p> */}
                   </div>
                 </div>
 
-                {/* Items de cada orden */}
-                <div className="space-y-3 mb-4">
-                  {orderSummary.order.order_items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-start py-2 border-b border-gray-100"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="font-medium text-gray-800">
-                              {item.product_name}
+                {/* Items de todas las órdenes de este cliente */}
+                <div className="space-y-4 mb-4">
+                  {customerSummary.orders.map((order, orderIndex) => (
+                    <div key={order.id}>
+                      {/* Info de la orden individual si hay más de una */}
+                      {customerSummary.orders.length > 1 && (
+                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                          {/* <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-gray-700">
+                              Orden #{order.id.slice(-8)}
                             </span>
-                            <div className="text-sm text-gray-500 mt-1">
-                              Cantidad: {item.quantity}
-                            </div>
-                            {item.notes && (
-                              <p className="text-sm text-gray-500 mt-1">
-                                Nota: {item.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium text-gray-800">
-                              {formatCurrency(item.price * item.quantity)}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {formatCurrency(item.price)} c/u
-                            </div>
-                          </div>
+                            <span className="text-gray-500">
+                              {getStatusText(order.status)}
+                            </span>
+                          </div> */}
                         </div>
+                      )}
+
+                      {/* Items de esta orden */}
+                      <div className="space-y-3">
+                        {order.order_items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex justify-between items-start py-2 border-b border-gray-100"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <span className="font-medium text-gray-800">
+                                    {item.product_name}
+                                  </span>
+                                  <div className="text-sm text-gray-500 mt-1">
+                                    Cantidad: {item.quantity}
+                                  </div>
+                                  {item.notes && (
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      Nota: {item.notes}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-medium text-gray-800">
+                                    {formatCurrency(item.price * item.quantity)}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {formatCurrency(item.price)} c/u
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+
+                      {/* Separador entre órdenes del mismo cliente */}
+                      {orderIndex < customerSummary.orders.length - 1 && (
+                        <div className="border-t border-gray-200 my-4"></div>
+                      )}
                     </div>
                   ))}
                 </div>
 
-                {index < orderSummaries.length - 1 && (
-                  <div className="border-t border-gray-200 my-4"></div>
+                {/* Resumen del cliente */}
+                <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    {/* <span className="font-medium text-gray-700">
+                      Subtotal de {customerSummary.customerName}:
+                    </span> */}
+                    {/* <span className="font-medium text-gray-700">
+                      {formatCurrency(customerSummary.subtotal)}
+                    </span> */}
+                  </div>
+                  {/* <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Impuestos (16%):</span>
+                    <span className="text-gray-600">
+                      {formatCurrency(customerSummary.taxAmount)}
+                    </span>
+                  </div> */}
+                  <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
+                    <span>Total de {customerSummary.customerName}:</span>
+                    <span>{formatCurrency(customerSummary.subtotal)}</span>
+                  </div>
+                </div>
+
+                {/* Separador entre clientes */}
+                {customerIndex < customerSummaries.length - 1 && (
+                  <div className="border-t border-gray-300 my-6"></div>
                 )}
               </div>
             ))}
 
             {/* Resumen FINAL de todos los pagos */}
-            <div className="border-t border-gray-200 pt-4 space-y-3">
+            <div className="border-t border-gray-200 pt-6 space-y-3">
               <div className="flex justify-between text-gray-600">
-                <span className="font-medium">Subtotal total:</span>
-                <span className="font-medium">
+                {/* <span className="font-medium text-lg">Subtotal total:</span>
+                <span className="font-medium text-lg">
                   {formatCurrency(paymentSummary.subtotal)}
-                </span>
+                </span> */}
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span className="font-medium">Impuestos (16%):</span>
-                <span className="font-medium">
+              {/* <div className="flex justify-between text-gray-600">
+                <span className="font-medium text-lg">Impuestos (16%):</span>
+                <span className="font-medium text-lg">
                   {formatCurrency(paymentSummary.taxAmount)}
                 </span>
-              </div>
-              <div className="flex justify-between text-xl font-bold text-gray-800 border-t border-gray-200 pt-3">
+              </div> */}
+              <div className="flex justify-between text-2xl font-bold text-gray-800 border-t border-gray-200 pt-4">
                 <span>TOTAL GENERAL:</span>
-                <span>{formatCurrency(paymentSummary.total)}</span>
+                <span>{formatCurrency(paymentSummary.subtotal)}</span>
               </div>
             </div>
           </div>
