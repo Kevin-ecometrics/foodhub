@@ -375,7 +375,7 @@ export default function HomePage() {
                       key={guest.id}
                       className="flex items-center justify-between bg-white p-3 rounded-lg border"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-col md:flex-row">
                         <FaUser className="text-gray-400" />
                         <span>{guest.name}</span>
                       </div>
