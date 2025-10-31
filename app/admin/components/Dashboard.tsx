@@ -138,7 +138,7 @@ export default function Dashboard({
                 Reporte del Día
               </h1>
               <p className="text-gray-600">
-                {isToday ? "Hoy" : formatLongDateNextDay(selectedDate)}
+                {isToday ? "Hoy" : formatLongDate(selectedDate)}
               </p>
             </div>
           </div>
@@ -195,6 +195,13 @@ export default function Dashboard({
                 Ventas CSV
               </button>
             </div>
+            <button
+              onClick={() => onDateChange(selectedDate)}
+              className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+            >
+              <FaTable />
+              Actualizar
+            </button>
           </div>
         </div>
       </div>

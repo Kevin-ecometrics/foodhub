@@ -331,17 +331,6 @@ export default function AdminPage() {
     return <LoginForm onLogin={() => setIsAuthenticated(true)} />;
   }
 
-  const formatLongDateNextDay = (date: Date): string => {
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
-    return nextDay.toLocaleDateString("es-MX", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -355,9 +344,6 @@ export default function AdminPage() {
                 <h1 className="text-xl font-bold text-gray-800">
                   Dashboard Administrativo
                 </h1>
-                <p className="text-sm text-gray-500">
-                  {formatLongDateNextDay(selectedDate)}
-                </p>
               </div>
             </div>
             <button

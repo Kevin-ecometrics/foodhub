@@ -204,20 +204,29 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Gestión de Mesas</h2>
-        <button
-          onClick={() => {
-            setEditingTable(null);
-            setTableForm({
-              capacity: "",
-              location: "",
-            });
-            setShowTableForm(true);
-          }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-        >
-          <FaPlus />
-          Nueva Mesa
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={loadTables}
+            className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+          >
+            <FaSpinner className="text-sm" />
+            Actualizar
+          </button>
+          <button
+            onClick={() => {
+              setEditingTable(null);
+              setTableForm({
+                capacity: "",
+                location: "",
+              });
+              setShowTableForm(true);
+            }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            <FaPlus />
+            Nueva Mesa
+          </button>
+        </div>
       </div>
 
       {showTableForm && (
