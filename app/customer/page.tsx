@@ -391,7 +391,7 @@ export default function HomePage() {
               )}
 
               {/* Agregar nuevo invitado */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 md:flex-row flex-col">
                 <input
                   type="text"
                   placeholder="Nombre del invitado"
