@@ -185,6 +185,7 @@ export default function PaymentPage() {
     }
   }, [paymentConfirmed, countdown, router]);
 
+  //metodo de confirmacion de pago
   const handlePaymentConfirmation = async () => {
     try {
       // Aquí podrías agregar lógica para marcar las órdenes como pagadas
