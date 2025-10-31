@@ -181,7 +181,7 @@ export default function PaymentPage() {
       }, 1000);
       return () => clearTimeout(timer);
     } else if (paymentConfirmed && countdown === 0) {
-      router.push("/customer");
+      router.push("/");
     }
   }, [paymentConfirmed, countdown, router]);
 

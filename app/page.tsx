@@ -46,13 +46,13 @@ export default function HomePage() {
             {/* Botones de Acción */}
             <div className="space-y-4">
               {/* Botón Seleccionar Mesa */}
-              <button
+              {/* <button
                 onClick={handleSelectTable}
                 className="w-full bg-blue-600 text-white py-4 px-6 rounded-2xl hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 font-semibold text-lg"
               >
                 <FaUtensils className="text-xl" />
                 Seleccionar Mesa
-              </button>
+              </button> */}
 
               {/* Botón Ver Sucursal */}
               <button
