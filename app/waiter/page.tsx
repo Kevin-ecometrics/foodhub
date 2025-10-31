@@ -687,8 +687,7 @@ export default function WaiterDashboard() {
                           ))}
                         </div>
 
-                        {/* SUBTOTAL DE ESTA ORDEN */}
-                        <div className="mt-3 pt-2 border-t border-gray-200">
+                        {/* <div className="mt-3 pt-2 border-t border-gray-200">
                           <div className="flex justify-between text-sm">
                             <span className="font-medium">
                               Subtotal esta orden:
@@ -697,7 +696,7 @@ export default function WaiterDashboard() {
                               ${order.total_amount.toFixed(2)}
                             </span>
                           </div>
-                        </div>
+                        </div> */}
                       </div>
                     ))}
 
