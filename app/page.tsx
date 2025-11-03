@@ -1,22 +1,15 @@
 // app/page.tsx
 "use client";
-import { useRouter } from "next/navigation";
-import { FaUtensils, FaMapMarkerAlt } from "react-icons/fa";
+import { FaMapMarkerAlt } from "react-icons/fa";
 
 export default function HomePage() {
-  const router = useRouter();
-
-  const handleSelectTable = () => {
-    router.push("/customer");
-  };
-
   const handleViewLocation = () => {
     // Por el momento redirige a un anchor, puedes cambiar esto después
     window.location.href = "#location";
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       {/* Header con Logo */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
