@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import SelectUser from "./components/SelectUser";
+import SelectUser from "../components/SelectUser";
 
 export default function Page() {
   return (
