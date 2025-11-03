@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import QRShare from "./components/QRShare";
+import QRShare from "../components/QRShare";
 
 export default function Page() {
   return (
