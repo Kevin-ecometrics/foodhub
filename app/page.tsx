@@ -50,7 +50,7 @@ export default function HomePage() {
               {/* Botón Ver Sucursal */}
               <button
                 onClick={handleViewLocation}
-                className="w-full bg-green-600 text-white py-4 px-6 rounded-2xl hover:bg-green-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 font-semibold text-lg"
+                className="w-full bg-green-800 text-white py-4 px-6 rounded-2xl hover:bg-green-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 font-semibold text-lg"
               >
                 <FaMapMarkerAlt className="text-xl" />
                 Ver Sucursal
