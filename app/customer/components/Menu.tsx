@@ -1220,7 +1220,9 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() =>
-              router.push(`/customer/qr?table=${targetTableId}&user=${userId}`)
+              router.push(
+                `/customer/qr?table=${targetTableId}&user=${userId}&order=${orderId}`
+              )
             }
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >

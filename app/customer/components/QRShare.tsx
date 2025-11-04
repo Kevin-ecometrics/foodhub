@@ -10,16 +10,19 @@ export default function QRSharePage() {
   const [copied, setCopied] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
 
-  // Obtener tableNumber directamente de los search params
+  // Obtener todos los parámetros necesarios
   const tableNumber = searchParams.get("table");
+  const userId = searchParams.get("user");
+  const orderId = searchParams.get("order");
 
   useEffect(() => {
     if (tableNumber) {
       const baseUrl = "https://foodhub-software.vercel.app";
+      // Incluir todos los parámetros en el QR
       const url = `${baseUrl}/customer?table=${tableNumber}`;
       setCurrentUrl(url);
     }
-  }, [tableNumber]);
+  }, [tableNumber, userId, orderId]);
 
   const handleCopyLink = async () => {
     if (!currentUrl) return;
@@ -169,12 +172,16 @@ export default function QRSharePage() {
         </div>
       </main>
 
-      {/* Navegación Inferior */}
+      {/* Navegación Inferior - MANTENIENDO LA MISMA ESTRUCTURA */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
         <div className="max-w-7xl mx-auto flex justify-around py-3">
           <button
-            onClick={() => router.push(`/customer/menu?table=${tableNumber}`)}
-            className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
+            onClick={() =>
+              router.push(
+                `/customer/menu?table=${tableNumber}&user=${userId}&order=${orderId}`
+              )
+            }
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaUtensils className="text-2xl mb-1" />
             <span className="text-xs font-medium">Menu</span>
@@ -182,9 +189,11 @@ export default function QRSharePage() {
 
           <button
             onClick={() =>
-              router.push(`/customer/history?table=${tableNumber}`)
+              router.push(
+                `/customer/history?table=${tableNumber}&user=${userId}&order=${orderId}`
+              )
             }
-            className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaHistory className="text-2xl mb-1" />
             <span className="text-xs font-medium">Historial</span>
