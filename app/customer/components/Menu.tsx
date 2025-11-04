@@ -424,7 +424,7 @@ export default function MenuPage() {
       const product = products.find((p) => p.id === item.product_id);
       return total + (product?.preparation_time || 10) * item.quantity;
     }, 0);
-    return Math.min(Math.max(totalTime, 15), 45);
+    return Math.min(Math.max(totalTime, 5), 45);
   };
 
   const getPopularItems = () => {
@@ -796,12 +796,6 @@ export default function MenuPage() {
                           </>
                         )}
                       </button>
-
-                      {isInCart && (
-                        <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
-                          {currentQuantity}
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -1027,7 +1021,7 @@ export default function MenuPage() {
 
               {/* Resumen rápido */}
               <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="bg-blue-50 p-3 rounded-lg">
+                {/* <div className="bg-blue-50 p-3 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
                     {cartItemsCount}
                   </div>
@@ -1038,7 +1032,7 @@ export default function MenuPage() {
                     ${cartTotal.toFixed(2)}
                   </div>
                   <div className="text-xs text-gray-600">Subtotal</div>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -1139,9 +1133,9 @@ export default function MenuPage() {
                 </div>
 
                 {/* Resumen y acciones */}
-                <div className="p-6 bg-gray-50 border-t sticky bottom-0">
+                <div className="p-6 bg-gray-50  sticky bottom-0">
                   <div className="space-y-2 mb-6">
-                    <div className="flex justify-between text-sm">
+                    {/* <div className="flex justify-between text-sm">
                       <span>Items en carrito:</span>
                       <span>{cartItemsCount}</span>
                     </div>
@@ -1152,12 +1146,14 @@ export default function MenuPage() {
                     <div className="flex justify-between">
                       <span>Tax (8%):</span>
                       <span>${(cartTotal * 0.08).toFixed(2)}</span>
-                    </div>
+                    </div> */}
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>
-                      <span className="text-blue-600">
+                      <span>${cartTotal.toFixed(2)}</span>
+
+                      {/* <span className="text-blue-600">
                         ${(cartTotal * 1.08).toFixed(2)}
-                      </span>
+                      </span> */}
                     </div>
 
                     {/* Tiempo estimado */}

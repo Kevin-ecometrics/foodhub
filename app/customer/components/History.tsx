@@ -17,6 +17,9 @@ import {
   FaUtensilSpoon,
   FaUser,
   FaUsers,
+  FaMoneyBillWave,
+  FaCreditCard,
+  FaQuestion,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -70,6 +73,13 @@ export default function HistoryPage() {
   const [error, setError] = useState("");
   const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+
+  // NUEVOS ESTADOS PARA EL MÉTODO DE PAGO
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
+    string | null
+  >(null);
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
 
   // Refs para prevenir loops infinitos
   const isSubscribedRef = useRef(false);
@@ -132,7 +142,7 @@ export default function HistoryPage() {
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    const taxRate = 0.16;
+    const taxRate = 0.08;
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
 
@@ -185,7 +195,7 @@ export default function HistoryPage() {
     });
 
     // Calcular impuestos y totales para cada cliente
-    const taxRate = 0.16;
+    const taxRate = 0.08;
     customerMap.forEach((customerSummary) => {
       customerSummary.taxAmount = customerSummary.subtotal * taxRate;
       customerSummary.total =
@@ -298,6 +308,85 @@ export default function HistoryPage() {
       console.error("Error adding new user:", error);
       alert("Error al agregar nuevo comensal");
     }
+  };
+
+  // NUEVA FUNCIÓN: Manejar solicitud de cuenta con método de pago
+  const handleBillRequest = async () => {
+    // Resetear selección y mostrar modal de selección
+    setSelectedPaymentMethod(null);
+    setShowPaymentMethodModal(true);
+    setShowPaymentConfirmation(false);
+  };
+
+  // NUEVA FUNCIÓN: Confirmar solicitud de cuenta con método de pago
+  const confirmBillRequest = async () => {
+    if (!selectedPaymentMethod) {
+      alert("Por favor selecciona un método de pago");
+      return;
+    }
+
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    setBillLoading(true);
+    try {
+      await historyService.requestBill(
+        parseInt(targetTableId.toString()),
+        currentOrder?.id,
+        selectedPaymentMethod
+      );
+
+      let methodText = "";
+      switch (selectedPaymentMethod) {
+        case "cash":
+          methodText = "en efectivo";
+          break;
+        case "terminal":
+          methodText = "con terminal";
+          break;
+        default:
+          methodText = "";
+      }
+
+      alert(
+        `✅ Se ha solicitado la cuenta ${methodText}. El mesero te traerá tu factura.`
+      );
+
+      // Cerrar modales
+      setShowPaymentMethodModal(false);
+      setShowPaymentConfirmation(false);
+      setSelectedPaymentMethod(null);
+
+      setTimeout(() => {
+        router.push(
+          `/customer/payment?table=${targetTableId}&user=${userId}&order=${orderId}`
+        );
+      }, 1000);
+    } catch (error) {
+      console.error("Error requesting bill:", error);
+      alert("❌ Error al solicitar la cuenta");
+    } finally {
+      setBillLoading(false);
+    }
+  };
+
+  // NUEVA FUNCIÓN: Manejar selección de método de pago
+  const handlePaymentMethodSelect = (method: string) => {
+    setSelectedPaymentMethod(method);
+    setShowPaymentConfirmation(true);
+  };
+
+  // NUEVA FUNCIÓN: Cancelar selección
+  const handleCancelSelection = () => {
+    setSelectedPaymentMethod(null);
+    setShowPaymentConfirmation(false);
+  };
+
+  // NUEVA FUNCIÓN: Cancelar todo el proceso
+  const handleCancelPayment = () => {
+    setShowPaymentMethodModal(false);
+    setShowPaymentConfirmation(false);
+    setSelectedPaymentMethod(null);
   };
 
   // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
@@ -413,31 +502,6 @@ export default function HistoryPage() {
     }
   };
 
-  const handleBillRequest = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
-
-    setBillLoading(true);
-    try {
-      await historyService.requestBill(
-        parseInt(targetTableId.toString()),
-        currentOrder?.id
-      );
-      alert("✅ Se ha solicitado la cuenta. El mesero te traerá tu factura.");
-
-      setTimeout(() => {
-        router.push(
-          `/customer/payment?table=${targetTableId}&user=${userId}&order=${orderId}`
-        );
-      }, 1000);
-    } catch (error) {
-      console.error("Error requesting bill:", error);
-      alert("❌ Error al solicitar la cuenta");
-    } finally {
-      setBillLoading(false);
-    }
-  };
-
   const handleRefresh = async () => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
@@ -515,18 +579,6 @@ export default function HistoryPage() {
                 {orderHistory.length} orden{orderHistory.length > 1 ? "es" : ""}
               </p>
             </div>
-
-            {/* Selector de usuario - Botón discreto */}
-            {/* <button
-              onClick={() => setShowUserSwitch(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200"
-              title="Cambiar de comensal"
-            >
-              <FaUsers className="text-blue-600 text-sm" />
-              <span className="text-sm font-medium text-blue-700">
-                {tableUsers.length}
-              </span>
-            </button> */}
           </div>
 
           {/* Botones */}
@@ -563,7 +615,7 @@ export default function HistoryPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6">
         {/* Orden Actual del Usuario */}
-        {currentOrder && orderItems.length > 0 && (
+        {/* {currentOrder && orderItems.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <FaUtensils />
@@ -574,7 +626,6 @@ export default function HistoryPage() {
             </h2>
 
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              {/* Header del Ticket */}
               <div className="bg-gray-800 text-white p-6 text-center">
                 <h3 className="text-xl font-bold">RESTAURANTE</h3>
                 <p className="text-gray-300 text-sm">Mesa {targetTableId}</p>
@@ -589,7 +640,6 @@ export default function HistoryPage() {
                 </p>
               </div>
 
-              {/* Items de la Orden */}
               <div className="p-6">
                 <div className="space-y-4 mb-6">
                   {orderItems.map((item) => (
@@ -623,7 +673,6 @@ export default function HistoryPage() {
                   ))}
                 </div>
 
-                {/* Resumen de Pagos */}
                 <div className="border-t border-gray-200 pt-4 space-y-2">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal:</span>
@@ -646,14 +695,13 @@ export default function HistoryPage() {
                 </div>
               </div>
 
-              {/* Footer del Ticket */}
               <div className="bg-gray-50 p-4 text-center text-sm text-gray-500">
                 <p>¡Gracias por su preferencia!</p>
                 <p>Para solicitar la cuenta, presione el botón Cuenta</p>
               </div>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Historial de Órdenes Agrupadas por Cliente */}
         {customerSummaries.length > 0 && (
@@ -681,10 +729,6 @@ export default function HistoryPage() {
                             {customerSummary.customerName}
                           </h3>
                           <div className="flex items-center gap-3 text-blue-200 text-sm">
-                            {/* <span>
-                              {customerSummary.orders.length} orden
-                              {customerSummary.orders.length > 1 ? "es" : ""}
-                            </span> */}
                             <span>•</span>
                             <span>
                               {customerSummary.itemsCount} item
@@ -692,7 +736,7 @@ export default function HistoryPage() {
                             </span>
                             <span>•</span>
                             <span>
-                              Total: {formatCurrency(customerSummary.total)}
+                              Total: {formatCurrency(customerSummary.subtotal)}
                             </span>
                           </div>
                         </div>
@@ -711,13 +755,6 @@ export default function HistoryPage() {
                               {/* Orden #{order.id.slice(-8)} */}
                             </span>
                             <div className="flex items-center gap-2 mt-1">
-                              {/* <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                  order.status as OrderStatus
-                                )}`}
-                              >
-                                {getStatusText(order.status as OrderStatus)}
-                              </span> */}
                               <span className="text-xs text-gray-500">
                                 Hora del pedido:{" "}
                                 {new Date(order.created_at).toLocaleString()}
@@ -773,20 +810,6 @@ export default function HistoryPage() {
 
                     {/* Resumen del Cliente */}
                     <div className=" border-gray-200 pt-4 mt-4">
-                      {/* <div className="flex justify-between text-sm mb-2">
-                        <span className="font-medium text-gray-700">
-                          Subtotal de {customerSummary.customerName}:
-                        </span>
-                        <span className="font-medium text-gray-700">
-                          {formatCurrency(customerSummary.subtotal)}
-                        </span>
-                      </div> */}
-                      {/* <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Impuestos (16%):</span>
-                        <span className="text-gray-600">
-                          {formatCurrency(customerSummary.taxAmount)}
-                        </span>
-                      </div> */}
                       <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
                         <span>Total de {customerSummary.customerName}:</span>
                         <span>{formatCurrency(customerSummary.subtotal)}</span>
@@ -822,6 +845,185 @@ export default function HistoryPage() {
           </div>
         )}
       </main>
+
+      {/* MODAL DE SELECCIÓN DE MÉTODO DE PAGO MEJORADO */}
+      {showPaymentMethodModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                {showPaymentConfirmation ? "Confirmar Pago" : "Método de Pago"}
+              </h2>
+              <p className="text-gray-600">
+                {showPaymentConfirmation
+                  ? `¿Confirmar solicitud de cuenta ${
+                      selectedPaymentMethod === "cash"
+                        ? "en efectivo"
+                        : "con terminal"
+                    }?`
+                  : "Selecciona cómo deseas pagar la cuenta"}
+              </p>
+            </div>
+
+            {!showPaymentConfirmation ? (
+              /* PANTALLA DE SELECCIÓN */
+              <div className="p-6 space-y-4">
+                {/* Opción Efectivo */}
+                <button
+                  onClick={() => handlePaymentMethodSelect("cash")}
+                  disabled={billLoading}
+                  className={`w-full p-4 border-2 rounded-xl transition flex items-center justify-between gap-3 disabled:opacity-50 ${
+                    selectedPaymentMethod === "cash"
+                      ? "border-green-500 bg-green-50"
+                      : "border-green-200 hover:border-green-500 hover:bg-green-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        selectedPaymentMethod === "cash"
+                          ? "bg-green-200"
+                          : "bg-green-100"
+                      }`}
+                    >
+                      <FaMoneyBillWave className="text-green-600" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold text-gray-800">
+                        Efectivo
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Pagar con dinero en efectivo
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      selectedPaymentMethod === "cash"
+                        ? "border-green-500 bg-green-500"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {selectedPaymentMethod === "cash" && (
+                      <FaCheck className="text-white text-xs" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Opción Terminal */}
+                <button
+                  onClick={() => handlePaymentMethodSelect("terminal")}
+                  disabled={billLoading}
+                  className={`w-full p-4 border-2 rounded-xl transition flex items-center justify-between gap-3 disabled:opacity-50 ${
+                    selectedPaymentMethod === "terminal"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-blue-200 hover:border-blue-500 hover:bg-blue-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        selectedPaymentMethod === "terminal"
+                          ? "bg-blue-200"
+                          : "bg-blue-100"
+                      }`}
+                    >
+                      <FaCreditCard className="text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold text-gray-800">
+                        Terminal
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Pagar con tarjeta
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      selectedPaymentMethod === "terminal"
+                        ? "border-blue-500 bg-blue-500"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {selectedPaymentMethod === "terminal" && (
+                      <FaCheck className="text-white text-xs" />
+                    )}
+                  </div>
+                </button>
+              </div>
+            ) : (
+              /* PANTALLA DE CONFIRMACIÓN */
+              <div className="p-6">
+                <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                  <div className="flex items-center justify-center gap-3 mb-3">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        selectedPaymentMethod === "cash"
+                          ? "bg-green-100"
+                          : "bg-blue-100"
+                      }`}
+                    >
+                      {selectedPaymentMethod === "cash" ? (
+                        <FaMoneyBillWave className="text-green-600 text-xl" />
+                      ) : (
+                        <FaCreditCard className="text-blue-600 text-xl" />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <h3 className="font-bold text-lg text-gray-800">
+                        {selectedPaymentMethod === "cash"
+                          ? "Efectivo"
+                          : "Terminal"}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {selectedPaymentMethod === "cash"
+                          ? "Pagarás con dinero en efectivo"
+                          : "Pagarás con tarjeta bancaria"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelSelection}
+                    disabled={billLoading}
+                    className="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition disabled:opacity-50"
+                  >
+                    Cambiar
+                  </button>
+                  <button
+                    onClick={confirmBillRequest}
+                    disabled={billLoading}
+                    className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {billLoading ? (
+                      <FaSpinner className="animate-spin" />
+                    ) : (
+                      <FaCheck />
+                    )}
+                    {billLoading ? "Enviando..." : "Confirmar"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* BOTÓN CANCELAR (solo en pantalla de selección) */}
+            {!showPaymentConfirmation && (
+              <div className="p-4 border-t bg-gray-50">
+                <button
+                  onClick={handleCancelPayment}
+                  className="w-full px-4 py-3 text-gray-600 hover:text-gray-800 transition font-medium rounded-xl hover:bg-gray-100"
+                  disabled={billLoading}
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE SELECCIÓN DE USUARIO */}
       {showUserSwitch && (

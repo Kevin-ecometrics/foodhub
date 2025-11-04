@@ -1,13 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
-import { FaDollarSign, FaSpinner, FaBell } from "react-icons/fa";
+import {
+  FaDollarSign,
+  FaSpinner,
+  FaBell,
+  FaMoneyBillWave,
+  FaCreditCard,
+} from "react-icons/fa";
 
 interface TableHeaderProps {
   table: TableWithOrder;
   tableTotal: number;
   processing: string | null;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
-  notifications: WaiterNotification[]; // Ahora es obligatorio
+  notifications: WaiterNotification[];
 }
 
 export default function TableHeader({
@@ -15,7 +21,7 @@ export default function TableHeader({
   tableTotal,
   processing,
   onCobrarMesa,
-  notifications = [], // Valor por defecto array vacío
+  notifications = [],
 }: TableHeaderProps) {
   const calculateTotalItems = (table: TableWithOrder) => {
     return table.orders.reduce(
@@ -58,12 +64,39 @@ export default function TableHeader({
     return { pending, ready, served };
   };
 
-  // Verificar si hay notificaciones de "Solicita la cuenta" para esta mesa
-  const hasBillRequest = notifications.some(
+  // Obtener notificaciones de "Solicita la cuenta" para esta mesa
+  const billRequestNotifications = notifications.filter(
     (notification: any) =>
-      notification.table_id === table.id &&
-      notification.message === "Solicita la cuenta"
+      notification.table_id === table.id && notification.type === "bill_request"
   );
+
+  // Obtener la notificación más reciente de cuenta
+  const latestBillRequest =
+    billRequestNotifications.length > 0
+      ? billRequestNotifications[billRequestNotifications.length - 1]
+      : null;
+
+  // Determinar el texto y estilo según el método de pago
+  const getPaymentMethodInfo = (paymentMethod: string | null) => {
+    if (paymentMethod === "cash") {
+      return {
+        text: "Pago en Efectivo",
+        icon: FaMoneyBillWave,
+        bgColor: "bg-green-100",
+        textColor: "text-green-800",
+        borderColor: "border-green-300",
+      };
+    } else {
+      // terminal o cualquier otro valor
+      return {
+        text: "Pago con Terminal",
+        icon: FaCreditCard,
+        bgColor: "bg-blue-100",
+        textColor: "text-blue-800",
+        borderColor: "border-blue-300",
+      };
+    }
+  };
 
   const totalItems = calculateTotalItems(table);
   const statusCounts = calculateItemsByStatus(table);
@@ -73,11 +106,6 @@ export default function TableHeader({
       <div className="flex-1">
         <h3 className="font-bold text-lg flex items-center gap-2">
           Mesa {table.number}
-          {/* {tableTotal > 0 && (
-            <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-              ${tableTotal.toFixed(2)}
-            </span>
-          )} */}
         </h3>
 
         <div className="flex flex-wrap gap-1 mt-2">
@@ -97,31 +125,49 @@ export default function TableHeader({
               : "⚪ Disponible"}
           </span>
 
-          {/* NUEVO: Tag "Cliente Solicita Cuenta" */}
-          {hasBillRequest && (
-            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded flex items-center gap-1 animate-pulse">
-              <FaBell className="text-xs" />
-              Cliente Solicita Cuenta
+          {/* NOTIFICACIÓN DE CUENTA CON MÉTODO DE PAGO */}
+          {latestBillRequest && (
+            <span
+              className={`text-xs px-2 py-1 rounded border ${
+                getPaymentMethodInfo(latestBillRequest.payment_method).bgColor
+              } ${
+                getPaymentMethodInfo(latestBillRequest.payment_method).textColor
+              } ${
+                getPaymentMethodInfo(latestBillRequest.payment_method)
+                  .borderColor
+              } flex items-center gap-1 animate-pulse`}
+            >
+              {(() => {
+                const IconComponent = getPaymentMethodInfo(
+                  latestBillRequest.payment_method
+                ).icon;
+                return <IconComponent className="text-xs" />;
+              })()}
+              {getPaymentMethodInfo(latestBillRequest.payment_method).text}
             </span>
           )}
 
           {totalItems > 0 && (
             <>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                {totalItems} productos
-              </span>
-              <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-                ⏱️ {statusCounts.pending} pendientes
-              </span>
-              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                ✅ {statusCounts.ready} listos
-              </span>
               <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
                 🍽️ {statusCounts.served} servidos
               </span>
             </>
           )}
         </div>
+
+        {/* INFORMACIÓN ADICIONAL DEL MÉTODO DE PAGO */}
+        {latestBillRequest && (
+          <div className="mt-2 text-xs text-gray-600">
+            {latestBillRequest.payment_method === "cash" ? (
+              <p>
+                💡 El cliente pagará en efectivo - Prepárate para dar cambio
+              </p>
+            ) : (
+              <p>💡 El cliente pagará con tarjeta - Lleva la terminal</p>
+            )}
+          </div>
+        )}
 
         <p className="text-sm text-gray-500 mt-1">
           {table.location} • {table.capacity} personas

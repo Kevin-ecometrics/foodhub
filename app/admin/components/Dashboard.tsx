@@ -11,6 +11,8 @@ import {
   FaFileExport,
   FaReceipt,
   FaTimes,
+  FaMoneyBillWave,
+  FaCreditCard,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -41,7 +43,6 @@ interface SalesItem {
   quantity: number;
   subtotal: number;
   notes?: string;
-  // category no está en tu tabla, lo obtenemos de otra forma si es necesario
 }
 
 // Interfaz para el ticket
@@ -166,6 +167,44 @@ export default function Dashboard({
     });
   };
 
+  // Función para obtener el texto del método de pago
+  const getPaymentMethodText = (method: "cash" | "terminal" | null): string => {
+    switch (method) {
+      case "cash":
+        return "EFECTIVO";
+      case "terminal":
+        return "TERMINAL";
+      default:
+        return "NO ESPECIFICADO";
+    }
+  };
+
+  // Función para obtener el icono del método de pago
+  const getPaymentMethodIcon = (method: "cash" | "terminal" | null) => {
+    switch (method) {
+      case "cash":
+        return <FaMoneyBillWave className="text-green-600" />;
+      case "terminal":
+        return <FaCreditCard className="text-blue-600" />;
+      default:
+        return <FaDollarSign className="text-gray-600" />;
+    }
+  };
+
+  // Función para obtener el color del método de pago
+  const getPaymentMethodColor = (
+    method: "cash" | "terminal" | null
+  ): string => {
+    switch (method) {
+      case "cash":
+        return "bg-green-100 text-green-800 border-green-300";
+      case "terminal":
+        return "bg-blue-100 text-blue-800 border-blue-300";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300";
+    }
+  };
+
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDateValue = e.target.value;
     setDateInput(newDateValue);
@@ -177,14 +216,8 @@ export default function Dashboard({
     setShowDateFilter(false);
   };
 
-  // FUNCIÓN: Generar CSV con productos vendidos
-  const generateProductsCSVReport = () => {
-    if (salesItems.length === 0) {
-      alert("No hay datos de productos vendidos para exportar");
-      return;
-    }
-
-    // Agrupar productos por nombre para sumar cantidades
+  // FUNCIÓN: Agrupar productos para reportes
+  const getGroupedProducts = () => {
     const productMap = new Map();
 
     salesItems.forEach((item) => {
@@ -206,27 +239,41 @@ export default function Dashboard({
       }
     });
 
-    // Crear CSV con los nuevos encabezados
-    let csvContent =
-      "Clave,Nombre del Producto,Precio Unitario,Cantidad Vendida,Venta Total\n";
+    return Array.from(productMap.values());
+  };
 
-    let counter = 1;
-    productMap.forEach((product) => {
-      csvContent += `"${counter}","${product.product_name}","${product.price}","${product.quantity}","${product.subtotal}"\n`;
-      counter++;
-    });
+  // FUNCIÓN: Generar Excel de productos vendidos
+  const generateProductsExcelReport = () => {
+    const products = getGroupedProducts();
 
-    // Agregar totales al final
-    const totalQuantity = Array.from(productMap.values()).reduce(
+    if (products.length === 0) {
+      alert("No hay datos de productos vendidos para exportar");
+      return;
+    }
+
+    // Calcular totales
+    const totalQuantity = products.reduce(
       (sum, product) => sum + product.quantity,
       0
     );
-    const totalSales = Array.from(productMap.values()).reduce(
+    const totalSales = products.reduce(
       (sum, product) => sum + product.subtotal,
       0
     );
 
-    csvContent += `\n"","TOTALES","","${totalQuantity}","${totalSales}"`;
+    // Crear CSV con encabezados
+    let csvContent = "No.,Producto,Precio Unitario,Cantidad Vendida,Total\n";
+
+    products.forEach((product, index) => {
+      csvContent += `"${index + 1}","${product.product_name}","${formatCurrency(
+        product.price
+      )}","${product.quantity}","${formatCurrency(product.subtotal)}"\n`;
+    });
+
+    // Agregar totales al final
+    csvContent += `\n"","TOTALES","","${totalQuantity}","${formatCurrency(
+      totalSales
+    )}"`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -241,13 +288,237 @@ export default function Dashboard({
     URL.revokeObjectURL(url);
   };
 
+  // FUNCIÓN: Generar PDF del reporte de productos vendidos
+  const generateProductsPDFReport = () => {
+    const products = getGroupedProducts();
+
+    if (products.length === 0) {
+      alert("No hay datos de productos vendidos para generar el reporte");
+      return;
+    }
+
+    // Calcular totales
+    const totalQuantity = products.reduce(
+      (sum, product) => sum + product.quantity,
+      0
+    );
+    const totalSales = products.reduce(
+      (sum, product) => sum + product.subtotal,
+      0
+    );
+
+    // Crear contenido HTML para el PDF
+    const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Reporte de Productos Vendidos - ${
+          selectedDate.toISOString().split("T")[0]
+        }</title>
+        <style>
+          body { 
+            font-family: 'Arial', sans-serif; 
+            font-size: 12px; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+            color: #333;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            border-bottom: 3px double #000; 
+            padding-bottom: 15px; 
+          }
+          .restaurant-name { 
+            font-size: 24px; 
+            font-weight: bold; 
+            margin-bottom: 5px; 
+            color: #1f2937;
+          }
+          .report-title { 
+            font-size: 18px; 
+            margin-bottom: 10px; 
+            color: #374151;
+          }
+          .summary-section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #f8fafc; 
+            border-radius: 8px; 
+            border: 1px solid #e2e8f0;
+          }
+          .summary-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 15px; 
+            margin: 15px 0; 
+          }
+          .summary-card { 
+            padding: 12px; 
+            border-radius: 6px; 
+            text-align: center;
+            border: 1px solid;
+          }
+          .summary-total { 
+            background: #dcfce7; 
+            border-color: #bbf7d0; 
+          }
+          .summary-items { 
+            background: #dbeafe; 
+            border-color: #bfdbfe; 
+          }
+          .summary-number { 
+            font-size: 18px; 
+            font-weight: bold; 
+            margin: 5px 0; 
+          }
+          .products-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0; 
+          }
+          .products-table th { 
+            background: #374151; 
+            color: white; 
+            padding: 10px; 
+            text-align: left; 
+            border: 1px solid #4b5563;
+          }
+          .products-table td { 
+            padding: 8px 10px; 
+            border: 1px solid #d1d5db; 
+          }
+          .products-table tr:nth-child(even) { 
+            background: #f9fafb; 
+          }
+          .totals-section { 
+            margin-top: 20px; 
+            padding-top: 15px; 
+            border-top: 2px solid #000; 
+          }
+          .total-row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin: 5px 0; 
+            padding: 0 10px; 
+          }
+          .grand-total { 
+            font-weight: bold; 
+            font-size: 16px; 
+            margin-top: 10px; 
+            padding-top: 10px; 
+            border-top: 1px solid #d1d5db; 
+          }
+          .footer { 
+            text-align: center; 
+            margin-top: 30px; 
+            padding-top: 15px; 
+            border-top: 1px solid #d1d5db; 
+            font-size: 10px; 
+            color: #6b7280;
+          }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="restaurant-name">FOODHUB RESTAURANT</div>
+          <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS</div>
+          <div>Fecha: ${formatLongDate(selectedDate)}</div>
+          <div>Generado: ${new Date().toLocaleString("es-MX")}</div>
+        </div>
+        
+        <!-- Resumen General -->
+        <div class="summary-section">
+          <h3 style="margin: 0 0 15px 0; color: #1f2937;">RESUMEN GENERAL</h3>
+          <div class="summary-grid">
+            <div class="summary-card summary-total">
+              <div>VENTAS TOTALES</div>
+              <div class="summary-number">${formatCurrency(totalSales)}</div>
+              <div>${products.length} productos diferentes</div>
+            </div>
+            <div class="summary-card summary-items">
+              <div>ITEMS VENDIDOS</div>
+              <div class="summary-number">${totalQuantity}</div>
+              <div>unidades totales</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de Productos Vendidos -->
+        <h3 style="margin: 25px 0 15px 0; color: #1f2937;">DETALLE DE PRODUCTOS VENDIDOS</h3>
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Producto</th>
+              <th class="text-right">Precio Unitario</th>
+              <th class="text-center">Cantidad</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${products
+              .map(
+                (product, index) => `
+              <tr>
+                <td class="text-center">${index + 1}</td>
+                <td>${product.product_name}</td>
+                <td class="text-right">${formatCurrency(product.price)}</td>
+                <td class="text-center">${product.quantity}</td>
+                <td class="text-right">${formatCurrency(product.subtotal)}</td>
+              </tr>
+            `
+              )
+              .join("")}
+          </tbody>
+        </table>
+
+        <!-- Totales -->
+        <div class="totals-section">
+          <div class="total-row">
+            <span><strong>Total Items Vendidos:</strong></span>
+            <span><strong>${totalQuantity} unidades</strong></span>
+          </div>
+          <div class="total-row grand-total">
+            <span><strong>VENTA TOTAL:</strong></span>
+            <span><strong>${formatCurrency(totalSales)}</strong></span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <div>*** REPORTE DE PRODUCTOS GENERADO AUTOMÁTICAMENTE ***</div>
+          <div>FoodHub Restaurant - Sistema de Gestión</div>
+          <div>${window.location.hostname}</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Abrir ventana para imprimir
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(content);
+      printWindow.document.close();
+      printWindow.focus();
+
+      // Esperar a que cargue el contenido antes de imprimir
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  };
+
   // FUNCIÓN: Generar PDF del ticket con cálculos correctos
   const generateTicketPDF = (ticketData: TicketData) => {
     const { sale, items } = ticketData;
 
     // Calcular subtotales y totales
     const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    const tax = subtotal * 0.16; // 16% de IVA
+    const tax = subtotal * 0.08; // 8% de IVA
     const total = subtotal + tax;
 
     // Crear contenido HTML para el PDF
@@ -268,6 +539,27 @@ export default function Dashboard({
           .header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
           .restaurant-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
           .ticket-info { margin-bottom: 10px; padding: 5px 0; }
+          .payment-method { 
+            background-color: ${
+              sale.payment_method === "cash"
+                ? "#d1fae5"
+                : sale.payment_method === "terminal"
+                ? "#dbeafe"
+                : "#f3f4f6"
+            }; 
+            padding: 5px; 
+            text-align: center; 
+            margin: 5px 0; 
+            border-radius: 4px; 
+            font-weight: bold;
+            color: ${
+              sale.payment_method === "cash"
+                ? "#065f46"
+                : sale.payment_method === "terminal"
+                ? "#1e40af"
+                : "#374151"
+            };
+          }
           .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
           .items-table th { border-bottom: 1px dashed #000; padding: 5px 2px; text-align: left; }
           .items-table td { padding: 4px 2px; border-bottom: 1px dotted #ccc; }
@@ -294,6 +586,10 @@ export default function Dashboard({
           <div><strong>TRANSACCIÓN:</strong> ${sale.id
             .slice(0, 8)
             .toUpperCase()}</div>
+        </div>
+
+        <div class="payment-method">
+          MÉTODO DE PAGO: ${getPaymentMethodText(sale.payment_method)}
         </div>
         
         <table class="items-table">
@@ -332,7 +628,7 @@ export default function Dashboard({
             <span>${formatCurrency(subtotal)}</span>
           </div>
           <div class="total-row">
-            <span>IVA (16%):</span>
+            <span>IVA (8%):</span>
             <span>${formatCurrency(tax)}</span>
           </div>
           <div class="total-row grand-total">
@@ -360,8 +656,6 @@ export default function Dashboard({
       // Esperar a que cargue el contenido antes de imprimir
       setTimeout(() => {
         printWindow.print();
-        // Opcional: cerrar después de imprimir
-        // printWindow.close();
       }, 500);
     }
   };
@@ -384,6 +678,14 @@ export default function Dashboard({
     totalOrders: salesSummary?.totalOrders || dailyStats?.totalOrders || 0,
     activeOrders: todayOrders.length,
     activeTables: dailyStats?.activeTables || 0,
+  };
+
+  // Calcular estadísticas de métodos de pago
+  const paymentMethodStats = {
+    cash: salesHistory.filter((sale) => sale.payment_method === "cash").length,
+    terminal: salesHistory.filter((sale) => sale.payment_method === "terminal")
+      .length,
+    unspecified: salesHistory.filter((sale) => !sale.payment_method).length,
   };
 
   return (
@@ -442,10 +744,10 @@ export default function Dashboard({
               )}
             </div>
 
-            {/* Botón de exportación */}
+            {/* Botones de exportación ACTUALIZADOS - AMBOS PARA PRODUCTOS */}
             <div className="flex gap-2">
               <button
-                onClick={generateProductsCSVReport}
+                onClick={generateProductsExcelReport}
                 disabled={salesItems.length === 0}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
                   salesItems.length === 0
@@ -454,7 +756,19 @@ export default function Dashboard({
                 }`}
               >
                 <FaFileExport />
-                Ventas
+                Excel
+              </button>
+              <button
+                onClick={generateProductsPDFReport}
+                disabled={salesItems.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                  salesItems.length === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                }`}
+              >
+                <FaReceipt />
+                PDF
               </button>
             </div>
             <button
@@ -541,16 +855,66 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* Estadísticas de Métodos de Pago */}
+      {salesSummary && salesSummary.saleCount > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <FaDollarSign className="text-green-600" />
+            Métodos de Pago Utilizados
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaMoneyBillWave className="text-green-600 text-xl" />
+                <p className="font-semibold text-green-800">Efectivo</p>
+              </div>
+              <p className="text-2xl font-bold text-green-600">
+                {paymentMethodStats.cash}
+              </p>
+              <p className="text-sm text-green-700">
+                {salesSummary.saleCount > 0
+                  ? Math.round(
+                      (paymentMethodStats.cash / salesSummary.saleCount) * 100
+                    )
+                  : 0}
+                %
+              </p>
+            </div>
+
+            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaCreditCard className="text-blue-600 text-xl" />
+                <p className="font-semibold text-blue-800">Terminal</p>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">
+                {paymentMethodStats.terminal}
+              </p>
+              <p className="text-sm text-blue-700">
+                {salesSummary.saleCount > 0
+                  ? Math.round(
+                      (paymentMethodStats.terminal / salesSummary.saleCount) *
+                        100
+                    )
+                  : 0}
+                %
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Vista previa de productos vendidos */}
       {salesItems.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <FaShoppingCart className="text-green-600" />
-              Productos Vendidos ({salesItems.length} items)
+              Productos Vendidos ({salesItems.length} items individuales)
             </h3>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {loadingItems ? "Cargando..." : "Listo para exportar"}
+              {loadingItems
+                ? "Cargando..."
+                : `${getGroupedProducts().length} productos diferentes`}
             </span>
           </div>
 
@@ -573,40 +937,37 @@ export default function Dashboard({
                 </tr>
               </thead>
               <tbody>
-                {salesItems.slice(0, 10).map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100">
-                    <td className="px-4 py-3 text-gray-800">
-                      {item.product_name}
-                      {item.notes && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          Nota: {item.notes}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-800">
-                      {formatCurrency(item.price)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-800">
-                      {item.quantity}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-green-600">
-                      {formatCurrency(item.subtotal)}
-                    </td>
-                  </tr>
-                ))}
+                {getGroupedProducts()
+                  .slice(0, 10)
+                  .map((product, index) => (
+                    <tr key={index} className="border-b border-gray-100">
+                      <td className="px-4 py-3 text-gray-800">
+                        {product.product_name}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-800">
+                        {formatCurrency(product.price)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-800">
+                        {product.quantity}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-600">
+                        {formatCurrency(product.subtotal)}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
-            {salesItems.length > 10 && (
+            {getGroupedProducts().length > 10 && (
               <p className="text-sm text-gray-500 mt-3 text-center">
-                Mostrando 10 de {salesItems.length} productos. Exporta el CSV
-                para ver todos.
+                Mostrando 10 de {getGroupedProducts().length} productos. Exporta
+                el Excel o PDF para ver todos.
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Detalle de Ventas Históricas */}
+      {/* Detalle de Ventas Históricas - ACTUALIZADO CON MÉTODO DE PAGO */}
       {salesSummary && salesSummary.saleCount > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -648,7 +1009,7 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* Lista de ventas históricas - AHORA CLICKEABLES */}
+          {/* Lista de ventas históricas - ACTUALIZADA CON MÉTODO DE PAGO */}
           <div className="mt-6">
             <h4 className="font-semibold text-gray-700 mb-3">
               Detalle de Ventas (Click para ver ticket):
@@ -661,14 +1022,23 @@ export default function Dashboard({
                   disabled={loadingTicket}
                   className="w-full text-left flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div>
-                    <p className="font-medium text-gray-800">
-                      Mesa {sale.table_number}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {sale.customer_name || "Invitado"} • {sale.order_count}{" "}
-                      órdenes • {sale.item_count} items
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${getPaymentMethodColor(
+                        sale.payment_method
+                      )}`}
+                    >
+                      {getPaymentMethodIcon(sale.payment_method)}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        Mesa {sale.table_number}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {sale.customer_name || "Invitado"} • {sale.order_count}{" "}
+                        órdenes • {sale.item_count} items
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
@@ -685,7 +1055,7 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* MODAL DEL TICKET */}
+      {/* MODAL DEL TICKET - ACTUALIZADO CON MÉTODO DE PAGO */}
       {showTicketModal && selectedTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -721,6 +1091,21 @@ export default function Dashboard({
                     <strong>Total:</strong>{" "}
                     {formatCurrency(selectedTicket.sale.total_amount)}
                   </p>
+                </div>
+              </div>
+
+              {/* MÉTODO DE PAGO EN EL MODAL */}
+              <div
+                className={`mt-3 p-3 rounded-lg border ${getPaymentMethodColor(
+                  selectedTicket.sale.payment_method
+                )}`}
+              >
+                <div className="flex items-center gap-2">
+                  {getPaymentMethodIcon(selectedTicket.sale.payment_method)}
+                  <span className="font-semibold">Método de Pago:</span>
+                  <span>
+                    {getPaymentMethodText(selectedTicket.sale.payment_method)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -770,21 +1155,24 @@ export default function Dashboard({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>IVA (16%):</span>
+                    <span>IVA (8%):</span>
                     <span>
                       {formatCurrency(
                         selectedTicket.items.reduce(
                           (sum, item) => sum + item.subtotal,
                           0
-                        ) * 0.16
+                        ) * 0.08
                       )}
                     </span>
                   </div>
                   <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
                     <span>TOTAL:</span>
-                    <span className="text-green-600">
-                      {formatCurrency(selectedTicket.sale.total_amount)}
-                    </span>
+                    {formatCurrency(
+                      selectedTicket.items.reduce(
+                        (sum, item) => sum + item.subtotal,
+                        0
+                      ) * 1.08
+                    )}
                   </div>
                 </div>
               </div>

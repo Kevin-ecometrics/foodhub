@@ -5,7 +5,7 @@ export interface OrderWithItems {
   id: string
   table_id: number
   customer_name: string | null
-  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid' // AGREGAR 'sent'
+  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid'
   total_amount: number
   created_at: string
   updated_at: string
@@ -44,40 +44,39 @@ interface OrderFromSupabase {
 
 export const historyService = {
 
-async createOrder(tableId: number, customerName: string): Promise<OrderWithItems> {
-  const { data, error } = await supabase
-    .from("orders")
-    .insert([
-      {
-        table_id: tableId,
-        customer_name: customerName,
-        status: "active",
-        total_amount: 0,
-      },
-    ] as never)
-    .select(`
-      *,
-      order_items (
+  async createOrder(tableId: number, customerName: string): Promise<OrderWithItems> {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([
+        {
+          table_id: tableId,
+          customer_name: customerName,
+          status: "active",
+          total_amount: 0,
+        },
+      ] as never)
+      .select(`
         *,
-        products (
-          name,
-          image_url,
-          preparation_time
+        order_items (
+          *,
+          products (
+            name,
+            image_url,
+            preparation_time
+          )
         )
-      )
-    `)
-    .single();
+      `)
+      .single();
 
-  if (error) {
-    console.error("Error creating order:", error);
-    throw new Error(`Error al crear la orden: ${error.message}`);
-  }
+    if (error) {
+      console.error("Error creating order:", error);
+      throw new Error(`Error al crear la orden: ${error.message}`);
+    }
 
-  console.log("✅ Nueva orden creada para:", customerName, "en mesa:", tableId);
+    console.log("✅ Nueva orden creada para:", customerName, "en mesa:", tableId);
 
-  return data as OrderWithItems;
-},
-
+    return data as OrderWithItems;
+  },
 
   // Obtener historial del cliente actual (orden activa + enviadas + completadas)
   async getCustomerOrderHistory(tableId: number, currentOrderId?: string): Promise<OrderWithItems[]> {
@@ -230,16 +229,26 @@ async createOrder(tableId: number, customerName: string): Promise<OrderWithItems
     console.log('✅ Asistencia solicitada para mesa:', tableId)
   },
 
-  // Solicitar la cuenta
-  async requestBill(tableId: number, orderId?: string): Promise<void> {
+  // Solicitar la cuenta CON MÉTODO DE PAGO
+  async requestBill(tableId: number, orderId?: string, paymentMethod?: string): Promise<void> {
+    let message = 'Solicita la cuenta';
+    
+    // Personalizar mensaje según método de pago
+    if (paymentMethod === 'cash') {
+      message = 'Solicita la cuenta - Pago en efectivo';
+    } else if (paymentMethod === 'terminal') {
+      message = 'Solicita la cuenta - Pago con terminal';
+    }
+    
     const { error } = await supabase
       .from('waiter_notifications')
       .insert({
         table_id: tableId,
         order_id: orderId || null,
         type: 'bill_request',
-        message: 'Solicita la cuenta',
-        status: 'pending'
+        message: message,
+        status: 'pending',
+        payment_method: paymentMethod || null
       } as any)
     
     if (error) {
@@ -247,7 +256,7 @@ async createOrder(tableId: number, customerName: string): Promise<OrderWithItems
       throw error
     }
     
-    console.log('✅ Cuenta solicitada para mesa:', tableId, 'orden:', orderId)
+    console.log('✅ Cuenta solicitada para mesa:', tableId, 'método:', paymentMethod)
   },
 
   // Nueva función: Obtener todas las órdenes de la mesa (para debugging)

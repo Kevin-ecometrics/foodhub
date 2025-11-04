@@ -13,6 +13,7 @@ type NotificationStatus = 'pending' | 'acknowledged' | 'completed'
 type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning'
 type OrderItemStatus = 'ordered' | 'preparing' | 'ready' | 'served'
 type OrderStatus = 'sent' | 'completed'
+type PaymentMethod = 'cash' | 'terminal' | null
 
 // Interfaces públicas (para tu lógica)
 export interface WaiterNotification {
@@ -22,6 +23,7 @@ export interface WaiterNotification {
   type: NotificationType
   message: string
   status: NotificationStatus
+  payment_method: PaymentMethod // NUEVO CAMPO
   created_at: string
   updated_at?: string
   tables?: {
@@ -98,6 +100,7 @@ interface SalesHistoryRow {
   total_amount: number
   order_count: number
   item_count: number
+  payment_method: PaymentMethod // NUEVO CAMPO
   closed_at: string
 }
 
@@ -109,6 +112,18 @@ interface SalesItemRow {
   quantity: number
   subtotal: number
   notes?: string | null
+}
+
+interface WaiterNotificationRow {
+  id: string
+  table_id: number
+  order_id: string | null
+  type: NotificationType
+  message: string
+  status: NotificationStatus
+  payment_method: PaymentMethod // NUEVO CAMPO
+  created_at: string
+  updated_at?: string
 }
 
 // Helpers tipados -> permitimos cualquier tipo (objeto o array)
@@ -221,9 +236,13 @@ export const waiterService = {
     }))
   },
 
-  async saveSalesHistory(tableId: number, tableNumber: number): Promise<string> {
+  async saveSalesHistory(
+    tableId: number, 
+    tableNumber: number, 
+    paymentMethod: PaymentMethod = null // NUEVO PARÁMETRO
+  ): Promise<string> {
     try {
-      console.log(`💰 Guardando historial de venta para mesa ${tableNumber}`)
+      console.log(`💰 Guardando historial de venta para mesa ${tableNumber}, método: ${paymentMethod}`)
 
       // Usamos el tipo OrderRow en la consulta (returns es seguro)
       const { data: orders, error: ordersError } = await supabase
@@ -265,7 +284,7 @@ export const waiterService = {
 
       const customerName = orders[0]?.customer_name ?? null
 
-      // Insertamos el historial SIN genérico en .insert() para evitar constraint 'never'
+      // Insertamos el historial CON el método de pago
       const { data: saleData, error: saleError } = await supabase
         .from('sales_history')
         .insert(
@@ -276,6 +295,7 @@ export const waiterService = {
             total_amount: totalAmount,
             order_count: orderCount,
             item_count: itemCount,
+            payment_method: paymentMethod, // NUEVO CAMPO
             closed_at: new Date().toISOString(),
           } as never)
         )
@@ -308,7 +328,7 @@ export const waiterService = {
       }
 
       console.log(
-        `✅ Historial guardado: $${totalAmount.toFixed(2)}, ${orderCount} órdenes, ${itemCount} items`
+        `✅ Historial guardado: $${totalAmount.toFixed(2)}, ${orderCount} órdenes, ${itemCount} items, método: ${paymentMethod}`
       )
       return sale.id
     } catch (err) {
@@ -317,11 +337,15 @@ export const waiterService = {
     }
   },
 
-  async freeTableAndClean(tableId: number, tableNumber: number): Promise<void> {
+  async freeTableAndClean(
+    tableId: number, 
+    tableNumber: number, 
+    paymentMethod: PaymentMethod = null // NUEVO PARÁMETRO
+  ): Promise<void> {
     try {
-      console.log(`🔄 Iniciando proceso completo para mesa ${tableNumber}`)
+      console.log(`🔄 Iniciando proceso completo para mesa ${tableNumber}, método: ${paymentMethod}`)
 
-      await this.saveSalesHistory(tableId, tableNumber)
+      await this.saveSalesHistory(tableId, tableNumber, paymentMethod) // PASA EL MÉTODO DE PAGO
 
       console.log(`🗑️ Eliminando notificaciones para mesa ${tableId}`)
       const { error: notificationsError } = await supabase
@@ -374,7 +398,7 @@ export const waiterService = {
 
       if (tableError) throw tableError
 
-      console.log(`✅ Mesa ${tableNumber} procesada completamente`)
+      console.log(`✅ Mesa ${tableNumber} procesada completamente, método: ${paymentMethod}`)
     } catch (err) {
       console.error('❌ Error en proceso completo:', err)
       throw err

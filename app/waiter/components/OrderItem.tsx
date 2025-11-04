@@ -63,30 +63,28 @@ export default function OrderItem({
     <div className="flex justify-between items-start text-sm bg-gray-50 p-3 rounded-lg border">
       <div className="flex-1">
         <div className="flex justify-between">
-          <span className="font-medium">
-            {item.product_name} × {item.quantity}
-          </span>
-          <span className="font-semibold text-green-600">
+          {item.product_name} × {item.quantity}
+          <button
+            onClick={handleStatusClick}
+            disabled={processing === item.id || item.status === "served"}
+            className={getButtonStyles(item.status)}
+          >
+            {processing === item.id ? (
+              <FaSpinner className="animate-spin" />
+            ) : (
+              getButtonText(item.status)
+            )}
+          </button>
+          {/* <span className="font-semibold text-green-600">
             ${(item.price * item.quantity).toFixed(2)}
-          </span>
+          </span> */}
         </div>
         <div className="flex justify-between items-center mt-2">
-          <span className="text-xs text-gray-500">
+          {/* <span className="text-xs text-gray-500">
             ${item.price.toFixed(2)} c/u
-          </span>
+          </span> */}
           <div className="flex items-center gap-3">
             {/* Botón de estado clickeable */}
-            <button
-              onClick={handleStatusClick}
-              disabled={processing === item.id || item.status === "served"}
-              className={getButtonStyles(item.status)}
-            >
-              {processing === item.id ? (
-                <FaSpinner className="animate-spin" />
-              ) : (
-                getButtonText(item.status)
-              )}
-            </button>
           </div>
         </div>
         {item.notes && (

@@ -12,14 +12,15 @@ import Header from "./components/Header";
 import Tabs from "./components/Tabs";
 import NotificationsTab from "./components/NotificationsTab";
 import TablesTab from "./components/TablesTab";
+import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
 
 export default function WaiterDashboard() {
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
-  const [activeTab, setActiveTab] = useState<"notifications" | "tables">(
-    "notifications"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "notifications" | "tables" | "products"
+  >("notifications"); // NUEVA PESTAÑA
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [attendedNotifications, setAttendedNotifications] = useState<
@@ -170,9 +171,28 @@ export default function WaiterDashboard() {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
+    // Buscar notificación de cuenta para esta mesa
+    const billNotification = notifications.find(
+      (notification) =>
+        notification.table_id === tableId &&
+        notification.type === "bill_request"
+    );
+
+    // Obtener el método de pago de la notificación (si existe)
+    const paymentMethod = billNotification?.payment_method || null;
+
+    let paymentMethodText = "";
+    if (paymentMethod === "cash") {
+      paymentMethodText = "💰 Pago en EFECTIVO";
+    } else if (paymentMethod === "terminal") {
+      paymentMethodText = "💳 Pago con TERMINAL";
+    } else {
+      paymentMethodText = "❓ Método de pago no especificado";
+    }
+
     if (
       !confirm(
-        `¿Estás seguro de que quieres COBRAR la Mesa ${tableNumber}?\n\n💰 Total: $${tableTotal.toFixed(
+        `¿Estás seguro de que quieres COBRAR la Mesa ${tableNumber}?\n\n${paymentMethodText}\n💰 Total: $${tableTotal.toFixed(
           2
         )}\n\n📊 Se guardará el historial de venta y se liberará la mesa.`
       )
@@ -182,14 +202,28 @@ export default function WaiterDashboard() {
 
     setProcessing(`cobrar-${tableId}`);
     try {
-      console.log(`💵 Iniciando cobro para mesa ${tableNumber}`);
-      await waiterService.freeTableAndClean(tableId, tableNumber);
-
-      alert(
-        `✅ Mesa ${tableNumber} cobrada exitosamente!\n\n💰 Total: $${tableTotal.toFixed(
-          2
-        )}\n📈 Historial guardado correctamente`
+      console.log(
+        `💵 Iniciando cobro para mesa ${tableNumber}, método: ${paymentMethod}`
       );
+
+      // PASA EL MÉTODO DE PAGO A LA FUNCIÓN
+      await waiterService.freeTableAndClean(
+        tableId,
+        tableNumber,
+        paymentMethod
+      );
+
+      let successMessage = `✅ Mesa ${tableNumber} cobrada exitosamente!\n\n`;
+      if (paymentMethod === "cash") {
+        successMessage += `💰 Pago en EFECTIVO\n`;
+      } else if (paymentMethod === "terminal") {
+        successMessage += `💳 Pago con TERMINAL\n`;
+      }
+      successMessage += `💵 Total: $${tableTotal.toFixed(
+        2
+      )}\n📈 Historial guardado correctamente`;
+
+      alert(successMessage);
 
       await loadData();
     } catch (error: any) {
@@ -202,6 +236,10 @@ export default function WaiterDashboard() {
 
   const handleGoToTables = () => {
     setActiveTab("tables");
+  };
+
+  const handleError = (error: string) => {
+    alert(error);
   };
 
   const calculateTableTotal = (table: TableWithOrder) => {
@@ -246,6 +284,11 @@ export default function WaiterDashboard() {
             calculateTableTotal={calculateTableTotal}
             notifications={notifications}
           />
+        )}
+
+        {/* NUEVA PESTAÑA DE PRODUCTOS */}
+        {activeTab === "products" && (
+          <ProductsManagement onError={handleError} />
         )}
       </main>
     </div>

@@ -13,6 +13,7 @@ import {
   FaSpinner,
   FaExclamationTriangle,
   FaUser,
+  FaFilePdf,
 } from "react-icons/fa";
 
 interface PaymentSummary {
@@ -46,6 +47,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
   const [error, setError] = useState("");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Obtener parámetros de la URL
   useEffect(() => {
@@ -137,7 +139,7 @@ export default function PaymentPage() {
     });
 
     // Calcular impuestos y totales para cada cliente
-    const taxRate = 0.16;
+    const taxRate = 0.08;
     customerMap.forEach((customerSummary) => {
       customerSummary.taxAmount = customerSummary.subtotal * taxRate;
       customerSummary.total =
@@ -158,7 +160,7 @@ export default function PaymentPage() {
       });
     });
 
-    const taxRate = 0.16; // 16% de impuesto
+    const taxRate = 0.08; // 16% de impuesto
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
 
@@ -185,21 +187,251 @@ export default function PaymentPage() {
     }
   }, [paymentConfirmed, countdown, router]);
 
-  //metodo de confirmacion de pago
+  // Función para generar PDF del ticket
+  const handleGeneratePDF = async () => {
+    try {
+      setGeneratingPdf(true);
+
+      // Crear contenido HTML para el PDF
+      const pdfContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Ticket de Pago - Mesa ${tableId || currentTableId}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              color: #333;
+            }
+            .header { 
+              text-align: center; 
+              background: #1f2937; 
+              color: white; 
+              padding: 20px; 
+              margin-bottom: 20px;
+            }
+            .restaurant-name { 
+              font-size: 24px; 
+              font-weight: bold; 
+              margin-bottom: 5px;
+            }
+            .table-info { 
+              font-size: 14px; 
+              color: #d1d5db;
+            }
+            .customer-section { 
+              margin-bottom: 25px; 
+              border-bottom: 1px solid #e5e7eb; 
+              padding-bottom: 15px;
+            }
+            .customer-header { 
+              display: flex; 
+              justify-content: space-between; 
+              align-items: flex-start; 
+              margin-bottom: 15px;
+            }
+            .customer-name { 
+              font-size: 18px; 
+              font-weight: bold; 
+              color: #1f2937;
+            }
+            .customer-total { 
+              font-size: 16px; 
+              font-weight: bold; 
+              color: #1f2937;
+            }
+            .item-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin-bottom: 8px; 
+              padding-bottom: 8px; 
+              border-bottom: 1px solid #f3f4f6;
+            }
+            .item-name { 
+              font-weight: 500;
+            }
+            .item-details { 
+              font-size: 12px; 
+              color: #6b7280; 
+              margin-top: 2px;
+            }
+            .item-price { 
+              text-align: right;
+            }
+            .order-separator { 
+              border-top: 1px solid #e5e7eb; 
+              margin: 15px 0;
+            }
+            .customer-summary { 
+              background: #dbeafe; 
+              padding: 15px; 
+              border-radius: 8px; 
+              margin-top: 15px;
+            }
+            .summary-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin-bottom: 5px;
+            }
+            .final-total { 
+              border-top: 2px solid #1f2937; 
+              padding-top: 15px; 
+              margin-top: 20px;
+            }
+            .total-row { 
+              display: flex; 
+              justify-content: space-between; 
+              font-size: 18px; 
+              font-weight: bold;
+            }
+            .footer { 
+              text-align: center; 
+              margin-top: 30px; 
+              padding-top: 20px; 
+              border-top: 1px solid #e5e7eb; 
+              color: #6b7280; 
+              font-size: 12px;
+            }
+            .timestamp { 
+              font-size: 12px; 
+              color: #6b7280; 
+              text-align: center; 
+              margin-bottom: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="restaurant-name">RESTAURANTE</div>
+            <div class="table-info">Mesa ${tableId || currentTableId}</div>
+            <div class="table-info">${new Date().toLocaleString("es-MX")}</div>
+          </div>
+
+          <div class="timestamp">
+            Generado el ${new Date().toLocaleString("es-MX")}
+          </div>
+
+          ${customerSummaries
+            .map(
+              (customerSummary) => `
+            <div class="customer-section">
+              <div class="customer-header">
+                <div class="customer-name">${customerSummary.customerName}</div>
+                <div class="customer-total">${formatCurrency(
+                  customerSummary.subtotal
+                )}</div>
+              </div>
+
+              ${customerSummary.orders
+                .map(
+                  (order) => `
+                ${
+                  customerSummary.orders.length > 1
+                    ? `
+                  <div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                    <div style="font-size: 12px; color: #6b7280;">
+                      Orden #${order.id.slice(-8)} - ${getStatusText(
+                        order.status
+                      )}
+                    </div>
+                  </div>
+                `
+                    : ""
+                }
+
+                ${order.order_items
+                  .map(
+                    (item) => `
+                  <div class="item-row">
+                    <div>
+                      <div class="item-name">${item.product_name}</div>
+                      <div class="item-details">
+                        Cantidad: ${item.quantity} • ${formatCurrency(
+                      item.price
+                    )} c/u
+                        ${item.notes ? `<br>Nota: ${item.notes}` : ""}
+                      </div>
+                    </div>
+                    <div class="item-price">
+                      ${formatCurrency(item.price * item.quantity)}
+                    </div>
+                  </div>
+                `
+                  )
+                  .join("")}
+
+                ${
+                  order !==
+                  customerSummary.orders[customerSummary.orders.length - 1]
+                    ? `
+                  <div class="order-separator"></div>
+                `
+                    : ""
+                }
+              `
+                )
+                .join("")}
+
+
+          `
+            )
+            .join("")}
+
+          <div class="final-total">
+            <div class="summary-row">
+              <span>Subtotal total:</span>
+              <span>${formatCurrency(paymentSummary.subtotal)}</span>
+            </div>
+            <div class="summary-row">
+              <span>Impuestos (8%):</span>
+              <span>${formatCurrency(paymentSummary.taxAmount)}</span>
+            </div>
+            <div class="total-row">
+              <span>TOTAL GENERAL:</span>
+              <span>${formatCurrency(paymentSummary.total)}</span>
+            </div>
+          </div>
+
+          <div class="footer">
+            <p style="font-weight: bold; margin-bottom: 5px;">¡Gracias por su preferencia!</p>
+            <p>Ticket generado para proceso de pago</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Abrir una nueva ventana con el contenido del PDF
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(pdfContent);
+        printWindow.document.close();
+
+        // Esperar a que se cargue el contenido antes de imprimir
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error al generar el PDF. Intente nuevamente.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  // Método de confirmación de pago
   const handlePaymentConfirmation = async () => {
     try {
-      // Aquí podrías agregar lógica para marcar las órdenes como pagadas
-      // Por ahora solo confirmamos el pago visualmente
+      // Confirmar el pago visualmente
       setPaymentConfirmed(true);
 
-      console.log(
-        "✅ Pago confirmado para clientes:",
-        customerSummaries.map((c) => ({
-          customer: c.customerName,
-          orders: c.orders.length,
-          total: c.total,
-        }))
-      );
+      console.log("✅ Pago confirmado:", {
+        tableId,
+        total: paymentSummary.total,
+        customers: customerSummaries.map((c) => c.customerName),
+      });
     } catch (error) {
       console.error("Error confirming payment:", error);
       alert("❌ Error al confirmar el pago. Intenta nuevamente.");
@@ -295,15 +527,10 @@ export default function PaymentPage() {
           </div>
 
           <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            ¡Gracias por su visita!
+            ¡Pago Confirmado!
           </h2>
 
-          <p className="text-lg text-gray-600 mb-2">
-            Gracias por comer en nuestro restaurante.
-          </p>
-          <p className="text-gray-600 mb-6">Esperamos volver a verle pronto.</p>
-
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
             <p className="text-sm text-gray-600">
               Comensales:{" "}
               <span className="font-semibold">{customerSummaries.length}</span>
@@ -315,10 +542,14 @@ export default function PaymentPage() {
             <p className="text-sm text-gray-600">
               Total pagado:{" "}
               <span className="font-semibold text-green-600">
-                {formatCurrency(paymentSummary.subtotal)}
+                {formatCurrency(paymentSummary.total)}
               </span>
             </p>
           </div>
+
+          <p className="text-gray-600 mb-4">
+            Gracias por su preferencia. ¡Esperamos verle pronto!
+          </p>
 
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
@@ -343,6 +574,12 @@ export default function PaymentPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.back()}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <FaArrowLeft className="text-gray-600" />
+              </button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">
                   Ticket de Pago
@@ -359,7 +596,7 @@ export default function PaymentPage() {
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(paymentSummary.subtotal)}
+                {formatCurrency(paymentSummary.total)}
               </p>
               <p className="text-sm text-gray-500">Total a pagar</p>
             </div>
@@ -376,12 +613,6 @@ export default function PaymentPage() {
             <p className="text-gray-300 text-sm">
               Mesa {tableId || currentTableId}
             </p>
-            {/* <p className="text-gray-300 text-sm">
-              {customerSummaries.length} comensal
-              {customerSummaries.length > 1 ? "es" : ""} • {allOrders.length}{" "}
-              orden{allOrders.length > 1 ? "es" : ""} •{" "}
-              {new Date().toLocaleString()}
-            </p> */}
           </div>
 
           {/* Lista de órdenes agrupadas por cliente */}
@@ -402,27 +633,20 @@ export default function PaymentPage() {
                         <h4 className="text-lg font-semibold text-gray-800">
                           {customerSummary.customerName}
                         </h4>
-                        {/* <div className="flex items-center gap-3 text-sm text-gray-500">
-                          <span>
-                            {customerSummary.orders.length} orden
-                            {customerSummary.orders.length > 1 ? "es" : ""}
-                          </span>
-                          <span>•</span>
-                          <span>
-                            {customerSummary.itemsCount} item
-                            {customerSummary.itemsCount > 1 ? "s" : ""}
-                          </span>
-                        </div> */}
+                        <p className="text-sm text-gray-500">
+                          {customerSummary.itemsCount} item
+                          {customerSummary.itemsCount > 1 ? "s" : ""}
+                        </p>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-semibold text-gray-800">
-                      {formatCurrency(customerSummary.subtotal)}
+                      {formatCurrency(customerSummary.total)}
                     </p>
-                    {/* <p className="text-sm text-gray-500">
-                      Subtotal: {formatCurrency(customerSummary.subtotal)}
-                    </p> */}
+                    <p className="text-sm text-gray-500">
+                      {formatCurrency(customerSummary.subtotal)} + impuestos
+                    </p>
                   </div>
                 </div>
 
@@ -430,20 +654,6 @@ export default function PaymentPage() {
                 <div className="space-y-4 mb-4">
                   {customerSummary.orders.map((order, orderIndex) => (
                     <div key={order.id}>
-                      {/* Info de la orden individual si hay más de una */}
-                      {customerSummary.orders.length > 1 && (
-                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                          {/* <div className="flex justify-between items-center text-sm">
-                            <span className="font-medium text-gray-700">
-                              Orden #{order.id.slice(-8)}
-                            </span>
-                            <span className="text-gray-500">
-                              {getStatusText(order.status)}
-                            </span>
-                          </div> */}
-                        </div>
-                      )}
-
                       {/* Items de esta orden */}
                       <div className="space-y-3">
                         {order.order_items.map((item) => (
@@ -489,26 +699,22 @@ export default function PaymentPage() {
                 </div>
 
                 {/* Resumen del cliente */}
-                <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div className="flex justify-between text-sm mb-2">
-                    {/* <span className="font-medium text-gray-700">
-                      Subtotal de {customerSummary.customerName}:
-                    </span> */}
-                    {/* <span className="font-medium text-gray-700">
-                      {formatCurrency(customerSummary.subtotal)}
-                    </span> */}
+                {/* <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(customerSummary.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Impuestos (8%):</span>
+                      <span>{formatCurrency(customerSummary.taxAmount)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
+                      <span>Total {customerSummary.customerName}:</span>
+                      <span>{formatCurrency(customerSummary.total)}</span>
+                    </div>
                   </div>
-                  {/* <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">Impuestos (16%):</span>
-                    <span className="text-gray-600">
-                      {formatCurrency(customerSummary.taxAmount)}
-                    </span>
-                  </div> */}
-                  <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
-                    <span>Total de {customerSummary.customerName}:</span>
-                    <span>{formatCurrency(customerSummary.subtotal)}</span>
-                  </div>
-                </div>
+                </div> */}
 
                 {/* Separador entre clientes */}
                 {customerIndex < customerSummaries.length - 1 && (
@@ -519,21 +725,17 @@ export default function PaymentPage() {
 
             {/* Resumen FINAL de todos los pagos */}
             <div className="border-t border-gray-200 pt-6 space-y-3">
-              <div className="flex justify-between text-gray-600">
-                {/* <span className="font-medium text-lg">Subtotal total:</span>
-                <span className="font-medium text-lg">
-                  {formatCurrency(paymentSummary.subtotal)}
-                </span> */}
+              <div className="flex justify-between text-lg">
+                <span>Subtotal total:</span>
+                <span>{formatCurrency(paymentSummary.subtotal)}</span>
               </div>
-              {/* <div className="flex justify-between text-gray-600">
-                <span className="font-medium text-lg">Impuestos (16%):</span>
-                <span className="font-medium text-lg">
-                  {formatCurrency(paymentSummary.taxAmount)}
-                </span>
-              </div> */}
+              <div className="flex justify-between text-lg">
+                <span>Impuestos (8%):</span>
+                <span>{formatCurrency(paymentSummary.taxAmount)}</span>
+              </div>
               <div className="flex justify-between text-2xl font-bold text-gray-800 border-t border-gray-200 pt-4">
                 <span>TOTAL GENERAL:</span>
-                <span>{formatCurrency(paymentSummary.subtotal)}</span>
+                <span>{formatCurrency(paymentSummary.total)}</span>
               </div>
             </div>
           </div>
@@ -541,25 +743,39 @@ export default function PaymentPage() {
           {/* Footer del Ticket */}
           <div className="bg-gray-50 p-6 text-center text-sm text-gray-500 border-t">
             <p className="font-medium mb-2">¡Gracias por su preferencia!</p>
-            <p>
-              Por favor, espere a que el mesero le traiga la terminal de pago
-            </p>
+            <p>Presione Ya Pagué cuando haya completado el pago</p>
           </div>
         </div>
 
-        {/* Botón de Confirmación de Pago */}
-        <div className="text-center">
+        {/* Botones de Acción */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          {/* Botón para Guardar PDF */}
+          <button
+            onClick={handleGeneratePDF}
+            disabled={generatingPdf}
+            className="flex-1 bg-blue-500 text-white px-6 py-4 rounded-xl hover:bg-blue-600 transition font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generatingPdf ? (
+              <FaSpinner className="text-xl animate-spin" />
+            ) : (
+              <FaFilePdf className="text-xl" />
+            )}
+            {generatingPdf ? "Generando PDF..." : "Guardar Ticket PDF"}
+          </button>
+
+          {/* Botón de Confirmación de Pago */}
           <button
             onClick={handlePaymentConfirmation}
-            className="bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold text-lg flex items-center justify-center gap-3 mx-auto"
+            className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
           >
             <FaCheck className="text-xl" />
             Ya Pagué
           </button>
-          <p className="text-gray-500 text-sm mt-3">
-            Presione este botón cuando haya completado su pago con el mesero
-          </p>
         </div>
+
+        <p className="text-gray-500 text-sm mt-4 text-center">
+          Puede guardar el ticket en PDF antes de confirmar el pago
+        </p>
       </main>
     </div>
   );
