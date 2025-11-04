@@ -244,6 +244,7 @@ export default function WaiterDashboard() {
             onUpdateItemStatus={handleUpdateItemStatus}
             onCobrarMesa={handleCobrarMesa}
             calculateTableTotal={calculateTableTotal}
+            notifications={notifications}
           />
         )}
       </main>

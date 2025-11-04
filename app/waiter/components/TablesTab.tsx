@@ -1,4 +1,4 @@
-import { TableWithOrder } from "@/app/lib/supabase/waiter";
+import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import TableCard from "./TableCard";
 
 interface TablesTabProps {
@@ -7,6 +7,7 @@ interface TablesTabProps {
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
+  notifications: WaiterNotification[]; // Nueva prop
 }
 
 export default function TablesTab({
@@ -15,6 +16,7 @@ export default function TablesTab({
   onUpdateItemStatus,
   onCobrarMesa,
   calculateTableTotal,
+  notifications,
 }: TablesTabProps) {
   const totalGeneral = tables.reduce(
     (sum, table) => sum + calculateTableTotal(table),
@@ -50,6 +52,7 @@ export default function TablesTab({
             onUpdateItemStatus={onUpdateItemStatus}
             onCobrarMesa={onCobrarMesa}
             calculateTableTotal={calculateTableTotal}
+            notifications={notifications}
           />
         ))}
       </div>

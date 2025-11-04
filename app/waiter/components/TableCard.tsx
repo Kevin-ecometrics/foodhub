@@ -1,4 +1,4 @@
-import { TableWithOrder } from "@/app/lib/supabase/waiter";
+import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import CustomerOrderSection from "./CustomerOrderSection";
 import TableHeader from "./TableHeader";
 import TableSummary from "./TableSummary";
@@ -9,6 +9,7 @@ interface TableCardProps {
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
+  notifications: WaiterNotification[];
 }
 
 export default function TableCard({
@@ -17,6 +18,7 @@ export default function TableCard({
   onUpdateItemStatus,
   onCobrarMesa,
   calculateTableTotal,
+  notifications,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
 
@@ -78,6 +80,7 @@ export default function TableCard({
         tableTotal={tableTotal}
         processing={processing}
         onCobrarMesa={onCobrarMesa}
+        notifications={notifications}
       />
 
       {customerSummaries.map((customerSummary) => (

@@ -25,7 +25,11 @@ interface OrderContextType {
     quantity?: number,
     notes?: string
   ) => Promise<void>;
-  updateCartItem: (itemId: string, quantity: number) => Promise<void>;
+  updateCartItem: (
+    itemId: string,
+    quantity: number,
+    notes?: string
+  ) => Promise<void>; // ACTUALIZADO
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => void;
   createNewOrder: (customerName?: string) => Promise<string>; // Retorna orderId
@@ -194,7 +198,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     await setCurrentUserOrder(orderId, userId);
   };
 
-  // Métodos del carrito (sin cambios mayores)
+  // Métodos del carrito - ACTUALIZADO para soportar notas
   const addToCart = async (
     product: Product,
     quantity: number = 1,
@@ -225,18 +229,31 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateCartItem = async (itemId: string, quantity: number) => {
+  // ACTUALIZADO: Ahora acepta parámetro de notas
+  const updateCartItem = async (
+    itemId: string,
+    quantity: number,
+    notes?: string
+  ) => {
     if (quantity < 1) {
       await removeFromCart(itemId);
       return;
     }
 
     try {
-      await orderItemsService.updateItemQuantity(itemId, quantity);
+      await orderItemsService.updateItemQuantity(itemId, quantity, notes);
 
       // Actualizar estado local
       setOrderItems((prev) =>
-        prev.map((item) => (item.id === itemId ? { ...item, quantity } : item))
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                quantity,
+                notes: notes !== undefined ? notes : item.notes, // Mantener notas existentes si no se proporcionan nuevas
+              }
+            : item
+        )
       );
 
       if (currentOrder) {

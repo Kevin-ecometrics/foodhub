@@ -2,24 +2,17 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
-import { Order, ordersService } from "@/app/lib/supabase/orders";
+import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
 import {
   FaSpinner,
   FaCheck,
   FaQrcode,
   FaExclamationTriangle,
-  FaUserPlus,
   FaUser,
-  FaTimes,
 } from "react-icons/fa";
 
-interface Guest {
-  id: string;
-  name: string;
-}
-
-export default function HomePage() {
+export default function CustomerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tables, setTables] = useState<Table[]>([]);
@@ -29,9 +22,6 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [loadingTables, setLoadingTables] = useState(false);
   const [nameError, setNameError] = useState("");
-  const [withGuests, setWithGuests] = useState<boolean>(false);
-  const [guests, setGuests] = useState<Guest[]>([]);
-  const [newGuestName, setNewGuestName] = useState("");
 
   // Obtener número de mesa desde parámetros de URL
   const tableFromParams = searchParams.get("table");
@@ -74,30 +64,6 @@ export default function HomePage() {
     }
   };
 
-  const addGuest = () => {
-    if (!newGuestName.trim()) {
-      alert("Por favor ingresa un nombre para el invitado");
-      return;
-    }
-
-    if (newGuestName.trim().length < 2) {
-      alert("El nombre del invitado debe tener al menos 2 caracteres");
-      return;
-    }
-
-    const newGuest: Guest = {
-      id: Date.now().toString(),
-      name: newGuestName.trim(),
-    };
-
-    setGuests([...guests, newGuest]);
-    setNewGuestName("");
-  };
-
-  const removeGuest = (id: string) => {
-    setGuests(guests.filter((guest) => guest.id !== id));
-  };
-
   const validateForm = () => {
     if (!selectedTable) {
       setError("No se ha especificado una mesa");
@@ -107,11 +73,6 @@ export default function HomePage() {
     const table = tables.find((t) => t.number === selectedTable);
     if (!table) {
       setError("Mesa no encontrada");
-      return false;
-    }
-
-    if (table.status !== "available") {
-      setError("Esta mesa no está disponible");
       return false;
     }
 
@@ -126,27 +87,12 @@ export default function HomePage() {
       return false;
     }
 
-    if (withGuests) {
-      if (guests.length === 0) {
-        setError("Debes agregar al menos un invitado");
-        return false;
-      }
-
-      // Validar nombres de invitados
-      for (const guest of guests) {
-        if (guest.name.length < 2) {
-          setError(`El nombre del invitado "${guest.name}" es muy corto`);
-          return false;
-        }
-      }
-    }
-
     setError("");
     setNameError("");
     return true;
   };
 
-  const handleTableSelect = async () => {
+  const handleRegisterAndRedirect = async () => {
     if (!validateForm()) {
       return;
     }
@@ -160,61 +106,31 @@ export default function HomePage() {
         return;
       }
 
-      // 1. Crear orden principal para el cliente principal
-      const mainOrder = await ordersService.createOrder(
+      // 1. Crear orden para el cliente
+      const order = await ordersService.createOrder(
         table.id,
         customerName.trim()
       );
 
-      // 2. Crear órdenes para los invitados si existen
-      const guestOrders: Order[] = [];
-      if (withGuests && guests.length > 0) {
-        for (const guest of guests) {
-          const guestOrder = await ordersService.createOrder(
-            table.id,
-            guest.name
-          );
-          guestOrders.push(guestOrder);
-        }
+      // 2. Si la mesa está disponible, actualizar estado a "occupied"
+      if (table.status === "available") {
+        await tablesService.updateTableStatus(table.id, "occupied");
       }
 
-      // 3. Actualizar estado de la mesa a "occupied"
-      await tablesService.updateTableStatus(table.id, "occupied");
-
-      // 4. Notificar al mesero
+      // 3. Notificar al mesero sobre nuevo cliente
       await notificationsService.createNotification(
         table.id,
         "new_order",
-        `Nuevos clientes en Mesa ${table.number} - ${customerName.trim()}${
-          guests.length > 0 ? ` + ${guests.length} invitados` : ""
-        }`,
-        mainOrder.id
+        `Nuevo cliente en Mesa ${table.number} - ${customerName.trim()}`,
+        order.id
       );
 
-      // 5. Redirigir a selección de usuario
-      const usersData = [
-        {
-          id: "main",
-          name: customerName.trim(),
-          orderId: mainOrder.id,
-        },
-        ...guests.map((guest) => ({
-          id: guest.id,
-          name: guest.name,
-          orderId:
-            guestOrders.find((g) => g.customer_name === guest.name)?.id || "",
-        })),
-      ];
-
-      // Guardar en sessionStorage para usar en select-user
-      sessionStorage.setItem(
-        `table_${table.id}_users`,
-        JSON.stringify(usersData)
+      // 4. Redirigir DIRECTAMENTE al menú con los parámetros necesarios
+      router.push(
+        `/customer/menu?table=${table.id}&user=${order.id}&order=${order.id}`
       );
-
-      router.push(`/customer/select-user?table=${table.id}`);
     } catch (err) {
-      setError("Error al crear las órdenes");
+      setError("Error al crear la orden");
       console.error(err);
     } finally {
       setLoading(false);
@@ -278,7 +194,6 @@ export default function HomePage() {
     );
   }
 
-  // Vista principal para /customer con parámetro table
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
@@ -307,6 +222,8 @@ export default function HomePage() {
                   className={`text-sm font-medium mt-1 ${
                     selectedTableData.status === "available"
                       ? "text-green-600"
+                      : selectedTableData.status === "occupied"
+                      ? "text-orange-600"
                       : "text-red-600"
                   }`}
                 >
@@ -352,109 +269,14 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Opción de invitados */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            ¿Vienes con invitados?
-          </label>
-          <div className="flex gap-4">
-            <button
-              onClick={() => setWithGuests(false)}
-              className={`flex-1 py-3 rounded-xl border-2 font-medium transition ${
-                !withGuests
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-              }`}
-            >
-              Solo
-            </button>
-            <button
-              onClick={() => setWithGuests(true)}
-              className={`flex-1 py-3 rounded-xl border-2 font-medium transition ${
-                withGuests
-                  ? "bg-green-600 text-white border-green-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-green-400"
-              }`}
-            >
-              Con Invitados
-            </button>
-          </div>
-        </div>
-
-        {/* Formulario para agregar invitados */}
-        {withGuests && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-700">Invitados</h3>
-              <span className="text-sm text-gray-500 bg-white px-2 py-1 rounded">
-                {guests.length} agregados
-              </span>
-            </div>
-
-            {/* Lista de invitados */}
-            {guests.length > 0 && (
-              <div className="mb-4 space-y-2">
-                {guests.map((guest) => (
-                  <div
-                    key={guest.id}
-                    className="flex items-center justify-between bg-white p-3 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-2 flex-col md:flex-row">
-                      <FaUser className="text-gray-400" />
-                      <span>{guest.name}</span>
-                    </div>
-                    <button
-                      onClick={() => removeGuest(guest.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <FaTimes />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Agregar nuevo invitado */}
-            <div className="flex gap-2 md:flex-row flex-col">
-              <input
-                type="text"
-                placeholder="Nombre del invitado"
-                value={newGuestName}
-                onChange={(e) => setNewGuestName(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    addGuest();
-                  }
-                }}
-              />
-              <button
-                onClick={addGuest}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-              >
-                <FaUserPlus className="text-sm" />
-                Agregar
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Botón de continuar */}
         <button
-          onClick={handleTableSelect}
-          disabled={
-            loading ||
-            !customerName.trim() ||
-            (selectedTableData && selectedTableData.status !== "available") ||
-            (withGuests && guests.length === 0)
-          }
+          onClick={handleRegisterAndRedirect}
+          disabled={loading || !customerName.trim() || !selectedTableData}
           className={`
             w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2
             ${
-              customerName.trim() &&
-              !loading &&
-              selectedTableData?.status === "available" &&
-              (!withGuests || guests.length > 0)
+              customerName.trim() && !loading && selectedTableData
                 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }
@@ -463,23 +285,13 @@ export default function HomePage() {
           {loading ? (
             <>
               <FaSpinner className="animate-spin" />
-              Creando órdenes...
+              Creando tu orden...
             </>
           ) : customerName.trim() ? (
-            selectedTableData?.status === "available" ? (
-              withGuests && guests.length === 0 ? (
-                "Agrega al menos un invitado"
-              ) : (
-                <>
-                  <FaCheck />
-                  {withGuests
-                    ? `Continuar con ${guests.length + 1} personas`
-                    : "Continuar al Menú"}
-                </>
-              )
-            ) : (
-              `Mesa ${selectedTable} no disponible`
-            )
+            <>
+              <FaCheck />
+              Continuar al Menú
+            </>
           ) : (
             "Ingresa tu nombre"
           )}
@@ -488,10 +300,7 @@ export default function HomePage() {
         {/* Información adicional */}
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
           <p className="text-sm text-blue-700 text-center">
-            💡{" "}
-            {withGuests
-              ? "Cada persona tendrá su propio menú y orden"
-              : "Podrás agregar más personas después"}
+            💡 Podrás agregar más personas después desde el menú
           </p>
           <p className="text-xs text-blue-600 text-center mt-2">
             * Campo obligatorio: Nombre

@@ -21,6 +21,8 @@ import {
   FaClock,
   FaUser,
   FaUsers,
+  FaEdit,
+  FaStickyNote,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
@@ -101,6 +103,12 @@ export default function MenuPage() {
   const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
 
+  // NUEVOS ESTADOS PARA NOTAS
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [notes, setNotes] = useState("");
+  const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
+
   // Cargar datos iniciales
   useEffect(() => {
     if (tableId && orderId && userId) {
@@ -146,7 +154,7 @@ export default function MenuPage() {
     } catch (error) {
       console.error("Error loading data:", error);
       alert("Error al cargar el menú. Redirigiendo...");
-      router.push("/customer/select-user?table=" + tableId);
+      router.push("/customer");
     } finally {
       setIsLoading(false);
     }
@@ -235,6 +243,60 @@ export default function MenuPage() {
     };
   }, [tableId, currentTableId]);
 
+  // NUEVA FUNCIÓN: Abrir modal para agregar producto con notas
+  const handleAddToCartWithNotes = (product: Product) => {
+    setSelectedProduct(product);
+    setNotes("");
+    setEditingItem(null);
+    setShowNotesModal(true);
+  };
+
+  // NUEVA FUNCIÓN: Abrir modal para editar notas de un item existente
+  const handleEditNotes = (item: OrderItem) => {
+    const product = products.find((p) => p.id === item.product_id);
+    if (product) {
+      setSelectedProduct(product);
+      setNotes(item.notes || "");
+      setEditingItem(item);
+      setShowNotesModal(true);
+    }
+  };
+
+  // NUEVA FUNCIÓN: Confirmar agregar/editar producto con notas
+  const handleConfirmAddWithNotes = async () => {
+    if (!selectedProduct) return;
+
+    setAddingProduct(selectedProduct.id);
+    try {
+      if (editingItem) {
+        // Editar notas de un item existente
+        await updateCartItem(editingItem.id, editingItem.quantity, notes);
+      } else {
+        // Agregar nuevo producto con notas
+        await addToCart(selectedProduct, 1, notes);
+      }
+
+      // Animación de confirmación
+      const button = document.getElementById(`product-${selectedProduct.id}`);
+      if (button) {
+        button.classList.add("bg-green-500");
+        setTimeout(() => {
+          button.classList.remove("bg-green-500");
+        }, 500);
+      }
+
+      setShowNotesModal(false);
+      setSelectedProduct(null);
+      setNotes("");
+      setEditingItem(null);
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    } finally {
+      setAddingProduct(null);
+    }
+  };
+
+  // FUNCIÓN ORIGINAL: Agregar producto sin notas (mantenida para compatibilidad)
   const handleAddToCart = async (product: Product) => {
     setAddingProduct(product.id);
     try {
@@ -255,7 +317,7 @@ export default function MenuPage() {
     }
   };
 
-  // FUNCIÓN CORREGIDA: Enviar orden a cocina (MANTIENE LA LÓGICA ORIGINAL)
+  // FUNCIÓN CORREGIDA: Enviar orden a cocina
   const handleSendOrder = async () => {
     if (!currentOrder || orderItems.length === 0) return;
 
@@ -429,6 +491,11 @@ export default function MenuPage() {
     return item ? item.quantity : 0;
   };
 
+  const getProductNotesInCart = (productId: number) => {
+    const item = orderItems.find((item) => item.product_id === productId);
+    return item ? item.notes : null;
+  };
+
   const renderStarRating = (rating: number) => {
     if (rating === 0) {
       return (
@@ -506,18 +573,6 @@ export default function MenuPage() {
                 {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
               </p>
             </div>
-
-            {/* Selector de usuario - Botón discreto */}
-            {/* <button
-              onClick={() => setShowUserSwitch(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200"
-              title="Cambiar de comensal"
-            >
-              <FaUsers className="text-blue-600 text-sm" />
-              <span className="text-sm font-medium text-blue-700">
-                {tableUsers.length}
-              </span>
-            </button> */}
           </div>
 
           <CartBadge />
@@ -618,6 +673,7 @@ export default function MenuPage() {
           {getProductsByCategory().map((product) => {
             const isInCart = isProductInCart(product.id);
             const currentQuantity = getProductQuantityInCart(product.id);
+            const currentNotes = getProductNotesInCart(product.id);
             const totalRecentQuantity = getProductTotalQuantityInRecentOrders(
               product.id
             );
@@ -713,7 +769,7 @@ export default function MenuPage() {
 
                       <button
                         id={`product-${product.id}`}
-                        onClick={() => handleAddToCart(product)}
+                        onClick={() => handleAddToCartWithNotes(product)}
                         disabled={addingProduct === product.id}
                         className={`px-4 py-2 rounded-full transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 ${
                           isInCart
@@ -748,6 +804,16 @@ export default function MenuPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Mostrar notas si existen */}
+                  {isInCart && currentNotes && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-xs text-yellow-800 flex items-center gap-1">
+                        <FaStickyNote className="text-yellow-600" />
+                        <strong>Nota:</strong> {currentNotes}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -764,6 +830,95 @@ export default function MenuPage() {
             </div>
           )}
       </main>
+
+      {/* MODAL DE NOTAS */}
+      {showNotesModal && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  <FaStickyNote className="text-blue-600" />
+                  {editingItem ? "Editar Notas" : "Agregar al Carrito"}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowNotesModal(false);
+                    setSelectedProduct(null);
+                    setNotes("");
+                    setEditingItem(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-gray-800">
+                  {selectedProduct.name}
+                </h3>
+                <p className="text-lg font-bold text-blue-600">
+                  ${selectedProduct.price.toFixed(2)}
+                </p>
+                {selectedProduct.description && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedProduct.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Notas para la preparación (opcional):
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ej: Sin tomate, extra queso, bien cocido, sin picante, etc."
+                className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                maxLength={200}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {notes.length}/200 caracteres - Estas notas se enviarán a cocina
+              </p>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowNotesModal(false);
+                    setSelectedProduct(null);
+                    setNotes("");
+                    setEditingItem(null);
+                  }}
+                  className="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmAddWithNotes}
+                  disabled={addingProduct === selectedProduct.id}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {addingProduct === selectedProduct.id ? (
+                    <FaSpinner className="animate-spin" />
+                  ) : editingItem ? (
+                    <>
+                      <FaEdit />
+                      Actualizar
+                    </>
+                  ) : (
+                    <>
+                      <FaPlus />
+                      Agregar al Carrito
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE SELECCIÓN DE USUARIO */}
       {showUserSwitch && (
@@ -925,19 +1080,31 @@ export default function MenuPage() {
                   {orderItems.map((item) => (
                     <div
                       key={item.id}
-                      className="p-6 flex items-center gap-4 hover:bg-gray-50 transition"
+                      className="p-6 flex items-center gap-4 hover:bg-gray-50 transition group"
                     >
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800">
-                          {item.product_name}
-                        </h3>
+                        <div className="flex justify-between items-start">
+                          <h3 className="font-semibold text-gray-800">
+                            {item.product_name}
+                          </h3>
+                          <button
+                            onClick={() => handleEditNotes(item)}
+                            className="text-gray-400 hover:text-blue-600 transition opacity-0 group-hover:opacity-100"
+                            title="Editar notas"
+                          >
+                            <FaEdit className="text-sm" />
+                          </button>
+                        </div>
                         <p className="text-lg font-bold text-blue-600">
                           ${item.price.toFixed(2)}
                         </p>
                         {item.notes && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            Nota: {item.notes}
-                          </p>
+                          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                            <p className="text-sm text-yellow-800 flex items-center gap-1">
+                              <FaStickyNote className="text-yellow-600 text-xs" />
+                              <strong>Nota:</strong> {item.notes}
+                            </p>
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-3">

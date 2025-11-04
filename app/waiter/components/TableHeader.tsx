@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { TableWithOrder } from "@/app/lib/supabase/waiter";
-import { FaDollarSign, FaSpinner } from "react-icons/fa";
+import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
+import { FaDollarSign, FaSpinner, FaBell } from "react-icons/fa";
 
 interface TableHeaderProps {
   table: TableWithOrder;
   tableTotal: number;
   processing: string | null;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
+  notifications: WaiterNotification[]; // Ahora es obligatorio
 }
 
 export default function TableHeader({
@@ -14,6 +15,7 @@ export default function TableHeader({
   tableTotal,
   processing,
   onCobrarMesa,
+  notifications = [], // Valor por defecto array vacío
 }: TableHeaderProps) {
   const calculateTotalItems = (table: TableWithOrder) => {
     return table.orders.reduce(
@@ -56,6 +58,13 @@ export default function TableHeader({
     return { pending, ready, served };
   };
 
+  // Verificar si hay notificaciones de "Solicita la cuenta" para esta mesa
+  const hasBillRequest = notifications.some(
+    (notification: any) =>
+      notification.table_id === table.id &&
+      notification.message === "Solicita la cuenta"
+  );
+
   const totalItems = calculateTotalItems(table);
   const statusCounts = calculateItemsByStatus(table);
 
@@ -64,11 +73,11 @@ export default function TableHeader({
       <div className="flex-1">
         <h3 className="font-bold text-lg flex items-center gap-2">
           Mesa {table.number}
-          {tableTotal > 0 && (
+          {/* {tableTotal > 0 && (
             <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
               ${tableTotal.toFixed(2)}
             </span>
-          )}
+          )} */}
         </h3>
 
         <div className="flex flex-wrap gap-1 mt-2">
@@ -87,6 +96,14 @@ export default function TableHeader({
               ? "🟡 Reservada"
               : "⚪ Disponible"}
           </span>
+
+          {/* NUEVO: Tag "Cliente Solicita Cuenta" */}
+          {hasBillRequest && (
+            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded flex items-center gap-1 animate-pulse">
+              <FaBell className="text-xs" />
+              Cliente Solicita Cuenta
+            </span>
+          )}
 
           {totalItems > 0 && (
             <>

@@ -58,17 +58,27 @@ export const orderItemsService = {
     return (data as OrderItem[]) || []
   },
 
-  // Actualizar cantidad de un item
-  async updateItemQuantity(itemId: string, quantity: number): Promise<void> {
-    const { error } = await supabase
+  // ACTUALIZADO: Actualizar cantidad y notas de un item
+  async updateItemQuantity(itemId: string, quantity: number, notes?: string): Promise<OrderItem> {
+    const updateData: any = { 
+      quantity,
+      updated_at: new Date().toISOString()
+    }
+
+    // Solo actualizar notes si se proporciona (puede ser string vacío para eliminar notas)
+    if (notes !== undefined) {
+      updateData.notes = notes || null
+    }
+
+    const { data, error } = await supabase
       .from('order_items')
-      .update({ 
-        quantity,
-        updated_at: new Date().toISOString()
-      } as never)
+      .update(updateData as never)
       .eq('id', itemId)
+      .select()
+      .single()
     
     if (error) throw error
+    return data as OrderItem
   },
 
   // Eliminar item de una orden
@@ -94,5 +104,52 @@ export const orderItemsService = {
     const total = itemsData?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
     
     return total
+  },
+
+  // NUEVO: Actualizar solo las notas de un item (método opcional)
+  async updateItemNotes(itemId: string, notes: string): Promise<OrderItem> {
+    const { data, error } = await supabase
+      .from('order_items')
+      .update({ 
+        notes: notes || null,
+        updated_at: new Date().toISOString()
+      } as never)
+      .eq('id', itemId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data as OrderItem
+  },
+
+  // NUEVO: Obtener items por mesa (útil para el historial)
+  async getItemsByTable(tableId: number): Promise<OrderItem[]> {
+    const { data, error } = await supabase
+      .from('order_items')
+      .select(`
+        *,
+        orders!inner(table_id)
+      `)
+      .eq('orders.table_id', tableId)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return (data as OrderItem[]) || []
+  },
+
+  // NUEVO: Actualizar estado de un item
+  async updateItemStatus(itemId: string, status: OrderItem['status']): Promise<OrderItem> {
+    const { data, error } = await supabase
+      .from('order_items')
+      .update({ 
+        status,
+        updated_at: new Date().toISOString()
+      } as never)
+      .eq('id', itemId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data as OrderItem
   }
 }

@@ -16,7 +16,7 @@ export default function QRSharePage() {
   useEffect(() => {
     if (tableNumber) {
       const baseUrl = "https://foodhub-software.vercel.app";
-      const url = `${baseUrl}/customer/select-user?table=${tableNumber}`;
+      const url = `${baseUrl}/customer?table=${tableNumber}`;
       setCurrentUrl(url);
     }
   }, [tableNumber]);
