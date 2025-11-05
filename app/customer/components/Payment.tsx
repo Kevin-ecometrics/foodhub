@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import axios from "axios";
 import {
   FaArrowLeft,
   FaCheck,
@@ -14,6 +15,9 @@ import {
   FaExclamationTriangle,
   FaUser,
   FaFilePdf,
+  FaFileInvoiceDollar,
+  FaEnvelope,
+  FaTimes,
 } from "react-icons/fa";
 
 interface PaymentSummary {
@@ -32,6 +36,159 @@ interface CustomerOrderSummary {
   itemsCount: number;
 }
 
+interface InvoiceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (email: string) => void;
+  isLoading: boolean;
+}
+
+// Componente Modal para capturar el correo
+const InvoiceModal: React.FC<InvoiceModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading,
+}) => {
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+
+  const validateEmail = (email: string) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email.trim()) {
+      setEmailError("El correo electrónico es requerido");
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setEmailError("Por favor ingresa un correo electrónico válido");
+      return;
+    }
+
+    setEmailError("");
+    onConfirm(email);
+  };
+
+  const handleClose = () => {
+    setEmail("");
+    setEmailError("");
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+        {/* Header del Modal */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <FaFileInvoiceDollar className="text-purple-600 text-lg" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Solicitar Factura
+              </h3>
+              <p className="text-sm text-gray-500">
+                Ingresa tu correo electrónico
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+            disabled={isLoading}
+          >
+            <FaTimes className="text-gray-400 hover:text-gray-600" />
+          </button>
+        </div>
+
+        {/* Contenido del Modal */}
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="mb-4">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Correo Electrónico
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaEnvelope className="text-gray-400" />
+              </div>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError("");
+                }}
+                placeholder="tu@correo.com"
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:border-transparent transition ${
+                  emailError
+                    ? "border-red-300 focus:ring-red-200"
+                    : "border-gray-300 focus:ring-purple-200 focus:border-purple-300"
+                }`}
+                disabled={isLoading}
+              />
+            </div>
+            {emailError && (
+              <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                <FaExclamationTriangle className="text-red-500" />
+                {emailError}
+              </p>
+            )}
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-700">
+              📧 Te enviaremos un correo con los pasos para completar tu
+              facturación y los datos fiscales requeridos.
+            </p>
+          </div>
+
+          {/* Botones del Modal */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={isLoading}
+              className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <FaFileInvoiceDollar />
+                  Solicitar Factura
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +205,8 @@ export default function PaymentPage() {
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
   const [error, setError] = useState("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   // Obtener parámetros de la URL
   useEffect(() => {
@@ -160,7 +319,7 @@ export default function PaymentPage() {
       });
     });
 
-    const taxRate = 0.08; // 16% de impuesto
+    const taxRate = 0.08; // 8% de impuesto
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
 
@@ -421,6 +580,100 @@ export default function PaymentPage() {
     }
   };
 
+  // Función para abrir el modal de facturación
+  const handleOpenInvoiceModal = () => {
+    setIsInvoiceModalOpen(true);
+  };
+
+  // Función para cerrar el modal de facturación
+  const handleCloseInvoiceModal = () => {
+    setIsInvoiceModalOpen(false);
+  };
+
+  // Función para facturar compra y enviar correo usando Axios
+  const handleInvoiceRequest = async (email: string) => {
+    try {
+      setGeneratingInvoice(true);
+
+      // Preparar datos para la facturación
+      const invoiceData = {
+        tableId: tableId || currentTableId,
+        customerEmail: email,
+        customerSummaries: customerSummaries.map((summary) => ({
+          customerName: summary.customerName,
+          subtotal: summary.subtotal,
+          taxAmount: summary.taxAmount,
+          total: summary.total,
+          itemsCount: summary.itemsCount,
+        })),
+        paymentSummary: {
+          subtotal: paymentSummary.subtotal,
+          taxAmount: paymentSummary.taxAmount,
+          total: paymentSummary.total,
+        },
+        orders: allOrders.map((order) => ({
+          id: order.id,
+          customerName: order.customer_name,
+          items: order.order_items.map((item) => ({
+            productName: item.product_name,
+            quantity: item.quantity,
+            price: item.price,
+            notes: item.notes,
+          })),
+        })),
+        timestamp: new Date().toISOString(),
+      };
+
+      // Enviar solicitud al servidor para facturación usando Axios
+      const response = await axios.post(
+        "https://e-commetrics.com/api/invoice",
+        invoiceData,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: 10000, // 10 segundos timeout
+        }
+      );
+
+      if (response.data.success) {
+        alert(
+          "✅ Solicitud de factura enviada correctamente. Recibirá un correo con los pasos para completar la facturación."
+        );
+        handleCloseInvoiceModal();
+      } else {
+        throw new Error(
+          response.data.message || "Error al procesar la factura"
+        );
+      }
+    } catch (error) {
+      console.error("Error solicitando factura:", error);
+
+      // Manejar diferentes tipos de errores de Axios
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          // El servidor respondió con un código de error
+          const errorMessage =
+            error.response.data?.message || "Error del servidor";
+          alert(`❌ Error al solicitar la factura: ${errorMessage}`);
+        } else if (error.request) {
+          // La solicitud fue hecha pero no se recibió respuesta
+          alert("❌ Error de conexión. No se pudo contactar al servidor.");
+        } else {
+          // Algo pasó en la configuración de la solicitud
+          alert("❌ Error en la solicitud de factura.");
+        }
+      } else {
+        // Error no relacionado con Axios
+        alert(
+          "❌ Error al solicitar la factura. Por favor, intente nuevamente o contacte al personal."
+        );
+      }
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  };
+
   // Método de confirmación de pago
   const handlePaymentConfirmation = async () => {
     try {
@@ -568,215 +821,231 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-8">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-lg transition"
-              >
-                <FaArrowLeft className="text-gray-600" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">
-                  Ticket de Pago
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Mesa {tableId || currentTableId}
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-8">
+        {/* Header */}
+        <header className="bg-white shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => router.back()}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <FaArrowLeft className="text-gray-600" />
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">
+                    Ticket de Pago
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    Mesa {tableId || currentTableId}
+                  </p>
+                  <p className="text-sm text-blue-600 font-medium">
+                    {customerSummaries.length} comensal
+                    {customerSummaries.length > 1 ? "es" : ""} •{" "}
+                    {allOrders.length} orden{allOrders.length > 1 ? "es" : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-green-600">
+                  {formatCurrency(paymentSummary.total)}
                 </p>
-                <p className="text-sm text-blue-600 font-medium">
-                  {customerSummaries.length} comensal
-                  {customerSummaries.length > 1 ? "es" : ""} •{" "}
-                  {allOrders.length} orden{allOrders.length > 1 ? "es" : ""}
-                </p>
+                <p className="text-sm text-gray-500">Total a pagar</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(paymentSummary.total)}
+          </div>
+        </header>
+
+        <main className="max-w-4xl mx-auto px-4 py-6">
+          {/* Resumen de todas las órdenes */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+            {/* Header del Ticket */}
+            <div className="bg-gray-800 text-white p-6 text-center">
+              <h3 className="text-2xl font-bold">RESTAURANTE</h3>
+              <p className="text-gray-300 text-sm">
+                Mesa {tableId || currentTableId}
               </p>
-              <p className="text-sm text-gray-500">Total a pagar</p>
             </div>
-          </div>
-        </div>
-      </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* Resumen de todas las órdenes */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
-          {/* Header del Ticket */}
-          <div className="bg-gray-800 text-white p-6 text-center">
-            <h3 className="text-2xl font-bold">RESTAURANTE</h3>
-            <p className="text-gray-300 text-sm">
-              Mesa {tableId || currentTableId}
-            </p>
-          </div>
-
-          {/* Lista de órdenes agrupadas por cliente */}
-          <div className="p-6">
-            {customerSummaries.map((customerSummary, customerIndex) => (
-              <div
-                key={customerSummary.customerName}
-                className="mb-8 last:mb-0"
-              >
-                {/* Header del cliente */}
-                <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-200">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <FaUser className="text-blue-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-800">
-                          {customerSummary.customerName}
-                        </h4>
-                        <p className="text-sm text-gray-500">
-                          {customerSummary.itemsCount} item
-                          {customerSummary.itemsCount > 1 ? "s" : ""}
-                        </p>
+            {/* Lista de órdenes agrupadas por cliente */}
+            <div className="p-6">
+              {customerSummaries.map((customerSummary, customerIndex) => (
+                <div
+                  key={customerSummary.customerName}
+                  className="mb-8 last:mb-0"
+                >
+                  {/* Header del cliente */}
+                  <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-200">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <FaUser className="text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-800">
+                            {customerSummary.customerName}
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            {customerSummary.itemsCount} item
+                            {customerSummary.itemsCount > 1 ? "s" : ""}
+                          </p>
+                        </div>
                       </div>
                     </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-gray-800">
+                        {formatCurrency(customerSummary.total)}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {formatCurrency(customerSummary.subtotal)} + impuestos
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-800">
-                      {formatCurrency(customerSummary.total)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatCurrency(customerSummary.subtotal)} + impuestos
-                    </p>
-                  </div>
-                </div>
 
-                {/* Items de todas las órdenes de este cliente */}
-                <div className="space-y-4 mb-4">
-                  {customerSummary.orders.map((order, orderIndex) => (
-                    <div key={order.id}>
-                      {/* Items de esta orden */}
-                      <div className="space-y-3">
-                        {order.order_items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between items-start py-2 border-b border-gray-100"
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <span className="font-medium text-gray-800">
-                                    {item.product_name}
-                                  </span>
-                                  <div className="text-sm text-gray-500 mt-1">
-                                    Cantidad: {item.quantity}
+                  {/* Items de todas las órdenes de este cliente */}
+                  <div className="space-y-4 mb-4">
+                    {customerSummary.orders.map((order, orderIndex) => (
+                      <div key={order.id}>
+                        {/* Items de esta orden */}
+                        <div className="space-y-3">
+                          {order.order_items.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex justify-between items-start py-2 border-b border-gray-100"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <span className="font-medium text-gray-800">
+                                      {item.product_name}
+                                    </span>
+                                    <div className="text-sm text-gray-500 mt-1">
+                                      Cantidad: {item.quantity}
+                                    </div>
+                                    {item.notes && (
+                                      <p className="text-sm text-gray-500 mt-1">
+                                        Nota: {item.notes}
+                                      </p>
+                                    )}
                                   </div>
-                                  {item.notes && (
-                                    <p className="text-sm text-gray-500 mt-1">
-                                      Nota: {item.notes}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="text-right">
-                                  <div className="font-medium text-gray-800">
-                                    {formatCurrency(item.price * item.quantity)}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {formatCurrency(item.price)} c/u
+                                  <div className="text-right">
+                                    <div className="font-medium text-gray-800">
+                                      {formatCurrency(
+                                        item.price * item.quantity
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                      {formatCurrency(item.price)} c/u
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+
+                        {/* Separador entre órdenes del mismo cliente */}
+                        {orderIndex < customerSummary.orders.length - 1 && (
+                          <div className="border-t border-gray-200 my-4"></div>
+                        )}
                       </div>
-
-                      {/* Separador entre órdenes del mismo cliente */}
-                      {orderIndex < customerSummary.orders.length - 1 && (
-                        <div className="border-t border-gray-200 my-4"></div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Resumen del cliente */}
-                {/* <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal:</span>
-                      <span>{formatCurrency(customerSummary.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Impuestos (8%):</span>
-                      <span>{formatCurrency(customerSummary.taxAmount)}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
-                      <span>Total {customerSummary.customerName}:</span>
-                      <span>{formatCurrency(customerSummary.total)}</span>
-                    </div>
+                    ))}
                   </div>
-                </div> */}
 
-                {/* Separador entre clientes */}
-                {customerIndex < customerSummaries.length - 1 && (
-                  <div className="border-t border-gray-300 my-6"></div>
-                )}
-              </div>
-            ))}
+                  {/* Separador entre clientes */}
+                  {customerIndex < customerSummaries.length - 1 && (
+                    <div className="border-t border-gray-300 my-6"></div>
+                  )}
+                </div>
+              ))}
 
-            {/* Resumen FINAL de todos los pagos */}
-            <div className="border-t border-gray-200 pt-6 space-y-3">
-              <div className="flex justify-between text-lg">
-                <span>Subtotal total:</span>
-                <span>{formatCurrency(paymentSummary.subtotal)}</span>
+              {/* Resumen FINAL de todos los pagos */}
+              <div className="border-t border-gray-200 pt-6 space-y-3">
+                <div className="flex justify-between text-lg">
+                  <span>Subtotal total:</span>
+                  <span>{formatCurrency(paymentSummary.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-lg">
+                  <span>Impuestos (8%):</span>
+                  <span>{formatCurrency(paymentSummary.taxAmount)}</span>
+                </div>
+                <div className="flex justify-between text-2xl font-bold text-gray-800 border-t border-gray-200 pt-4">
+                  <span>TOTAL GENERAL:</span>
+                  <span>{formatCurrency(paymentSummary.total)}</span>
+                </div>
               </div>
-              <div className="flex justify-between text-lg">
-                <span>Impuestos (8%):</span>
-                <span>{formatCurrency(paymentSummary.taxAmount)}</span>
-              </div>
-              <div className="flex justify-between text-2xl font-bold text-gray-800 border-t border-gray-200 pt-4">
-                <span>TOTAL GENERAL:</span>
-                <span>{formatCurrency(paymentSummary.total)}</span>
-              </div>
+            </div>
+
+            {/* Footer del Ticket */}
+            <div className="bg-gray-50 p-6 text-center text-sm text-gray-500 border-t">
+              <p className="font-medium mb-2">¡Gracias por su preferencia!</p>
+              <p>Presione Ya Pagué cuando haya completado el pago</p>
             </div>
           </div>
 
-          {/* Footer del Ticket */}
-          <div className="bg-gray-50 p-6 text-center text-sm text-gray-500 border-t">
-            <p className="font-medium mb-2">¡Gracias por su preferencia!</p>
-            <p>Presione Ya Pagué cuando haya completado el pago</p>
+          {/* Botones de Acción */}
+          <div className="flex flex-col gap-4">
+            {/* Primera fila de botones */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              {/* Botón para Guardar PDF */}
+              <button
+                onClick={handleGeneratePDF}
+                disabled={generatingPdf}
+                className="flex-1 bg-blue-500 text-white px-6 py-4 rounded-xl hover:bg-blue-600 transition font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generatingPdf ? (
+                  <FaSpinner className="text-xl animate-spin" />
+                ) : (
+                  <FaFilePdf className="text-xl" />
+                )}
+                {generatingPdf ? "Generando PDF..." : "Guardar Ticket PDF"}
+              </button>
+
+              {/* Botón de Confirmación de Pago */}
+              <button
+                onClick={handlePaymentConfirmation}
+                className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
+              >
+                <FaCheck className="text-xl" />
+                Ya Pagué
+              </button>
+            </div>
+
+            {/* Segundo botón para Facturar Compra */}
+            <div className="flex justify-center">
+              <button
+                onClick={handleOpenInvoiceModal}
+                disabled={generatingInvoice}
+                className="flex-1 max-w-2xl bg-purple-500 text-white px-6 py-4 rounded-xl hover:bg-purple-600 transition font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generatingInvoice ? (
+                  <FaSpinner className="text-xl animate-spin" />
+                ) : (
+                  <FaFileInvoiceDollar className="text-xl" />
+                )}
+                {generatingInvoice
+                  ? "Procesando Factura..."
+                  : "Facturar Compra"}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Botones de Acción */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          {/* Botón para Guardar PDF */}
-          <button
-            onClick={handleGeneratePDF}
-            disabled={generatingPdf}
-            className="flex-1 bg-blue-500 text-white px-6 py-4 rounded-xl hover:bg-blue-600 transition font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {generatingPdf ? (
-              <FaSpinner className="text-xl animate-spin" />
-            ) : (
-              <FaFilePdf className="text-xl" />
-            )}
-            {generatingPdf ? "Generando PDF..." : "Guardar Ticket PDF"}
-          </button>
+          <p className="text-gray-500 text-sm mt-4 text-center">
+            Puede guardar el ticket en PDF o solicitar factura antes de
+            confirmar el pago
+          </p>
+        </main>
+      </div>
 
-          {/* Botón de Confirmación de Pago */}
-          <button
-            onClick={handlePaymentConfirmation}
-            className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
-          >
-            <FaCheck className="text-xl" />
-            Ya Pagué
-          </button>
-        </div>
-
-        <p className="text-gray-500 text-sm mt-4 text-center">
-          Puede guardar el ticket en PDF antes de confirmar el pago
-        </p>
-      </main>
-    </div>
+      {/* Modal para facturación */}
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={handleCloseInvoiceModal}
+        onConfirm={handleInvoiceRequest}
+        isLoading={generatingInvoice}
+      />
+    </>
   );
 }
