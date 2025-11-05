@@ -52,13 +52,15 @@ export default function OrderItem({
   };
 
   // Función para manejar el click en el botón
-  const handleStatusClick = () => {
-    if (item.status === "served") return; // No hacer nada si ya está servido
+  const handleStatusClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevenir comportamiento por defecto
+    e.stopPropagation(); // Prevenir propagación
+
+    if (item.status === "served") return;
 
     const nextStatus = getNextStatus(item.status);
     onUpdateStatus(item.id, nextStatus);
   };
-
   return (
     <div className="flex justify-between items-start text-sm bg-gray-50 p-3 rounded-lg border">
       <div className="flex-1">

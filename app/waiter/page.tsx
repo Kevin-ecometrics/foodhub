@@ -49,8 +49,14 @@ export default function WaiterDashboard() {
         waiterService.getTablesWithOrders(),
       ]);
 
-      setNotifications(notifsData);
-      setTables(tablesData);
+      // Actualizar estados solo si los datos realmente cambiaron
+      setNotifications((prev) =>
+        JSON.stringify(prev) === JSON.stringify(notifsData) ? prev : notifsData
+      );
+
+      setTables((prev) =>
+        JSON.stringify(prev) === JSON.stringify(tablesData) ? prev : tablesData
+      );
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -158,10 +164,28 @@ export default function WaiterDashboard() {
   const handleUpdateItemStatus = async (itemId: string, newStatus: string) => {
     setProcessing(itemId);
     try {
+      // Actualizar solo el item específico en lugar de recargar todo
       await waiterService.updateItemStatus(itemId, newStatus as never);
-      await loadData();
+
+      // En lugar de loadData(), actualizar solo el estado local
+      setTables((prevTables) =>
+        prevTables.map((table) => ({
+          ...table,
+          orders: table.orders.map(
+            (order) =>
+              ({
+                ...order,
+                order_items: order.order_items.map((item) =>
+                  item.id === itemId ? { ...item, status: newStatus } : item
+                ),
+              } as never)
+          ),
+        }))
+      );
     } catch (error) {
       console.error("Error updating item status:", error);
+      // Si hay error, entonces sí recargar todo
+      await loadData();
     } finally {
       setProcessing(null);
     }
