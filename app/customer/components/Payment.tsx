@@ -1002,19 +1002,6 @@ export default function PaymentPage() {
                 )}
                 {generatingPdf ? "Generando PDF..." : "Guardar Ticket PDF"}
               </button>
-
-              {/* Botón de Confirmación de Pago */}
-              <button
-                onClick={handlePaymentConfirmation}
-                className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
-              >
-                <FaCheck className="text-xl" />
-                Ya Pagué
-              </button>
-            </div>
-
-            {/* Segundo botón para Facturar Compra */}
-            <div className="flex justify-center">
               <button
                 onClick={handleOpenInvoiceModal}
                 disabled={generatingInvoice}
@@ -1028,6 +1015,14 @@ export default function PaymentPage() {
                 {generatingInvoice
                   ? "Procesando Factura..."
                   : "Facturar Compra"}
+              </button>
+              {/* Botón de Confirmación de Pago */}
+              <button
+                onClick={handlePaymentConfirmation}
+                className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
+              >
+                <FaCheck className="text-xl" />
+                Ya Pagué
               </button>
             </div>
           </div>
