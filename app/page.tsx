@@ -59,7 +59,7 @@ export default function HomePage() {
           </div>
 
           {/* Información Adicional */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          {/* <div className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-semibold text-gray-800 mb-3">
               Horarios de Atención
             </h3>
@@ -67,7 +67,7 @@ export default function HomePage() {
               <p>🏪 Lunes a Viernes: 8:00 AM - 10:00 PM</p>
               <p>🏪 Sábados y Domingos: 9:00 AM - 11:00 PM</p>
             </div>
-          </div>
+          </div> */}
         </div>
       </main>
 
@@ -75,7 +75,8 @@ export default function HomePage() {
       <footer className="bg-white border-t py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-600">
-            © 2024 FoodHub Restaurant. Todos los derechos reservados.
+            © {new Date().getFullYear()} FoodHub Restaurant. Todos los derechos
+            reservados.
           </p>
           <p className="text-gray-500 text-sm mt-2">
             Desarrollado con ❤️ para tu experiencia gastronómica
