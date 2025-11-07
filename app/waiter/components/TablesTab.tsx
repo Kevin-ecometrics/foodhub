@@ -7,7 +7,7 @@ interface TablesTabProps {
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
-  notifications: WaiterNotification[]; // Nueva prop
+  notifications: WaiterNotification[];
 }
 
 export default function TablesTab({

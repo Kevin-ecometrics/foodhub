@@ -28,35 +28,36 @@ export default function WaiterDashboard() {
   >(new Set());
 
   useEffect(() => {
+    console.log("🎯 WaiterDashboard: Iniciando con Realtime puro");
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000);
-
     return () => {
       unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      console.log("📥 Cargando datos...");
+
       const [notifsData, tablesData] = await Promise.all([
         waiterService.getPendingNotifications(),
         waiterService.getTablesWithOrders(),
       ]);
 
-      // Actualizar estados solo si los datos realmente cambiaron
-      setNotifications((prev) =>
-        JSON.stringify(prev) === JSON.stringify(notifsData) ? prev : notifsData
-      );
+      console.log("✅ Datos cargados:", {
+        notificaciones: notifsData.length,
+        mesas: tablesData.length,
+        ordenes: tablesData.reduce(
+          (total, table) => total + table.orders.length,
+          0
+        ),
+      });
 
-      setTables((prev) =>
-        JSON.stringify(prev) === JSON.stringify(tablesData) ? prev : tablesData
-      );
+      setNotifications(notifsData);
+      setTables(tablesData);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -65,8 +66,11 @@ export default function WaiterDashboard() {
   };
 
   const setupRealtimeSubscription = () => {
+    console.log("🔔 Configurando suscripciones Realtime...");
+
+    // Suscripción para NOTIFICACIONES
     const notificationsSub = supabase
-      .channel("waiter-notifications")
+      .channel("waiter-notifications-realtime")
       .on(
         "postgres_changes",
         {
@@ -74,14 +78,22 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "waiter_notifications",
         },
-        () => {
-          loadData();
+        (payload) => {
+          console.log(
+            "🔔 EVENTO Realtime - Notificación:",
+            payload.eventType,
+            payload.new
+          );
+          loadData(); // Recargar cuando haya cambios en notificaciones
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Notificaciones - Estado:", status);
+      });
 
+    // Suscripción para ÓRDENES (CRÍTICO)
     const ordersSub = supabase
-      .channel("waiter-orders")
+      .channel("waiter-orders-realtime")
       .on(
         "postgres_changes",
         {
@@ -89,14 +101,22 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "orders",
         },
-        () => {
-          loadData();
+        (payload) => {
+          console.log(
+            "🔔 EVENTO Realtime - Orden:",
+            payload.eventType,
+            payload.new
+          );
+          loadData(); // Recargar cuando haya nuevas órdenes o cambios
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Órdenes - Estado:", status);
+      });
 
+    // Suscripción para ITEMS DE ORDEN
     const orderItemsSub = supabase
-      .channel("waiter-order-items")
+      .channel("waiter-order-items-realtime")
       .on(
         "postgres_changes",
         {
@@ -104,14 +124,24 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "order_items",
         },
-        () => {
-          loadData();
+        (payload) => {
+          console.log("🔔 EVENTO Realtime - Order Item:", payload.eventType);
+          // Para items, podemos actualizar de forma más granular
+          if (
+            payload.eventType === "INSERT" ||
+            payload.eventType === "DELETE"
+          ) {
+            loadData(); // Recargar si se agregan o eliminan items
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Order Items - Estado:", status);
+      });
 
+    // Suscripción para MESAS
     const tablesSub = supabase
-      .channel("waiter-tables")
+      .channel("waiter-tables-realtime")
       .on(
         "postgres_changes",
         {
@@ -119,13 +149,17 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "tables",
         },
-        () => {
-          loadData();
+        (payload) => {
+          console.log("🔔 EVENTO Realtime - Mesa:", payload.eventType);
+          loadData(); // Recargar cuando cambie el estado de las mesas
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Mesas - Estado:", status);
+      });
 
     return () => {
+      console.log("🧹 Limpiando suscripciones Realtime");
       notificationsSub.unsubscribe();
       ordersSub.unsubscribe();
       orderItemsSub.unsubscribe();
@@ -148,12 +182,7 @@ export default function WaiterDashboard() {
     setProcessing(notificationId);
     try {
       await waiterService.completeNotification(notificationId);
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-      setAttendedNotifications((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(notificationId);
-        return newSet;
-      });
+      // No necesitamos actualizar manualmente - Realtime lo hará
     } catch (error) {
       console.error("Error completing notification:", error);
     } finally {
@@ -164,28 +193,10 @@ export default function WaiterDashboard() {
   const handleUpdateItemStatus = async (itemId: string, newStatus: string) => {
     setProcessing(itemId);
     try {
-      // Actualizar solo el item específico en lugar de recargar todo
       await waiterService.updateItemStatus(itemId, newStatus as never);
-
-      // En lugar de loadData(), actualizar solo el estado local
-      setTables((prevTables) =>
-        prevTables.map((table) => ({
-          ...table,
-          orders: table.orders.map(
-            (order) =>
-              ({
-                ...order,
-                order_items: order.order_items.map((item) =>
-                  item.id === itemId ? { ...item, status: newStatus } : item
-                ),
-              } as never)
-          ),
-        }))
-      );
+      // No necesitamos actualizar manualmente - Realtime lo hará
     } catch (error) {
       console.error("Error updating item status:", error);
-      // Si hay error, entonces sí recargar todo
-      await loadData();
     } finally {
       setProcessing(null);
     }
@@ -195,14 +206,12 @@ export default function WaiterDashboard() {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
-    // Buscar notificación de cuenta para esta mesa
     const billNotification = notifications.find(
       (notification) =>
         notification.table_id === tableId &&
         notification.type === "bill_request"
     );
 
-    // Obtener el método de pago de la notificación (si existe)
     const paymentMethod = billNotification?.payment_method || null;
 
     let paymentMethodText = "";
@@ -230,7 +239,6 @@ export default function WaiterDashboard() {
         `💵 Iniciando cobro para mesa ${tableNumber}, método: ${paymentMethod}`
       );
 
-      // PASA EL MÉTODO DE PAGO A LA FUNCIÓN
       await waiterService.freeTableAndClean(
         tableId,
         tableNumber,
@@ -249,7 +257,7 @@ export default function WaiterDashboard() {
 
       alert(successMessage);
 
-      await loadData();
+      // No necesitamos loadData() - Reactualizará automáticamente via Realtime
     } catch (error: any) {
       console.error("Error cobrando mesa:", error);
       alert(`❌ Error al cobrar la mesa ${tableNumber}:\n${error.message}`);
