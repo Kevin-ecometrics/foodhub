@@ -9,7 +9,6 @@ import {
   FaArrowLeft,
   FaCheck,
   FaReceipt,
-  FaUtensils,
   FaClock,
   FaSpinner,
   FaExclamationTriangle,
@@ -196,11 +195,11 @@ export default function PaymentPage() {
   const userId = searchParams.get("user");
   const orderId = searchParams.get("order");
 
-  const { currentOrder, orderItems, currentTableId, refreshOrder } = useOrder();
+  const { currentTableId, notificationState, createBillNotification } =
+    useOrder();
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [countdown, setCountdown] = useState(5);
-  const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
   const [error, setError] = useState("");
@@ -208,12 +207,7 @@ export default function PaymentPage() {
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
-  // Obtener parámetros de la URL
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Cargar todas las órdenes pendientes de pago
+  // Cargar órdenes pendientes de pago
   useEffect(() => {
     const loadAllOrders = async () => {
       const targetTableId = tableId || currentTableId;
@@ -223,32 +217,15 @@ export default function PaymentPage() {
         setLoading(true);
         setError("");
 
-        // Obtener todas las órdenes de la mesa (activas + enviadas)
         const orders = await historyService.getCustomerOrderHistory(
           parseInt(targetTableId.toString())
         );
 
-        // Filtrar solo órdenes pendientes de pago (active + sent)
         const pendingOrders = orders.filter(
           (order) => order.status === "active" || order.status === "sent"
         );
 
         setAllOrders(pendingOrders);
-
-        console.log("📊 Órdenes para pago:", {
-          total: orders.length,
-          pending: pendingOrders.length,
-          orders: pendingOrders.map((o) => ({
-            id: o.id.slice(-8),
-            customer: o.customer_name,
-            status: o.status,
-            items: o.order_items.length,
-            total: o.order_items.reduce(
-              (sum, item) => sum + item.price * item.quantity,
-              0
-            ),
-          })),
-        });
 
         if (pendingOrders.length === 0) {
           setError("No hay órdenes pendientes de pago");
@@ -261,7 +238,7 @@ export default function PaymentPage() {
       }
     };
 
-    if (tableId !== null) {
+    if (tableId !== null || currentTableId) {
       loadAllOrders();
     }
   }, [tableId, currentTableId]);
@@ -287,7 +264,6 @@ export default function PaymentPage() {
       const customerSummary = customerMap.get(customerName)!;
       customerSummary.orders.push(order);
 
-      // Calcular subtotal de esta orden
       const orderSubtotal = order.order_items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
@@ -297,7 +273,6 @@ export default function PaymentPage() {
       customerSummary.itemsCount += order.order_items.length;
     });
 
-    // Calcular impuestos y totales para cada cliente
     const taxRate = 0.08;
     customerMap.forEach((customerSummary) => {
       customerSummary.taxAmount = customerSummary.subtotal * taxRate;
@@ -312,14 +287,13 @@ export default function PaymentPage() {
   const calculateTotalPaymentSummary = (): PaymentSummary => {
     let subtotal = 0;
 
-    // Sumar todos los items de todas las órdenes pendientes
     allOrders.forEach((order) => {
       order.order_items.forEach((item) => {
         subtotal += item.price * item.quantity;
       });
     });
 
-    const taxRate = 0.08; // 8% de impuesto
+    const taxRate = 0.08;
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
 
@@ -351,7 +325,6 @@ export default function PaymentPage() {
     try {
       setGeneratingPdf(true);
 
-      // Crear contenido HTML para el PDF
       const pdfContent = `
         <!DOCTYPE html>
         <html>
@@ -561,13 +534,10 @@ export default function PaymentPage() {
         </html>
       `;
 
-      // Abrir una nueva ventana con el contenido del PDF
       const printWindow = window.open("", "_blank");
       if (printWindow) {
         printWindow.document.write(pdfContent);
         printWindow.document.close();
-
-        // Esperar a que se cargue el contenido antes de imprimir
         printWindow.onload = () => {
           printWindow.print();
         };
@@ -595,7 +565,6 @@ export default function PaymentPage() {
     try {
       setGeneratingInvoice(true);
 
-      // Preparar datos para la facturación
       const invoiceData = {
         tableId: tableId || currentTableId,
         customerEmail: email,
@@ -624,7 +593,6 @@ export default function PaymentPage() {
         timestamp: new Date().toISOString(),
       };
 
-      // Enviar solicitud al servidor para facturación usando Axios
       const response = await axios.post(
         "https://e-commetrics.com/api/invoice",
         invoiceData,
@@ -632,7 +600,7 @@ export default function PaymentPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          timeout: 10000, // 10 segundos timeout
+          timeout: 10000,
         }
       );
 
@@ -648,23 +616,17 @@ export default function PaymentPage() {
       }
     } catch (error) {
       console.error("Error solicitando factura:", error);
-
-      // Manejar diferentes tipos de errores de Axios
       if (axios.isAxiosError(error)) {
         if (error.response) {
-          // El servidor respondió con un código de error
           const errorMessage =
             error.response.data?.message || "Error del servidor";
           alert(`❌ Error al solicitar la factura: ${errorMessage}`);
         } else if (error.request) {
-          // La solicitud fue hecha pero no se recibió respuesta
           alert("❌ Error de conexión. No se pudo contactar al servidor.");
         } else {
-          // Algo pasó en la configuración de la solicitud
           alert("❌ Error en la solicitud de factura.");
         }
       } else {
-        // Error no relacionado con Axios
         alert(
           "❌ Error al solicitar la factura. Por favor, intente nuevamente o contacte al personal."
         );
@@ -674,14 +636,14 @@ export default function PaymentPage() {
     }
   };
 
-  // Método de confirmación de pago
+  // Método de confirmación de pago SIMPLIFICADO usando el Context
   const handlePaymentConfirmation = async () => {
     try {
-      // Confirmar el pago visualmente
+      // Confirmar el pago visualmente (solo redirección)
       setPaymentConfirmed(true);
 
       console.log("✅ Pago confirmado:", {
-        tableId,
+        tableId: tableId || currentTableId,
         total: paymentSummary.total,
         customers: customerSummaries.map((c) => c.customerName),
       });
@@ -708,8 +670,47 @@ export default function PaymentPage() {
     return statusMap[status] || status;
   };
 
+  // Renderizado condicional del botón SIMPLIFICADO usando el Context
+  const renderPaymentButton = () => {
+    const { checkingNotification, hasPendingBill } = notificationState;
+
+    if (checkingNotification) {
+      return (
+        <button
+          disabled
+          className="flex-1 bg-gray-400 text-white px-8 py-4 rounded-xl font-semibold flex items-center justify-center gap-3 cursor-not-allowed"
+        >
+          <FaSpinner className="text-xl animate-spin" />
+          Verificando...
+        </button>
+      );
+    }
+
+    if (hasPendingBill) {
+      return (
+        <button
+          disabled
+          className="flex-1 bg-yellow-500 text-white px-8 py-4 rounded-xl font-semibold flex items-center justify-center gap-3 cursor-not-allowed"
+        >
+          <FaClock className="text-xl" />
+          Tu ticket está en proceso
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={handlePaymentConfirmation}
+        className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
+      >
+        <FaCheck className="text-xl" />
+        Ya Pagué
+      </button>
+    );
+  };
+
   // Mostrar loading mientras se obtiene el tableId
-  if (!isClient || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -1016,16 +1017,23 @@ export default function PaymentPage() {
                   ? "Procesando Factura..."
                   : "Facturar Compra"}
               </button>
-              {/* Botón de Confirmación de Pago */}
-              <button
-                onClick={handlePaymentConfirmation}
-                className="flex-1 bg-green-500 text-white px-8 py-4 rounded-xl hover:bg-green-600 transition font-semibold flex items-center justify-center gap-3"
-              >
-                <FaCheck className="text-xl" />
-                Ya Pagué
-              </button>
+              {/* Botón de Confirmación de Pago desde el Context */}
+              {renderPaymentButton()}
             </div>
           </div>
+
+          {/* Mensaje informativo cuando hay notificación */}
+          {notificationState.hasPendingBill && (
+            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-yellow-800">
+                <FaClock className="text-yellow-600" />
+                <p className="text-sm font-medium">
+                  Hemos recibido tu solicitud de pago. El mesero está en camino
+                  con tu ticket.
+                </p>
+              </div>
+            </div>
+          )}
 
           <p className="text-gray-500 text-sm mt-4 text-center">
             Puede guardar el ticket en PDF o solicitar factura antes de

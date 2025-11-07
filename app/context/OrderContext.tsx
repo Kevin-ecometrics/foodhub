@@ -1,3 +1,4 @@
+// app/context/OrderContext.tsx
 "use client";
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Order } from "@/app/lib/supabase/orders";
@@ -6,6 +7,13 @@ import { ordersService } from "@/app/lib/supabase/orders";
 import { orderItemsService } from "@/app/lib/supabase/order-items";
 import { supabase } from "@/app/lib/supabase/client";
 import { Product } from "@/app/lib/supabase/products";
+
+// Nueva interfaz para el estado de notificaciones
+interface NotificationState {
+  billNotification: never | null;
+  checkingNotification: boolean;
+  hasPendingBill: boolean;
+}
 
 interface OrderContextType {
   // Estado actual
@@ -16,6 +24,9 @@ interface OrderContextType {
   loading: boolean;
   currentTableId: number | null;
   currentUserId: string | null;
+
+  // Estado de notificaciones
+  notificationState: NotificationState;
 
   // Métodos principales
   refreshOrder: (tableId: number, orderId?: string) => Promise<void>;
@@ -29,10 +40,14 @@ interface OrderContextType {
     itemId: string,
     quantity: number,
     notes?: string
-  ) => Promise<void>; // ACTUALIZADO
+  ) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => void;
-  createNewOrder: (customerName?: string) => Promise<string>; // Retorna orderId
+  createNewOrder: (customerName?: string) => Promise<string>;
+
+  // Métodos para notificaciones
+  checkBillNotification: () => Promise<void>;
+  createBillNotification: () => Promise<boolean>;
 
   // Métodos para múltiples usuarios
   getRecentOrdersItems: (tableId: number) => Promise<OrderItem[]>;
@@ -51,6 +66,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [currentTableId, setCurrentTableId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  // Nuevo estado para notificaciones
+  const [notificationState, setNotificationState] = useState<NotificationState>(
+    {
+      billNotification: null,
+      checkingNotification: true,
+      hasPendingBill: false,
+    }
+  );
+
   const cartTotal = orderItems.reduce(
     (total, item) => total + item.price * item.quantity,
     0
@@ -59,6 +83,169 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     (count, item) => count + item.quantity,
     0
   );
+
+  // Función para verificar notificación de cuenta
+  const checkBillNotification = async () => {
+    try {
+      if (!currentTableId) return;
+
+      console.log(
+        "🔍 Context: Verificando notificación para mesa:",
+        currentTableId
+      );
+
+      const { data, error } = await supabase
+        .from("waiter_notifications")
+        .select("*")
+        .eq("table_id", currentTableId)
+        .eq("type", "bill_request")
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        console.error("Error checking bill notification:", error);
+      }
+
+      const hasNotification = !!data;
+
+      setNotificationState((prev) => ({
+        ...prev,
+        billNotification: data,
+        hasPendingBill: hasNotification,
+        checkingNotification: false,
+      }));
+
+      console.log(
+        "🔍 Context: Estado notificación:",
+        hasNotification ? "PENDIENTE" : "LIBRE"
+      );
+    } catch (error) {
+      console.error("Error checking bill notification:", error);
+      setNotificationState((prev) => ({
+        ...prev,
+        billNotification: null,
+        hasPendingBill: false,
+        checkingNotification: false,
+      }));
+    }
+  };
+
+  // Función para crear notificación de cuenta
+  const createBillNotification = async (): Promise<boolean> => {
+    try {
+      if (!currentTableId || !currentOrder) return false;
+
+      const notificationData = {
+        table_id: currentTableId,
+        order_id: currentOrder.id,
+        type: "bill_request",
+        message: "Solicita la cuenta - Pago con terminal",
+        payment_method: "terminal",
+      };
+
+      const { data, error } = await supabase
+        .from("waiter_notifications")
+        .insert([notificationData] as never)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating bill notification:", error);
+        return false;
+      }
+
+      setNotificationState((prev) => ({
+        ...prev,
+        billNotification: data,
+        hasPendingBill: true,
+      }));
+
+      console.log("✅ Context: Notificación creada exitosamente");
+      return true;
+    } catch (error) {
+      console.error("Error creating bill notification:", error);
+      return false;
+    }
+  };
+
+  // Suscripción a cambios en notificaciones
+  useEffect(() => {
+    if (!currentTableId) return;
+
+    console.log(
+      "🎯 Context: Iniciando monitoreo de notificaciones para mesa:",
+      currentTableId
+    );
+
+    // Verificación inicial
+    checkBillNotification();
+
+    // Polling cada 3 segundos
+    const interval = setInterval(() => {
+      checkBillNotification();
+    }, 3000);
+
+    // Intentar suscripción realtime
+    try {
+      const subscription = supabase
+        .channel(`table-${currentTableId}-notifications`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "waiter_notifications",
+            filter: `table_id=eq.${currentTableId}`,
+          },
+          (payload) => {
+            console.log(
+              "⚡ Context: Cambio en notificación:",
+              payload.eventType
+            );
+
+            const newData = payload.new as { type?: string; status?: string };
+            if (newData?.type === "bill_request") {
+              if (
+                payload.eventType === "INSERT" ||
+                payload.eventType === "UPDATE"
+              ) {
+                setNotificationState(
+                  (prev) =>
+                    ({
+                      ...prev,
+                      billNotification:
+                        payload.new.status === "pending" ? payload.new : null,
+                      hasPendingBill: payload.new.status === "pending",
+                    } as never)
+                );
+              }
+            } else if (
+              payload.eventType === "DELETE" &&
+              payload.old?.type === "bill_request"
+            ) {
+              setNotificationState((prev) => ({
+                ...prev,
+                billNotification: null,
+                hasPendingBill: false,
+              }));
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            console.log("✅ Context: Suscripción realtime activa");
+          }
+        });
+
+      return () => {
+        subscription.unsubscribe();
+        clearInterval(interval);
+      };
+    } catch (error) {
+      console.log("⚠️ Context: Usando polling para notificaciones");
+      return () => clearInterval(interval);
+    }
+  }, [currentTableId]);
 
   // Suscripción a cambios en tiempo real de la orden actual
   const subscribeToOrderUpdates = (orderId: string) => {
@@ -91,7 +278,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const items = await orderItemsService.getOrderItems(orderId);
       setOrderItems(items);
 
-      // Actualizar total de la orden
       if (currentOrder) {
         const newTotal = items.reduce(
           (sum, item) => sum + item.price * item.quantity,
@@ -107,39 +293,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Error refreshing order items:", error);
-    }
-  };
-
-  // NUEVO: Cambiar a una orden de usuario específico
-  const setCurrentUserOrder = async (orderId: string, userId: string) => {
-    setLoading(true);
-    try {
-      const order = await ordersService.getOrder(orderId);
-      if (!order) {
-        throw new Error("Orden no encontrada");
-      }
-
-      setCurrentOrder(order);
-      setCurrentUserId(userId);
-      setCurrentTableId(order.table_id);
-
-      // Cargar items de la orden
-      const items = await orderItemsService.getOrderItems(orderId);
-      setOrderItems(items);
-
-      // Suscribirse a cambios
-      subscribeToOrderUpdates(orderId);
-
-      console.log("✅ Orden de usuario cargada:", {
-        userId,
-        orderId,
-        itemsCount: items.length,
-      });
-    } catch (error) {
-      console.error("Error setting user order:", error);
-      throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -182,12 +335,51 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
         // Suscribirse a cambios
         subscribeToOrderUpdates(order.id);
+
+        // Verificar notificación después de cargar la orden
+        await checkBillNotification();
       } else {
         setCurrentOrder(null);
         setOrderItems([]);
       }
     } catch (error) {
       console.error("Error refreshing order:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // NUEVO: Cambiar a una orden de usuario específico
+  const setCurrentUserOrder = async (orderId: string, userId: string) => {
+    setLoading(true);
+    try {
+      const order = await ordersService.getOrder(orderId);
+      if (!order) {
+        throw new Error("Orden no encontrada");
+      }
+
+      setCurrentOrder(order);
+      setCurrentUserId(userId);
+      setCurrentTableId(order.table_id);
+
+      // Cargar items de la orden
+      const items = await orderItemsService.getOrderItems(orderId);
+      setOrderItems(items);
+
+      // Suscribirse a cambios
+      subscribeToOrderUpdates(orderId);
+
+      // Verificar notificación
+      await checkBillNotification();
+
+      console.log("✅ Orden de usuario cargada:", {
+        userId,
+        orderId,
+        itemsCount: items.length,
+      });
+    } catch (error) {
+      console.error("Error setting user order:", error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -433,6 +625,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         loading,
         currentTableId,
         currentUserId,
+        notificationState,
         refreshOrder,
         setCurrentUserOrder,
         addToCart,
@@ -440,6 +633,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         removeFromCart,
         clearCart,
         createNewOrder,
+        checkBillNotification,
+        createBillNotification,
         getRecentOrdersItems,
         getTableUsers,
         switchUserOrder,

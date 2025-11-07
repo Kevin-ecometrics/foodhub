@@ -20,7 +20,7 @@ export default function WaiterDashboard() {
   const [tables, setTables] = useState<TableWithOrder[]>([]);
   const [activeTab, setActiveTab] = useState<
     "notifications" | "tables" | "products"
-  >("notifications"); // NUEVA PESTAÑA
+  >("notifications");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [attendedNotifications, setAttendedNotifications] = useState<
@@ -310,7 +310,6 @@ export default function WaiterDashboard() {
           />
         )}
 
-        {/* NUEVA PESTAÑA DE PRODUCTOS */}
         {activeTab === "products" && (
           <ProductsManagement onError={handleError} />
         )}
