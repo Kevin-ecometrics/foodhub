@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   waiterService,
   WaiterNotification,
@@ -27,12 +27,35 @@ export default function WaiterDashboard() {
     Set<string>
   >(new Set());
 
+  // Referencia para guardar la posición del scroll
+  const scrollPositionRef = useRef(0);
+  const isUpdatingRef = useRef(false);
+
   useEffect(() => {
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
     const interval = setInterval(() => {
-      loadData();
+      if (isUpdatingRef.current) return; // Evitar múltiples actualizaciones simultáneas
+
+      isUpdatingRef.current = true;
+      // Guardar posición actual del scroll antes de actualizar
+      scrollPositionRef.current =
+        window.scrollY || document.documentElement.scrollTop;
+
+      console.log(
+        "🔄 Auto-actualizando, posición guardada:",
+        scrollPositionRef.current
+      );
+
+      loadData().finally(() => {
+        // Pequeño delay para asegurar que el DOM se haya actualizado
+        setTimeout(() => {
+          window.scrollTo(0, scrollPositionRef.current);
+          console.log("📍 Scroll restaurado a:", scrollPositionRef.current);
+          isUpdatingRef.current = false;
+        }, 100);
+      });
     }, 30000);
 
     return () => {
@@ -75,7 +98,18 @@ export default function WaiterDashboard() {
           table: "waiter_notifications",
         },
         () => {
-          loadData();
+          if (isUpdatingRef.current) return;
+
+          isUpdatingRef.current = true;
+          scrollPositionRef.current =
+            window.scrollY || document.documentElement.scrollTop;
+
+          loadData().finally(() => {
+            setTimeout(() => {
+              window.scrollTo(0, scrollPositionRef.current);
+              isUpdatingRef.current = false;
+            }, 100);
+          });
         }
       )
       .subscribe();
@@ -90,7 +124,18 @@ export default function WaiterDashboard() {
           table: "orders",
         },
         () => {
-          loadData();
+          if (isUpdatingRef.current) return;
+
+          isUpdatingRef.current = true;
+          scrollPositionRef.current =
+            window.scrollY || document.documentElement.scrollTop;
+
+          loadData().finally(() => {
+            setTimeout(() => {
+              window.scrollTo(0, scrollPositionRef.current);
+              isUpdatingRef.current = false;
+            }, 100);
+          });
         }
       )
       .subscribe();
@@ -105,7 +150,18 @@ export default function WaiterDashboard() {
           table: "order_items",
         },
         () => {
-          loadData();
+          if (isUpdatingRef.current) return;
+
+          isUpdatingRef.current = true;
+          scrollPositionRef.current =
+            window.scrollY || document.documentElement.scrollTop;
+
+          loadData().finally(() => {
+            setTimeout(() => {
+              window.scrollTo(0, scrollPositionRef.current);
+              isUpdatingRef.current = false;
+            }, 100);
+          });
         }
       )
       .subscribe();
@@ -120,7 +176,18 @@ export default function WaiterDashboard() {
           table: "tables",
         },
         () => {
-          loadData();
+          if (isUpdatingRef.current) return;
+
+          isUpdatingRef.current = true;
+          scrollPositionRef.current =
+            window.scrollY || document.documentElement.scrollTop;
+
+          loadData().finally(() => {
+            setTimeout(() => {
+              window.scrollTo(0, scrollPositionRef.current);
+              isUpdatingRef.current = false;
+            }, 100);
+          });
         }
       )
       .subscribe();
@@ -132,6 +199,8 @@ export default function WaiterDashboard() {
       tablesSub.unsubscribe();
     };
   };
+
+  // ... (el resto de las funciones se mantienen igual)
 
   const handleAcknowledgeNotification = async (notificationId: string) => {
     setProcessing(notificationId);
