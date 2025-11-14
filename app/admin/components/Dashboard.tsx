@@ -14,8 +14,9 @@ import {
   FaTimes,
   FaPlus,
   FaStar,
-  FaComment,
   FaUser,
+  FaCalendarDay,
+  FaCalendarWeek,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -32,6 +33,7 @@ interface DashboardProps {
   popularProducts: PopularProduct[];
   dataLoading: boolean;
   onDateChange: (date: Date) => void;
+  onDateRangeChange: (startDate: Date, endDate: Date) => void;
   selectedDate: Date;
   salesSummary: SalesSummary | null;
   salesHistory: SalesHistory[];
@@ -88,18 +90,28 @@ interface GroupedProduct {
   extrasTotal?: number;
 }
 
+type FilterMode = "single" | "range";
+
 export default function Dashboard({
   dailyStats,
   todayOrders,
   popularProducts,
   dataLoading,
   onDateChange,
+  onDateRangeChange,
   selectedDate,
   salesSummary,
   salesHistory,
 }: DashboardProps) {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateInput, setDateInput] = useState(
+    selectedDate.toISOString().split("T")[0]
+  );
+  const [filterMode, setFilterMode] = useState<FilterMode>("single");
+  const [startDateInput, setStartDateInput] = useState(
+    selectedDate.toISOString().split("T")[0]
+  );
+  const [endDateInput, setEndDateInput] = useState(
     selectedDate.toISOString().split("T")[0]
   );
   const [salesItems, setSalesItems] = useState<SalesItem[]>([]);
@@ -112,6 +124,55 @@ export default function Dashboard({
   );
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const formatDateRange = (startDate: Date, endDate: Date): string => {
+    // Ajustar las fechas para la zona horaria local
+    const adjustForTimezone = (date: Date) => {
+      const localDate = new Date(date);
+      localDate.setMinutes(
+        localDate.getMinutes() + localDate.getTimezoneOffset()
+      );
+      return localDate;
+    };
+
+    const localStart = adjustForTimezone(startDate);
+    const localEnd = adjustForTimezone(endDate);
+
+    if (localStart.toDateString() === localEnd.toDateString()) {
+      return formatLongDate(localStart);
+    }
+
+    return `${localStart.toLocaleDateString(
+      "es-MX"
+    )} - ${localEnd.toLocaleDateString("es-MX")}`;
+  };
+  const handleDateRangeChange = () => {
+    if (startDateInput && endDateInput) {
+      const [startYear, startMonth, startDay] = startDateInput
+        .split("-")
+        .map(Number);
+      const [endYear, endMonth, endDay] = endDateInput.split("-").map(Number);
+
+      const startDate = new Date(startYear, startMonth - 1, startDay);
+      const endDate = new Date(endYear, endMonth - 1, endDay);
+
+      if (startDate > endDate) {
+        alert("La fecha de inicio no puede ser mayor que la fecha final");
+        return;
+      }
+
+      onDateRangeChange(startDate, endDate);
+      setShowDateFilter(false);
+    }
+  };
+
+  const handleFilterModeChange = (mode: FilterMode) => {
+    setFilterMode(mode);
+    if (mode === "single") {
+      const today = new Date();
+      setDateInput(today.toISOString().split("T")[0]);
+      onDateChange(today);
+    }
+  };
   const [selectedFeedback, setSelectedFeedback] =
     useState<CustomerFeedback | null>(null);
 
@@ -131,17 +192,24 @@ export default function Dashboard({
 
   // Cargar encuestas de satisfacción
   useEffect(() => {
-    loadCustomerFeedback();
-  }, [selectedDate]);
+    if (filterMode === "single") {
+      loadCustomerFeedback(selectedDate);
+    } else {
+      // En modo rango, cargar encuestas para el rango actual
+      const startDate = new Date(startDateInput + "T00:00:00");
+      const endDate = new Date(endDateInput + "T23:59:59");
+      loadCustomerFeedbackForRange(startDate, endDate);
+    }
+  }, [selectedDate, filterMode, startDateInput, endDateInput]);
 
   // Función para cargar las encuestas de satisfacción
-  const loadCustomerFeedback = async () => {
+  const loadCustomerFeedback = async (date: Date = selectedDate) => {
     setLoadingFeedback(true);
     try {
-      const startDate = new Date(selectedDate);
+      const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
 
-      const endDate = new Date(selectedDate);
+      const endDate = new Date(date);
       endDate.setHours(23, 59, 59, 999);
 
       const { data, error } = await supabase
@@ -159,6 +227,39 @@ export default function Dashboard({
       setCustomerFeedback(data || []);
     } catch (error) {
       console.error("Error al cargar encuestas:", error);
+    } finally {
+      setLoadingFeedback(false);
+    }
+  };
+  // Agrega esta función después de loadCustomerFeedback:
+  // NUEVA FUNCIÓN: Cargar encuestas por rango de fechas
+  const loadCustomerFeedbackForRange = async (
+    startDate: Date,
+    endDate: Date
+  ) => {
+    setLoadingFeedback(true);
+    try {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      const { data, error } = await supabase
+        .from("customer_feedback")
+        .select("*")
+        .gte("created_at", start.toISOString())
+        .lt("created_at", end.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error cargando encuestas por rango:", error);
+        throw error;
+      }
+
+      setCustomerFeedback(data || []);
+    } catch (error) {
+      console.error("Error al cargar encuestas por rango:", error);
     } finally {
       setLoadingFeedback(false);
     }
@@ -324,14 +425,18 @@ export default function Dashboard({
   };
 
   const formatLongDate = (date: Date): string => {
-    return date.toLocaleDateString("es-MX", {
+    const localDate = new Date(date);
+    localDate.setMinutes(
+      localDate.getMinutes() + localDate.getTimezoneOffset()
+    );
+
+    return localDate.toLocaleDateString("es-MX", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
     });
   };
-
   const formatDateTime = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleString("es-MX", {
@@ -1065,10 +1170,19 @@ export default function Dashboard({
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">
-                Reporte del Día
+                {filterMode === "single"
+                  ? "Reporte del Día"
+                  : "Reporte por Rango"}
               </h1>
               <p className="text-gray-600">
-                {isToday ? "Hoy" : formatLongDate(selectedDate)}
+                {filterMode === "single"
+                  ? isToday
+                    ? "Hoy"
+                    : formatLongDate(selectedDate)
+                  : formatDateRange(
+                      new Date(startDateInput),
+                      new Date(endDateInput)
+                    )}
               </p>
             </div>
           </div>
@@ -1078,25 +1192,100 @@ export default function Dashboard({
             <div className="relative">
               <button
                 onClick={() => setShowDateFilter(!showDateFilter)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
               >
                 <FaFilter />
-                Cambiar Fecha
+                Filtrar Fecha
               </button>
 
               {showDateFilter && (
-                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10 min-w-64">
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Seleccionar fecha:
-                    </label>
-                    <input
-                      type="date"
-                      value={dateInput}
-                      onChange={handleDateChange}
-                      max={new Date().toISOString().split("T")[0]}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10 min-w-80">
+                  <div className="space-y-4">
+                    {/* Selector de modo de filtro */}
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        onClick={() => handleFilterModeChange("single")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition ${
+                          filterMode === "single"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        <FaCalendarDay />
+                        Un Día
+                      </button>
+                      <button
+                        onClick={() => handleFilterModeChange("range")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition ${
+                          filterMode === "range"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        <FaCalendarWeek />
+                        Por Rango
+                      </button>
+                    </div>
+
+                    {filterMode === "single" ? (
+                      <>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Seleccionar fecha:
+                        </label>
+                        <input
+                          type="date"
+                          value={dateInput}
+                          onChange={handleDateChange}
+                          max={new Date().toISOString().split("T")[0]}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Rango de fechas:
+                          </label>
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Fecha de inicio:
+                              </label>
+                              <input
+                                type="date"
+                                value={startDateInput}
+                                onChange={(e) =>
+                                  setStartDateInput(e.target.value)
+                                }
+                                max={new Date().toISOString().split("T")[0]}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Fecha final:
+                              </label>
+                              <input
+                                type="date"
+                                value={endDateInput}
+                                onChange={(e) =>
+                                  setEndDateInput(e.target.value)
+                                }
+                                max={new Date().toISOString().split("T")[0]}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleDateRangeChange}
+                          className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                        >
+                          Aplicar Rango
+                        </button>
+                      </>
+                    )}
+
                     <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => setShowDateFilter(false)}

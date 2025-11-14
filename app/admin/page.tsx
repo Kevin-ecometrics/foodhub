@@ -41,7 +41,262 @@ export default function AdminPage() {
   // Estado para fecha seleccionada
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // NUEVA FUNCIÓN: Cargar datos de ventas históricas
+  // NUEVOS ESTADOS PARA RANGO DE FECHAS
+  const [dateRange, setDateRange] = useState({
+    start: new Date(),
+    end: new Date(),
+  });
+
+  // NUEVA FUNCIÓN: Manejar cambio de rango de fechas
+  const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    setDateRange({ start: startDate, end: endDate });
+    // Cargar datos para el rango de fechas
+    loadRangeData(startDate, endDate);
+  };
+
+  // NUEVA FUNCIÓN: Cargar datos por rango de fechas
+  const loadRangeData = async (startDate: Date, endDate: Date) => {
+    setDataLoading(true);
+    try {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      const startISO = start.toISOString();
+      const endISO = end.toISOString();
+
+      console.log("Cargando datos del rango:", startISO, "a", endISO);
+
+      // Cargar ventas del rango
+      const { data: sales, error: salesError } = await supabase
+        .from("sales_history")
+        .select("*")
+        .gte("closed_at", startISO)
+        .lte("closed_at", endISO)
+        .order("closed_at", { ascending: false });
+
+      if (salesError) throw salesError;
+
+      setSalesHistory(sales || []);
+
+      // Calcular resumen de ventas para el rango
+      const salesData = sales || [];
+      const totalSales = salesData.reduce(
+        (sum: number, sale: any) => sum + sale.total_amount,
+        0
+      );
+      const totalItems = salesData.reduce(
+        (sum: number, sale: any) => sum + sale.item_count,
+        0
+      );
+      const totalOrders = salesData.reduce(
+        (sum: number, sale: any) => sum + sale.order_count,
+        0
+      );
+
+      setSalesSummary({
+        totalSales,
+        totalItems,
+        totalOrders,
+        saleCount: salesData.length,
+        averageSale: salesData.length > 0 ? totalSales / salesData.length : 0,
+      });
+
+      // También cargar estadísticas diarias para el rango
+      await loadDailyStatsForRange(startISO, endISO);
+    } catch (error) {
+      console.error("Error loading range data:", error);
+      setError("Error cargando los datos del rango de fechas");
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  // NUEVA FUNCIÓN: Cargar estadísticas para rango de fechas
+  const loadDailyStatsForRange = async (startISO: string, endISO: string) => {
+    try {
+      // Cargar datos de orders para el rango
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, total_amount, created_at, order_items(quantity, price)")
+        .gte("created_at", startISO)
+        .lte("created_at", endISO);
+
+      if (ordersError) throw ordersError;
+
+      const ordersData = (orders || []) as any[];
+      const totalOrders = ordersData.length;
+
+      const totalRevenue = ordersData.reduce((sum: number, order: any) => {
+        return sum + (order.total_amount || 0);
+      }, 0);
+
+      const totalItemsSold = ordersData.reduce((sum: number, order: any) => {
+        const items = order.order_items || [];
+        return (
+          sum +
+          items.reduce((itemSum: number, item: any) => {
+            return itemSum + (item.quantity || 0);
+          }, 0)
+        );
+      }, 0);
+
+      const averageOrderValue =
+        totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      const { data: activeTables, error: tablesError } = await supabase
+        .from("orders")
+        .select("table_id")
+        .gte("created_at", startISO)
+        .lte("created_at", endISO)
+        .neq("status", "completed");
+
+      if (tablesError) throw tablesError;
+
+      const activeTablesData = (activeTables || []) as any[];
+      const uniqueTables = new Set(
+        activeTablesData.map((order: any) => order.table_id)
+      );
+
+      setDailyStats({
+        totalOrders,
+        totalRevenue,
+        totalItemsSold,
+        activeTables: uniqueTables.size,
+        averageOrderValue,
+      });
+
+      // Cargar órdenes del rango
+      await loadOrdersForRange(startISO, endISO);
+      // Cargar productos populares del rango
+      await loadPopularProductsForRange(startISO, endISO);
+    } catch (error) {
+      console.error("Error in loadDailyStatsForRange:", error);
+      throw error;
+    }
+  };
+
+  // NUEVA FUNCIÓN: Cargar órdenes para rango de fechas
+  const loadOrdersForRange = async (startISO: string, endISO: string) => {
+    try {
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select(
+          "id, table_id, total_amount, created_at, status, order_items(id)"
+        )
+        .gte("created_at", startISO)
+        .lte("created_at", endISO)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const ordersData = (orders || []) as any[];
+      const ordersWithCount: OrderSummary[] = ordersData.map((order: any) => ({
+        id: order.id,
+        table_id: order.table_id,
+        total_amount: order.total_amount,
+        created_at: order.created_at,
+        status: order.status,
+        items_count: order.order_items?.length || 0,
+      }));
+
+      setTodayOrders(ordersWithCount);
+    } catch (error) {
+      console.error("Error in loadOrdersForRange:", error);
+      throw error;
+    }
+  };
+
+  // NUEVA FUNCIÓN: Cargar productos populares para rango de fechas
+  const loadPopularProductsForRange = async (
+    startISO: string,
+    endISO: string
+  ) => {
+    try {
+      // Primero intentar desde sales_items (datos históricos)
+      const { data: salesItems, error: salesError } = await supabase
+        .from("sales_items")
+        .select("product_name, quantity, price")
+        .gte("created_at", startISO)
+        .lte("created_at", endISO);
+
+      if (!salesError && salesItems && salesItems.length > 0) {
+        const productMap = new Map<
+          string,
+          { total_quantity: number; total_revenue: number }
+        >();
+
+        salesItems.forEach((item: any) => {
+          const existing = productMap.get(item.product_name) || {
+            total_quantity: 0,
+            total_revenue: 0,
+          };
+          productMap.set(item.product_name, {
+            total_quantity: existing.total_quantity + (item.quantity || 0),
+            total_revenue:
+              existing.total_revenue + (item.price || 0) * (item.quantity || 0),
+          });
+        });
+
+        const popular: PopularProduct[] = Array.from(productMap.entries())
+          .map(([product_name, stats]) => ({
+            product_name,
+            total_quantity: stats.total_quantity,
+            total_revenue: stats.total_revenue,
+          }))
+          .sort((a, b) => b.total_quantity - a.total_quantity)
+          .slice(0, 10);
+
+        setPopularProducts(popular);
+        return;
+      }
+
+      // Fallback a order_items si no hay datos en sales_items
+      const { data: orderItems, error } = await supabase
+        .from("order_items")
+        .select("product_name, quantity, price, created_at")
+        .gte("created_at", startISO)
+        .lte("created_at", endISO);
+
+      if (error) throw error;
+
+      const orderItemsData = (orderItems || []) as any[];
+      const productMap = new Map<
+        string,
+        { total_quantity: number; total_revenue: number }
+      >();
+
+      orderItemsData.forEach((item: any) => {
+        const existing = productMap.get(item.product_name) || {
+          total_quantity: 0,
+          total_revenue: 0,
+        };
+        productMap.set(item.product_name, {
+          total_quantity: existing.total_quantity + (item.quantity || 0),
+          total_revenue:
+            existing.total_revenue + (item.price || 0) * (item.quantity || 0),
+        });
+      });
+
+      const popular: PopularProduct[] = Array.from(productMap.entries())
+        .map(([product_name, stats]) => ({
+          product_name,
+          total_quantity: stats.total_quantity,
+          total_revenue: stats.total_revenue,
+        }))
+        .sort((a, b) => b.total_quantity - a.total_quantity)
+        .slice(0, 10);
+
+      setPopularProducts(popular);
+    } catch (error) {
+      console.error("Error in loadPopularProductsForRange:", error);
+      throw error;
+    }
+  };
+
+  // FUNCIÓN EXISTENTE: Cargar datos de ventas históricas
   const loadSalesData = async (date: Date = selectedDate) => {
     try {
       const startOfDay = new Date(date);
@@ -327,6 +582,10 @@ export default function AdminPage() {
     setError("");
     // Resetear a fecha actual al hacer logout
     setSelectedDate(new Date());
+    setDateRange({
+      start: new Date(),
+      end: new Date(),
+    });
   };
 
   const handleWaiter = () => {
@@ -428,6 +687,7 @@ export default function AdminPage() {
             popularProducts={popularProducts}
             dataLoading={dataLoading}
             onDateChange={handleDateChange}
+            onDateRangeChange={handleDateRangeChange}
             selectedDate={selectedDate}
             salesSummary={salesSummary}
             salesHistory={salesHistory}
