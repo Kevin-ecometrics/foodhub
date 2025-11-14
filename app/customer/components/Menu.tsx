@@ -22,11 +22,12 @@ import {
   FaUser,
   FaUsers,
   FaEdit,
+  FaQuestion,
   FaStickyNote,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
-
+import { historyService } from "@/app/lib/supabase/history";
 const CATEGORIES = [
   {
     id: "favorites",
@@ -102,6 +103,7 @@ export default function MenuPage() {
   const [lastOrderSent, setLastOrderSent] = useState(false);
   const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
+  const [assistanceLoading, setAssistanceLoading] = useState(false);
 
   // ESTADOS PARA NOTAS Y EXTRAS
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -660,6 +662,24 @@ export default function MenuPage() {
         return category?.description || "";
     }
   };
+  // Función para solicitar asistencia - VERSIÓN CORREGIDA
+  const handleAssistanceRequest = async () => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    setAssistanceLoading(true);
+    try {
+      await historyService.requestAssistance(
+        parseInt(targetTableId.toString())
+      );
+      alert("✅ El mesero ha sido notificado. Pronto te atenderá.");
+    } catch (error) {
+      console.error("Error requesting assistance:", error);
+      alert("❌ Error al solicitar asistencia");
+    } finally {
+      setAssistanceLoading(false);
+    }
+  };
 
   const isProductInCart = (productId: number) => {
     return orderItems.some((item) => item.product_id === productId);
@@ -754,7 +774,22 @@ export default function MenuPage() {
             </div>
           </div>
 
-          <CartBadge />
+          {/* Botones en el header - SECCIÓN MODIFICADA */}
+          <div className="flex items-center gap-2">
+            {/* Botón de Ayuda - NUEVO BOTÓN */}
+            <button
+              onClick={handleAssistanceRequest}
+              disabled={assistanceLoading}
+              className="bg-yellow-500 text-white px-4 py-2 rounded-full hover:bg-yellow-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              title="Solicitar ayuda del mesero"
+            >
+              <FaQuestion />
+              {assistanceLoading ? "Enviando..." : "Ayuda"}
+            </button>
+
+            {/* Botón del Carrito (existente) */}
+            <CartBadge />
+          </div>
         </div>
       </header>
 

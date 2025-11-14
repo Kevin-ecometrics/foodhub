@@ -436,7 +436,7 @@ export default function HistoryPage() {
         "ticket"
       );
 
-      alert("✅ Se ha solicitado el ticket. El mesero te lo traerá pronto.");
+      alert("✅ Se ha solicitado la cuenta. El mesero te lo traerá pronto.");
 
       // Cerrar modal
       setShowPaymentMethodModal(false);
@@ -834,12 +834,12 @@ export default function HistoryPage() {
               </div>
 
               <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                Solicitar Ticket
+                Solicitar Cuenta
               </h2>
 
               <p className="text-gray-600 mb-6">
-                ¿Deseas solicitar el ticket de tu cuenta? El mesero te lo traerá
-                a la mesa.
+                ¿Deseas solicitar el fin de tu cuenta? El mesero te lo traerá a
+                la mesa.
               </p>
 
               <div className="flex gap-3">
@@ -861,7 +861,7 @@ export default function HistoryPage() {
                   ) : (
                     <FaCheck />
                   )}
-                  {billLoading ? "Enviando..." : "Pedir Ticket"}
+                  {billLoading ? "Enviando..." : "Pedir Cuenta"}
                 </button>
               </div>
             </div>
@@ -965,7 +965,7 @@ export default function HistoryPage() {
           </button>
           <button className="flex flex-col items-center text-blue-600">
             <FaHistory className="text-2xl mb-1" />
-            <span className="text-xs font-medium">Historial</span>
+            <span className="text-xs font-medium">Cuenta</span>
           </button>
           <button
             onClick={() =>

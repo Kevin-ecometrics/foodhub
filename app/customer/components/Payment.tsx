@@ -524,22 +524,22 @@ export default function PaymentPage() {
 
   // Calcular resumen de TODAS las órdenes pendientes
   const calculateTotalPaymentSummary = (): PaymentSummary => {
-    let subtotal = 0;
+    let totalConIva = 0;
 
     allOrders.forEach((order) => {
       order.order_items.forEach((item) => {
-        subtotal += item.price * item.quantity;
+        totalConIva += item.price * item.quantity;
       });
     });
 
     const taxRate = 0.08;
-    const taxAmount = subtotal * taxRate;
-    const total = subtotal + taxAmount;
+    const subtotal = totalConIva / 1.08; // Extraemos el IVA
+    const taxAmount = totalConIva - subtotal;
 
     return {
-      subtotal,
-      taxAmount,
-      total,
+      subtotal, // $100 (sin IVA)
+      taxAmount, // $8 (IVA)
+      total: totalConIva, // $108 (con IVA incluido)
       taxRate,
     };
   };
@@ -1277,12 +1277,12 @@ export default function PaymentPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-semibold text-gray-800">
+                      {/* <p className="text-lg font-semibold text-gray-800">
                         {formatCurrency(customerSummary.total)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formatCurrency(customerSummary.subtotal)} + impuestos
-                      </p>
+                      </p> */}
+                      {/* <p className="text-sm text-gray-500">
+                        {formatCurrency(customerSummary.subtotal)}
+                      </p> */}
                     </div>
                   </div>
 
@@ -1309,11 +1309,11 @@ export default function PaymentPage() {
                                     {formatItemNotes(item.notes)}
                                   </div>
                                   <div className="text-right">
-                                    <div className="font-medium text-gray-800">
+                                    {/* <div className="font-medium text-gray-800">
                                       {formatCurrency(
                                         item.price * item.quantity
                                       )}
-                                    </div>
+                                    </div> */}
                                     <div className="text-sm text-gray-500">
                                       {formatCurrency(item.price)} c/u
                                     </div>

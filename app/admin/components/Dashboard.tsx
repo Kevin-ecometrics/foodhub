@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/admin/components/Dashboard.tsx
 "use client";
 import { useState, useEffect } from "react";
@@ -53,13 +54,14 @@ interface TicketData {
   items: SalesItem[];
 }
 
-// Interfaz para extras procesados
+// Interfaz para extras procesados - MEJORADA
 interface ProcessedExtras {
   hasExtras: boolean;
-  extrasList: string[];
+  extrasList: Array<{ name: string; price: number }>;
   extrasTotal: number;
   basePrice: number;
   finalPrice: number;
+  mainNotes?: string;
 }
 
 // Interfaz para las encuestas de satisfacción
@@ -72,6 +74,18 @@ interface CustomerFeedback {
   order_count: number;
   total_amount: number;
   created_at: string;
+}
+
+// Interfaz para producto agrupado - NUEVA
+interface GroupedProduct {
+  product_name: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+  hasExtras: boolean;
+  isExtra?: boolean;
+  basePrice?: number;
+  extrasTotal?: number;
 }
 
 export default function Dashboard({
@@ -189,7 +203,7 @@ export default function Dashboard({
     }
   };
 
-  // FUNCIÓN MEJORADA: Procesar extras desde las notas
+  // FUNCIÓN MEJORADA: Procesar extras desde las notas - CORREGIDA
   const processExtrasFromNotes = (
     notes: string | null | undefined
   ): ProcessedExtras => {
@@ -215,7 +229,7 @@ export default function Dashboard({
       const extrasPart = parts.find((part) => part.includes("Extras:"));
       const totalPart = parts.find((part) => part.includes("Total:"));
 
-      let extrasList: string[] = [];
+      let extrasList: Array<{ name: string; price: number }> = [];
       let extrasTotal = 0;
 
       // Procesar extras con precios
@@ -224,8 +238,9 @@ export default function Dashboard({
         extrasList = extrasText.split(", ").map((extra) => {
           const priceMatch = extra.match(/\(\+\$([^)]+)\)/);
           const price = priceMatch ? parseFloat(priceMatch[1]) : 0;
+          const name = extra.split(" (+$")[0];
           extrasTotal += price;
-          return extra;
+          return { name, price };
         });
       }
 
@@ -245,6 +260,7 @@ export default function Dashboard({
         extrasTotal,
         basePrice,
         finalPrice,
+        mainNotes: mainNotes || undefined,
       };
     }
 
@@ -255,7 +271,9 @@ export default function Dashboard({
 
       if (extrasPart) {
         const extrasText = extrasPart.replace("Extras: ", "");
-        const extrasList = extrasText.split(", ");
+        const extrasList = extrasText
+          .split(", ")
+          .map((name) => ({ name, price: 0 }));
 
         return {
           hasExtras: true,
@@ -401,67 +419,87 @@ export default function Dashboard({
     setShowDateFilter(false);
   };
 
-  // FUNCIÓN: Agrupar productos para reportes (INCLUYENDO EXTRAS)
-  const getGroupedProducts = () => {
-    const productMap = new Map();
+  // FUNCIÓN CORREGIDA: Agrupar productos para reportes (SIN DUPLICAR EXTRAS)
+  const getGroupedProducts = (): GroupedProduct[] => {
+    const productMap = new Map<string, GroupedProduct>();
 
     salesItems.forEach((item) => {
       const processedExtras = processExtrasFromNotes(item.notes);
 
-      // Producto base
-      const baseKey = `${item.product_name}-${item.price}`;
-      if (productMap.has(baseKey)) {
-        const existing = productMap.get(baseKey);
-        productMap.set(baseKey, {
-          ...existing,
-          quantity: existing.quantity + item.quantity,
-          subtotal: existing.subtotal + item.subtotal,
-          hasExtras: existing.hasExtras || processedExtras.hasExtras,
-        });
-      } else {
-        productMap.set(baseKey, {
-          product_name: item.product_name,
-          price: item.price,
-          quantity: item.quantity,
-          subtotal: item.subtotal,
-          hasExtras: processedExtras.hasExtras,
-        });
-      }
+      // Si el producto tiene extras, usar el precio base en lugar del precio final
+      if (processedExtras.hasExtras && processedExtras.basePrice > 0) {
+        // Producto base con precio base (sin extras)
+        const baseKey = `${item.product_name}-BASE-${processedExtras.basePrice}`;
+        if (productMap.has(baseKey)) {
+          const existing = productMap.get(baseKey)!;
+          productMap.set(baseKey, {
+            ...existing,
+            quantity: existing.quantity + item.quantity,
+            subtotal:
+              existing.subtotal + processedExtras.basePrice * item.quantity,
+          });
+        } else {
+          productMap.set(baseKey, {
+            product_name: item.product_name,
+            price: processedExtras.basePrice,
+            quantity: item.quantity,
+            subtotal: processedExtras.basePrice * item.quantity,
+            hasExtras: true,
+            basePrice: processedExtras.basePrice,
+            extrasTotal: processedExtras.extrasTotal,
+          });
+        }
 
-      // Si hay extras, agregarlos como productos separados
-      if (processedExtras.hasExtras && processedExtras.extrasList.length > 0) {
+        // Agregar extras como productos separados
         processedExtras.extrasList.forEach((extra) => {
-          const extraPriceMatch = extra.match(/\(\+\$([^)]+)\)/);
-          const extraPrice = extraPriceMatch
-            ? parseFloat(extraPriceMatch[1])
-            : 0;
-          const extraName = extra.split(" (+$")[0];
-
-          const extraKey = `EXTRA: ${extraName}-${extraPrice}`;
-          if (productMap.has(extraKey)) {
-            const existing = productMap.get(extraKey);
-            productMap.set(extraKey, {
-              ...existing,
-              quantity: existing.quantity + item.quantity,
-              subtotal: existing.subtotal + extraPrice * item.quantity,
-            });
-          } else {
-            productMap.set(extraKey, {
-              product_name: `+ ${extraName}`,
-              price: extraPrice,
-              quantity: item.quantity,
-              subtotal: extraPrice * item.quantity,
-              isExtra: true,
-            });
+          if (extra.price > 0) {
+            // Solo agregar extras con precio
+            const extraKey = `EXTRA:${extra.name}-${extra.price}`;
+            if (productMap.has(extraKey)) {
+              const existing = productMap.get(extraKey)!;
+              productMap.set(extraKey, {
+                ...existing,
+                quantity: existing.quantity + item.quantity,
+                subtotal: existing.subtotal + extra.price * item.quantity,
+              });
+            } else {
+              productMap.set(extraKey, {
+                product_name: `+ ${extra.name}`,
+                price: extra.price,
+                quantity: item.quantity,
+                subtotal: extra.price * item.quantity,
+                isExtra: true,
+              } as never);
+            }
           }
         });
+      } else {
+        // Producto sin extras o con extras sin precio definido
+        const baseKey = `${item.product_name}-${item.price}`;
+        if (productMap.has(baseKey)) {
+          const existing = productMap.get(baseKey)!;
+          productMap.set(baseKey, {
+            ...existing,
+            quantity: existing.quantity + item.quantity,
+            subtotal: existing.subtotal + item.subtotal,
+            hasExtras: existing.hasExtras || processedExtras.hasExtras,
+          });
+        } else {
+          productMap.set(baseKey, {
+            product_name: item.product_name,
+            price: item.price,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+            hasExtras: processedExtras.hasExtras,
+          });
+        }
       }
     });
 
     return Array.from(productMap.values());
   };
 
-  // FUNCIÓN: Generar Excel de productos vendidos (INCLUYENDO EXTRAS)
+  // FUNCIÓN CORREGIDA: Generar Excel de productos vendidos
   const generateProductsExcelReport = () => {
     const products = getGroupedProducts();
 
@@ -470,31 +508,36 @@ export default function Dashboard({
       return;
     }
 
-    // Calcular totales
+    // Calcular totales CORREGIDOS - Aplicar /1.08 a CADA producto
     const totalQuantity = products.reduce(
       (sum, product) => sum + product.quantity,
       0
     );
+
+    // Aplicar /1.08 a cada subtotal antes de sumar
     const totalSales = products.reduce(
-      (sum, product) => sum + product.subtotal,
+      (sum, product) => sum + product.subtotal / 1.08,
       0
     );
 
     // Crear CSV con encabezados
-    let csvContent =
-      "No.,Producto,Precio Unitario,Cantidad Vendida,Total,Tipo\n";
+    let csvContent = "No.,Producto,Precio Unitario,Cantidad,Total,Tipo\n";
 
-    products.forEach((product, index) => {
+    let rowNumber = 1;
+    products.forEach((product) => {
       const tipo = product.isExtra
         ? "Extra"
         : product.hasExtras
         ? "Con Extras"
         : "Producto";
-      csvContent += `"${index + 1}","${product.product_name}","${formatCurrency(
-        product.price
+
+      // Aplicar /1.08 a CADA precio y subtotal
+      csvContent += `"${rowNumber}","${product.product_name}","${formatCurrency(
+        product.price / 1.08 // Precio sin IVA
       )}","${product.quantity}","${formatCurrency(
-        product.subtotal
+        product.subtotal / 1.08 // Subtotal sin IVA
       )}","${tipo}"\n`;
+      rowNumber++;
     });
 
     // Agregar totales al final
@@ -515,7 +558,7 @@ export default function Dashboard({
     URL.revokeObjectURL(url);
   };
 
-  // FUNCIÓN: Generar PDF del reporte de productos vendidos (INCLUYENDO EXTRAS)
+  // FUNCIÓN CORREGIDA: Generar PDF del reporte de productos vendidos
   const generateProductsPDFReport = () => {
     const products = getGroupedProducts();
 
@@ -524,218 +567,235 @@ export default function Dashboard({
       return;
     }
 
-    // Calcular totales
+    // Calcular totales CORREGIDOS - Aplicar /1.08 a CADA producto
     const totalQuantity = products.reduce(
       (sum, product) => sum + product.quantity,
       0
     );
+
+    // Aplicar /1.08 a cada subtotal antes de sumar
     const totalSales = products.reduce(
-      (sum, product) => sum + product.subtotal,
+      (sum, product) => sum + product.subtotal / 1.08,
       0
     );
 
     // Crear contenido HTML para el PDF
     const content = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Reporte de Productos Vendidos - ${
-          selectedDate.toISOString().split("T")[0]
-        }</title>
-        <style>
-          body { 
-            font-family: 'Arial', sans-serif; 
-            font-size: 12px; 
-            max-width: 800px; 
-            margin: 0 auto; 
-            padding: 20px;
-            color: #333;
-          }
-          .header { 
-            text-align: center; 
-            margin-bottom: 20px; 
-            border-bottom: 3px double #000; 
-            padding-bottom: 15px; 
-          }
-          .restaurant-name { 
-            font-size: 24px; 
-            font-weight: bold; 
-            margin-bottom: 5px; 
-            color: #1f2937;
-          }
-          .report-title { 
-            font-size: 18px; 
-            margin-bottom: 10px; 
-            color: #374151;
-          }
-          .summary-section { 
-            margin: 20px 0; 
-            padding: 15px; 
-            background: #f8fafc; 
-            border-radius: 8px; 
-            border: 1px solid #e2e8f0;
-          }
-          .summary-grid { 
-            display: grid; 
-            grid-template-columns: repeat(2, 1fr); 
-            gap: 15px; 
-            margin: 15px 0; 
-          }
-          .summary-card { 
-            padding: 12px; 
-            border-radius: 6px; 
-            text-align: center;
-            border: 1px solid;
-          }
-          .summary-total { 
-            background: #dcfce7; 
-            border-color: #bbf7d0; 
-          }
-          .summary-items { 
-            background: #dbeafe; 
-            border-color: #bfdbfe; 
-          }
-          .summary-number { 
-            font-size: 18px; 
-            font-weight: bold; 
-            margin: 5px 0; 
-          }
-          .products-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin: 20px 0; 
-          }
-          .products-table th { 
-            background: #374151; 
-            color: white; 
-            padding: 10px; 
-            text-align: left; 
-            border: 1px solid #4b5563;
-          }
-          .products-table td { 
-            padding: 8px 10px; 
-            border: 1px solid #d1d5db; 
-          }
-          .products-table tr:nth-child(even) { 
-            background: #f9fafb; 
-          }
-          .extra-row { 
-            background: #f0f9ff !important; 
-            font-style: italic;
-          }
-          .totals-section { 
-            margin-top: 20px; 
-            padding-top: 15px; 
-            border-top: 2px solid #000; 
-          }
-          .total-row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin: 5px 0; 
-            padding: 0 10px; 
-          }
-          .grand-total { 
-            font-weight: bold; 
-            font-size: 16px; 
-            margin-top: 10px; 
-            padding-top: 10px; 
-            border-top: 1px solid #d1d5db; 
-          }
-          .footer { 
-            text-align: center; 
-            margin-top: 30px; 
-            padding-top: 15px; 
-            border-top: 1px solid #d1d5db; 
-            font-size: 10px; 
-            color: #6b7280;
-          }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="restaurant-name">FOODHUB RESTAURANT</div>
-          <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS</div>
-          <div>Fecha: ${formatLongDate(selectedDate)}</div>
-          <div>Generado: ${new Date().toLocaleString("es-MX")}</div>
-        </div>
-        
-        <!-- Resumen General -->
-        <div class="summary-section">
-          <h3 style="margin: 0 0 15px 0; color: #1f2937;">RESUMEN GENERAL</h3>
-          <div class="summary-grid">
-            <div class="summary-card summary-total">
-              <div>VENTAS TOTALES</div>
-              <div class="summary-number">${formatCurrency(totalSales)}</div>
-              <div>${products.length} productos diferentes</div>
-            </div>
-            <div class="summary-card summary-items">
-              <div>ITEMS VENDIDOS</div>
-              <div class="summary-number">${totalQuantity}</div>
-              <div>unidades totales</div>
-            </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Reporte de Productos Vendidos - ${
+        selectedDate.toISOString().split("T")[0]
+      }</title>
+      <style>
+        body { 
+          font-family: 'Arial', sans-serif; 
+          font-size: 12px; 
+          max-width: 800px; 
+          margin: 0 auto; 
+          padding: 20px;
+          color: #333;
+        }
+        .header { 
+          text-align: center; 
+          margin-bottom: 20px; 
+          border-bottom: 3px double #000; 
+          padding-bottom: 15px; 
+        }
+        .restaurant-name { 
+          font-size: 24px; 
+          font-weight: bold; 
+          margin-bottom: 5px; 
+          color: #1f2937;
+        }
+        .report-title { 
+          font-size: 18px; 
+          margin-bottom: 10px; 
+          color: #374151;
+        }
+        .summary-section { 
+          margin: 20px 0; 
+          padding: 15px; 
+          background: #f8fafc; 
+          border-radius: 8px; 
+          border: 1px solid #e2e8f0;
+        }
+        .summary-grid { 
+          display: grid; 
+          grid-template-columns: repeat(2, 1fr); 
+          gap: 15px; 
+          margin: 15px 0; 
+        }
+        .summary-card { 
+          padding: 12px; 
+          border-radius: 6px; 
+          text-align: center;
+          border: 1px solid;
+        }
+        .summary-total { 
+          background: #dcfce7; 
+          border-color: #bbf7d0; 
+        }
+        .summary-items { 
+          background: #dbeafe; 
+          border-color: #bfdbfe; 
+        }
+        .summary-number { 
+          font-size: 18px; 
+          font-weight: bold; 
+          margin: 5px 0; 
+        }
+        .products-table { 
+          width: 100%; 
+          border-collapse: collapse; 
+          margin: 20px 0; 
+        }
+        .products-table th { 
+          background: #374151; 
+          color: white; 
+          padding: 10px; 
+          text-align: left; 
+          border: 1px solid #4b5563;
+        }
+        .products-table td { 
+          padding: 8px 10px; 
+          border: 1px solid #d1d5db; 
+        }
+        .products-table tr:nth-child(even) { 
+          background: #f9fafb; 
+        }
+        .extra-row { 
+          background: #f0f9ff !important; 
+          font-style: italic;
+          color: #1e40af;
+        }
+        .product-with-extras { 
+          background: #f0fdf4 !important; 
+          font-weight: bold;
+        }
+        .totals-section { 
+          margin-top: 20px; 
+          padding-top: 15px; 
+          border-top: 2px solid #000; 
+        }
+        .total-row { 
+          display: flex; 
+          justify-content: space-between; 
+          margin: 5px 0; 
+          padding: 0 10px; 
+        }
+        .grand-total { 
+          font-weight: bold; 
+          font-size: 16px; 
+          margin-top: 10px; 
+          padding-top: 10px; 
+          border-top: 1px solid #d1d5db; 
+        }
+        .footer { 
+          text-align: center; 
+          margin-top: 30px; 
+          padding-top: 15px; 
+          border-top: 1px solid #d1d5db; 
+          font-size: 10px; 
+          color: #6b7280;
+        }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="restaurant-name">FOODHUB RESTAURANT</div>
+        <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS</div>
+        <div>Fecha: ${formatLongDate(selectedDate)}</div>
+        <div>Generado: ${new Date().toLocaleString("es-MX")}</div>
+      </div>
+      
+      <!-- Resumen General -->
+      <div class="summary-section">
+        <h3 style="margin: 0 0 15px 0; color: #1f2937;">RESUMEN GENERAL</h3>
+        <div class="summary-grid">
+          <div class="summary-card summary-total">
+            <div>VENTAS TOTALES</div>
+            <div class="summary-number">${formatCurrency(totalSales)}</div>
+            <div>${products.length} productos diferentes</div>
+          </div>
+          <div class="summary-card summary-items">
+            <div>ITEMS VENDIDOS</div>
+            <div class="summary-number">${totalQuantity}</div>
+            <div>unidades totales</div>
           </div>
         </div>
+      </div>
 
-        <!-- Tabla de Productos Vendidos -->
-        <h3 style="margin: 25px 0 15px 0; color: #1f2937;">DETALLE DE PRODUCTOS VENDIDOS</h3>
-        <table class="products-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Producto</th>
-              <th class="text-right">Precio Unitario</th>
-              <th class="text-center">Cantidad</th>
-              <th class="text-right">Total</th>
-              <th>Tipo</th>
+      <!-- Tabla de Productos Vendidos -->
+      <h3 style="margin: 25px 0 15px 0; color: #1f2937;">DETALLE DE PRODUCTOS VENDIDOS</h3>
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Producto</th>
+            <th class="text-right">Precio Unitario</th>
+            <th class="text-center">Cantidad</th>
+            <th class="text-right">Total</th>
+            <th>Tipo</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${products
+            .map(
+              (product, index) => `
+            <tr class="${
+              product.isExtra
+                ? "extra-row"
+                : product.hasExtras
+                ? "product-with-extras"
+                : ""
+            }">
+              <td class="text-center">${index + 1}</td>
+              <td>${product.product_name}</td>
+              <td class="text-right">${formatCurrency(
+                product.price / 1.08
+              )}</td>
+              <td class="text-center">${product.quantity}</td>
+              <td class="text-right">${formatCurrency(
+                product.subtotal / 1.08
+              )}</td>
+              <td>${
+                product.isExtra
+                  ? "Extra"
+                  : product.hasExtras
+                  ? "Con Extras"
+                  : "Producto"
+              }</td>
             </tr>
-          </thead>
-          <tbody>
-            ${products
-              .map(
-                (product, index) => `
-              <tr class="${product.isExtra ? "extra-row" : ""}">
-                <td class="text-center">${index + 1}</td>
-                <td>${product.product_name}</td>
-                <td class="text-right">${formatCurrency(product.price)}</td>
-                <td class="text-center">${product.quantity}</td>
-                <td class="text-right">${formatCurrency(product.subtotal)}</td>
-                <td>${
-                  product.isExtra
-                    ? "Extra"
-                    : product.hasExtras
-                    ? "Con Extras"
-                    : "Producto"
-                }</td>
-              </tr>
-            `
-              )
-              .join("")}
-          </tbody>
-        </table>
+          `
+            )
+            .join("")}
+        </tbody>
+      </table>
 
-        <!-- Totales -->
-        <div class="totals-section">
-          <div class="total-row">
-            <span><strong>Total Items Vendidos:</strong></span>
-            <span><strong>${totalQuantity} unidades</strong></span>
-          </div>
-          <div class="total-row grand-total">
-            <span><strong>VENTA TOTAL:</strong></span>
-            <span><strong>${formatCurrency(totalSales)}</strong></span>
-          </div>
+      <!-- Totales -->
+      <div class="totals-section">
+        <div class="total-row">
+          <span><strong>Total Items Vendidos:</strong></span>
+          <span><strong>${totalQuantity} unidades</strong></span>
         </div>
+        <div class="total-row grand-total">
+          <span><strong>VENTA TOTAL:</strong></span>
+          <span><strong>${formatCurrency(totalSales)}</strong></span>
+        </div>
+      </div>
 
-        <div class="footer">
-          <div>*** REPORTE DE PRODUCTOS GENERADO AUTOMÁTICAMENTE ***</div>
-          <div>FoodHub Restaurant - Sistema de Gestión</div>
-          <div>${window.location.hostname}</div>
-        </div>
-      </body>
-      </html>
-    `;
+      <div class="footer">
+        <div>*** REPORTE DE PRODUCTOS GENERADO AUTOMÁTICAMENTE ***</div>
+        <div>FoodHub Restaurant - Sistema de Gestión</div>
+        <div>${window.location.hostname}</div>
+      </div>
+    </body>
+    </html>
+  `;
 
     // Abrir ventana para imprimir
     const printWindow = window.open("", "_blank");
@@ -750,161 +810,170 @@ export default function Dashboard({
       }, 500);
     }
   };
-
-  // FUNCIÓN: Generar PDF del ticket con cálculos correctos (INCLUYENDO EXTRAS)
+  // FUNCIÓN CORREGIDA: Generar PDF del ticket con cálculos correctos
   const generateTicketPDF = (ticketData: TicketData) => {
     const { sale, items } = ticketData;
 
-    // Calcular subtotales y totales
-    const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    const tax = subtotal * 0.08; // 8% de IVA
-    const total = subtotal + tax;
+    // Usar el total_amount de la venta en lugar de calcularlo
+    const total = sale.total_amount;
+    const subtotal = total / 1.08; // Quitar IVA
+    const tax = (total * 0.08) / 1.08; // Calcular IVA real
+
+    const itemsWithExtras: Array<any> = [];
+
+    // Procesar cada item para separar productos base de extras
+    items.forEach((item) => {
+      const processedExtras = processExtrasFromNotes(item.notes);
+
+      if (processedExtras.hasExtras && processedExtras.basePrice > 0) {
+        // Producto con extras - usar precio base
+        const baseSubtotal = processedExtras.basePrice * item.quantity;
+
+        // Agregar producto base
+        itemsWithExtras.push({
+          ...item,
+          price: processedExtras.basePrice,
+          subtotal: baseSubtotal,
+          isBaseProduct: true,
+          extras: processedExtras.extrasList,
+        });
+
+        // Agregar extras como items separados
+        processedExtras.extrasList.forEach((extra) => {
+          if (extra.price > 0) {
+            const extraSubtotal = extra.price * item.quantity;
+            itemsWithExtras.push({
+              ...item,
+              product_name: `+ ${extra.name}`,
+              price: extra.price,
+              subtotal: extraSubtotal,
+              isExtra: true,
+              quantity: item.quantity,
+            });
+          }
+        });
+      } else {
+        // Producto sin extras
+        itemsWithExtras.push({
+          ...item,
+          isBaseProduct: true,
+        });
+      }
+    });
 
     // Crear contenido HTML para el PDF
     const content = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Ticket - Mesa ${sale.table_number}</title>
-        <style>
-          body { 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            max-width: 300px; 
-            margin: 0 auto; 
-            padding: 10px;
-          }
-          .header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
-          .restaurant-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-          .ticket-info { margin-bottom: 10px; padding: 5px 0; }
-          .payment-method { 
-            background-color: #dbeafe; 
-            padding: 5px; 
-            text-align: center; 
-            margin: 5px 0; 
-            border-radius: 4px; 
-            font-weight: bold;
-            color: #1e40af;
-          }
-          .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-          .items-table th { border-bottom: 1px dashed #000; padding: 5px 2px; text-align: left; }
-          .items-table td { padding: 4px 2px; border-bottom: 1px dotted #ccc; }
-          .extra-item { font-style: italic; color: #666; font-size: 11px; padding-left: 15px !important; }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-          .totals { margin-top: 10px; padding-top: 10px; border-top: 2px dashed #000; }
-          .total-row { display: flex; justify-content: space-between; margin: 2px 0; }
-          .grand-total { font-weight: bold; font-size: 14px; margin-top: 5px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; padding-top: 10px; border-top: 1px dashed #000; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="restaurant-name">FOODHUB RESTAURANT</div>
-          <div>*** TICKET DE VENTA ***</div>
-        </div>
-        
-        <div class="ticket-info">
-          <div><strong>MESA:</strong> ${sale.table_number}</div>
-          <div><strong>CLIENTE:</strong> ${
-            sale.customer_name || "INVITADO"
-          }</div>
-          <div><strong>FECHA:</strong> ${formatDateTime(sale.closed_at)}</div>
-          <div><strong>TRANSACCIÓN:</strong> ${sale.id
-            .slice(0, 8)
-            .toUpperCase()}</div>
-        </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Ticket - Mesa ${sale.table_number}</title>
+      <style>
+        body { 
+          font-family: 'Courier New', monospace; 
+          font-size: 12px; 
+          max-width: 300px; 
+          margin: 0 auto; 
+          padding: 10px;
+        }
+        .header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
+        .restaurant-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+        .ticket-info { margin-bottom: 10px; padding: 5px 0; }
+        .payment-method { 
+          background-color: #dbeafe; 
+          padding: 5px; 
+          text-align: center; 
+          margin: 5px 0; 
+          border-radius: 4px; 
+          font-weight: bold;
+          color: #1e40af;
+        }
+        .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .items-table th { border-bottom: 1px dashed #000; padding: 5px 2px; text-align: left; }
+        .items-table td { padding: 4px 2px; border-bottom: 1px dotted #ccc; }
+        .extra-item { font-style: italic; color: #1e40af; font-size: 11px; padding-left: 15px !important; }
+        .base-product { font-weight: bold; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .totals { margin-top: 10px; padding-top: 10px; border-top: 2px dashed #000; }
+        .total-row { display: flex; justify-content: space-between; margin: 2px 0; }
+        .grand-total { font-weight: bold; font-size: 14px; margin-top: 5px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 10px; padding-top: 10px; border-top: 1px dashed #000; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="restaurant-name">FOODHUB RESTAURANT</div>
+        <div>*** TICKET DE VENTA ***</div>
+      </div>
+      
+      <div class="ticket-info">
+        <div><strong>MESA:</strong> ${sale.table_number}</div>
+        <div><strong>CLIENTE:</strong> ${sale.customer_name || "INVITADO"}</div>
+        <div><strong>FECHA:</strong> ${formatDateTime(sale.closed_at)}</div>
+        <div><strong>TRANSACCIÓN:</strong> ${sale.id
+          .slice(0, 8)
+          .toUpperCase()}</div>
+      </div>
 
-        <div class="payment-method">
-          MÉTODO DE PAGO: ${getPaymentMethodText(sale.payment_method)}
+      <div class="payment-method">
+        MÉTODO DE PAGO: ${getPaymentMethodText(sale.payment_method)}
+      </div>
+      
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th class="text-right">CANT</th>
+            <th class="text-right">PRECIO</th>
+            <th class="text-right">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsWithExtras
+            .map(
+              (item) => `
+              <tr class="${
+                item.isExtra
+                  ? "extra-item"
+                  : item.isBaseProduct
+                  ? "base-product"
+                  : ""
+              }">
+                <td>${item.product_name}</td>
+                <td class="text-right">${item.quantity}</td>
+                <td class="text-right">${formatCurrency(item.price)}</td>
+                <td class="text-right">${formatCurrency(item.subtotal)}</td>
+              </tr>
+            `
+            )
+            .join("")}
+        </tbody>
+      </table>
+      
+      <div class="totals">
+        <div class="total-row">
+          <span>SUBTOTAL:</span>
+          <span>${formatCurrency(subtotal)}</span>
         </div>
-        
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>PRODUCTO</th>
-              <th class="text-right">CANT</th>
-              <th class="text-right">PRECIO</th>
-              <th class="text-right">TOTAL</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items
-              .map((item) => {
-                const processedExtras = processExtrasFromNotes(item.notes);
-                let rows = `
-                    <tr>
-                      <td>${item.product_name}</td>
-                      <td class="text-right">${item.quantity}</td>
-                      <td class="text-right">${formatCurrency(item.price)}</td>
-                      <td class="text-right">${formatCurrency(
-                        item.subtotal
-                      )}</td>
-                    </tr>
-                  `;
-
-                // Agregar extras si existen
-                if (
-                  processedExtras.hasExtras &&
-                  processedExtras.extrasList.length > 0
-                ) {
-                  processedExtras.extrasList.forEach((extra) => {
-                    const extraPriceMatch = extra.match(/\(\+\$([^)]+)\)/);
-                    const extraPrice = extraPriceMatch
-                      ? parseFloat(extraPriceMatch[1])
-                      : 0;
-                    const extraName = extra.split(" (+$")[0];
-
-                    rows += `
-                        <tr class="extra-item">
-                          <td>+ ${extraName}</td>
-                          <td class="text-right">${item.quantity}</td>
-                          <td class="text-right">${formatCurrency(
-                            extraPrice
-                          )}</td>
-                          <td class="text-right">${formatCurrency(
-                            extraPrice * item.quantity
-                          )}</td>
-                        </tr>
-                      `;
-                  });
-                }
-
-                // Agregar notas si existen (que no sean extras)
-                if (item.notes && !processedExtras.hasExtras) {
-                  rows += `<tr class="extra-item"><td colspan="4">→ ${item.notes}</td></tr>`;
-                }
-
-                return rows;
-              })
-              .join("")}
-          </tbody>
-        </table>
-        
-        <div class="totals">
-          <div class="total-row">
-            <span>SUBTOTAL:</span>
-            <span>${formatCurrency(subtotal)}</span>
-          </div>
-          <div class="total-row">
-            <span>IVA (8%):</span>
-            <span>${formatCurrency(tax)}</span>
-          </div>
-          <div class="total-row grand-total">
-            <span>TOTAL:</span>
-            <span>${formatCurrency(total)}</span>
-          </div>
+        <div class="total-row">
+          <span>IVA (8%):</span>
+          <span>${formatCurrency(tax)}</span>
         </div>
-        
-        <div class="footer">
-          <div>*** GRACIAS POR SU VISITA ***</div>
-          <div>FoodHub Restaurant</div>
-          <div>${window.location.hostname}</div>
+        <div class="total-row grand-total">
+          <span>TOTAL:</span>
+          <span>${formatCurrency(total)}</span>
         </div>
-      </body>
-      </html>
-    `;
+      </div>
+      
+      <div class="footer">
+        <div>*** GRACIAS POR SU VISITA ***</div>
+        <div>FoodHub Restaurant</div>
+        <div>${window.location.hostname}</div>
+      </div>
+    </body>
+    </html>
+  `;
 
     // Abrir ventana para imprimir
     const printWindow = window.open("", "_blank");
@@ -919,7 +988,6 @@ export default function Dashboard({
       }, 500);
     }
   };
-
   // Calcular estadísticas de encuestas
   const feedbackStats = {
     total: customerFeedback.length,
@@ -1071,7 +1139,7 @@ export default function Dashboard({
             <div>
               <p className="text-sm text-gray-600">Ingresos Totales</p>
               <p className="text-2xl font-bold text-gray-800">
-                {formatCurrency(combinedStats.totalRevenue)}
+                {formatCurrency(combinedStats.totalRevenue / 1.08)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 {salesSummary?.saleCount || 0} ventas procesadas
@@ -1205,7 +1273,8 @@ export default function Dashboard({
                           </p>
                           <p className="text-sm text-gray-500">
                             Mesa {feedback.table_id} • {feedback.order_count}{" "}
-                            órdenes • {formatCurrency(feedback.total_amount)}
+                            órdenes •{" "}
+                            {formatCurrency(feedback.total_amount / 1.08)}
                           </p>
                         </div>
                       </div>
@@ -1272,7 +1341,7 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Vista previa de productos vendidos */}
+      {/* Vista previa de productos vendidos CORREGIDA */}
       {salesItems.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <div className="flex justify-between items-center mb-4">
@@ -1303,13 +1372,25 @@ export default function Dashboard({
                   <th className="px-4 py-2 text-right font-semibold text-gray-700">
                     Subtotal
                   </th>
+                  <th className="px-4 py-2 text-center font-semibold text-gray-700">
+                    Tipo
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {getGroupedProducts()
                   .slice(0, 10)
                   .map((product, index) => (
-                    <tr key={index} className="border-b border-gray-100">
+                    <tr
+                      key={index}
+                      className={`border-b border-gray-100 ${
+                        product.isExtra
+                          ? "bg-blue-50"
+                          : product.hasExtras
+                          ? "bg-green-50"
+                          : ""
+                      }`}
+                    >
                       <td className="px-4 py-3 text-gray-800">
                         {product.product_name}
                       </td>
@@ -1321,6 +1402,23 @@ export default function Dashboard({
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-green-600">
                         {formatCurrency(product.subtotal)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-xs ${
+                            product.isExtra
+                              ? "bg-blue-100 text-blue-800"
+                              : product.hasExtras
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {product.isExtra
+                            ? "Extra"
+                            : product.hasExtras
+                            ? "Con Extras"
+                            : "Producto"}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -1347,7 +1445,7 @@ export default function Dashboard({
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <p className="font-semibold text-green-800">Total Cobrado</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(salesSummary.totalSales)}
+                {formatCurrency(salesSummary.totalSales / 1.08)}
               </p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
@@ -1373,7 +1471,7 @@ export default function Dashboard({
             <div className="text-center p-4 bg-indigo-50 rounded-lg">
               <p className="font-semibold text-indigo-800">Ticket Promedio</p>
               <p className="text-2xl font-bold text-indigo-600">
-                {formatCurrency(salesSummary.averageSale)}
+                {formatCurrency(salesSummary.averageSale / 1.08)}
               </p>
             </div>
           </div>
@@ -1411,7 +1509,7 @@ export default function Dashboard({
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      {formatCurrency(sale.total_amount)}
+                      {formatCurrency(sale.total_amount / 1.08)}
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(sale.closed_at).toLocaleTimeString("es-MX")}
@@ -1492,7 +1590,7 @@ export default function Dashboard({
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-gray-600">Total Gastado</p>
                     <p className="font-semibold text-green-600">
-                      {formatCurrency(selectedFeedback.total_amount)}
+                      {formatCurrency(selectedFeedback.total_amount / 1.08)}
                     </p>
                   </div>
                 </div>
@@ -1622,20 +1720,15 @@ export default function Dashboard({
                             </span>
                           </div>
                           {processedExtras.extrasList.map((extra, index) => {
-                            const extraPriceMatch =
-                              extra.match(/\(\+\$([^)]+)\)/);
-                            const extraPrice = extraPriceMatch
-                              ? parseFloat(extraPriceMatch[1])
-                              : 0;
-
                             return (
                               <div
                                 key={index}
                                 className="flex justify-between items-center text-sm text-gray-600 ml-4"
                               >
-                                <span>• {extra}</span>
+                                <span>• {extra.name}</span>
                                 <span className="text-green-600">
-                                  {item.quantity} × {formatCurrency(extraPrice)}
+                                  {item.quantity} ×{" "}
+                                  {formatCurrency(extra.price)}
                                 </span>
                               </div>
                             );
@@ -1654,10 +1747,7 @@ export default function Dashboard({
                     <span>Subtotal:</span>
                     <span>
                       {formatCurrency(
-                        selectedTicket.items.reduce(
-                          (sum, item) => sum + item.subtotal,
-                          0
-                        )
+                        selectedTicket.sale.total_amount / 1.08 // Dividimos entre 1.08 para quitar el IVA
                       )}
                     </span>
                   </div>
@@ -1665,21 +1755,13 @@ export default function Dashboard({
                     <span>IVA (8%):</span>
                     <span>
                       {formatCurrency(
-                        selectedTicket.items.reduce(
-                          (sum, item) => sum + item.subtotal,
-                          0
-                        ) * 0.08
+                        (selectedTicket.sale.total_amount * 0.08) / 1.08 // Calculamos el IVA real
                       )}
                     </span>
                   </div>
                   <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
                     <span>TOTAL:</span>
-                    {formatCurrency(
-                      selectedTicket.items.reduce(
-                        (sum, item) => sum + item.subtotal,
-                        0
-                      ) * 1.08
-                    )}
+                    {formatCurrency(selectedTicket.sale.total_amount)}
                   </div>
                 </div>
               </div>

@@ -103,7 +103,7 @@ export default function TableHeader({
   const getPaymentMethodInfo = (paymentMethod: string | null) => {
     if (paymentMethod === "ticket") {
       return {
-        text: "Ticket Solicitado",
+        text: "Cuenta Solicitada",
         icon: FaReceipt,
         bgColor: "bg-blue-100",
         textColor: "text-blue-800",
@@ -197,7 +197,8 @@ export default function TableHeader({
         </p>
       </div>
 
-      {table.status === "occupied" && table.orders.length > 0 && (
+      {/* BOTÓN DE COBRAR - SOLO APARECE CUANDO HAY SOLICITUD DE CUENTA */}
+      {latestBillRequest && latestBillRequest.type === "bill_request" && (
         <button
           onClick={() => onCobrarMesa(table.id, table.number)}
           disabled={processing === `cobrar-${table.id}`}

@@ -196,7 +196,7 @@ export default function QRSharePage() {
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaHistory className="text-2xl mb-1" />
-            <span className="text-xs font-medium">Historial</span>
+            <span className="text-xs font-medium">Cuenta</span>
           </button>
 
           <button className="flex flex-col items-center text-blue-600">
