@@ -138,16 +138,17 @@ export default function Dashboard({
   const loadCustomerFeedback = async () => {
     setLoadingFeedback(true);
     try {
+      const startDate = new Date(selectedDate);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(selectedDate);
+      endDate.setHours(23, 59, 59, 999);
+
       const { data, error } = await supabase
         .from("customer_feedback")
         .select("*")
-        .gte("created_at", selectedDate.toISOString().split("T")[0])
-        .lt(
-          "created_at",
-          new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0]
-        )
+        .gte("created_at", startDate.toISOString())
+        .lt("created_at", endDate.toISOString())
         .order("created_at", { ascending: false });
 
       if (error) {
