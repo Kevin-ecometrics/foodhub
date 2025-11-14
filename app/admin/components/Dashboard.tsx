@@ -419,17 +419,43 @@ export default function Dashboard({
     setShowDateFilter(false);
   };
 
-  // FUNCIÓN CORREGIDA: Agrupar productos para reportes (SIN DUPLICAR EXTRAS)
+  // FUNCIÓN CORREGIDA: Calcular ingresos totales incluyendo extras
+  const calculateTotalRevenue = (): number => {
+    // Sumar todos los subtotales de los items de venta
+    const totalFromItems = salesItems.reduce((total, item) => {
+      return total + item.subtotal;
+    }, 0);
+
+    return totalFromItems;
+  };
+
+  // FUNCIÓN CORREGIDA: Calcular total cobrado
+  const calculateTotalCollected = (): number => {
+    // Sumar todos los subtotales de los items de venta
+    const totalFromItems = salesItems.reduce((total, item) => {
+      return total + item.subtotal;
+    }, 0);
+
+    return totalFromItems;
+  };
+
+  // FUNCIÓN CORREGIDA: Calcular ventas totales para reportes
+  const calculateTotalSalesForReports = (): number => {
+    const products = getGroupedProducts();
+    return products.reduce((total, product) => total + product.subtotal, 0);
+  };
+
+  // FUNCIÓN CORREGIDA: Agrupar productos para reportes
   const getGroupedProducts = (): GroupedProduct[] => {
     const productMap = new Map<string, GroupedProduct>();
 
     salesItems.forEach((item) => {
       const processedExtras = processExtrasFromNotes(item.notes);
 
-      // Si el producto tiene extras, usar el precio base en lugar del precio final
       if (processedExtras.hasExtras && processedExtras.basePrice > 0) {
-        // Producto base con precio base (sin extras)
+        // Producto con extras
         const baseKey = `${item.product_name}-BASE-${processedExtras.basePrice}`;
+
         if (productMap.has(baseKey)) {
           const existing = productMap.get(baseKey)!;
           productMap.set(baseKey, {
@@ -445,15 +471,12 @@ export default function Dashboard({
             quantity: item.quantity,
             subtotal: processedExtras.basePrice * item.quantity,
             hasExtras: true,
-            basePrice: processedExtras.basePrice,
-            extrasTotal: processedExtras.extrasTotal,
           });
         }
 
-        // Agregar extras como productos separados
+        // Agregar extras
         processedExtras.extrasList.forEach((extra) => {
           if (extra.price > 0) {
-            // Solo agregar extras con precio
             const extraKey = `EXTRA:${extra.name}-${extra.price}`;
             if (productMap.has(extraKey)) {
               const existing = productMap.get(extraKey)!;
@@ -469,28 +492,27 @@ export default function Dashboard({
                 quantity: item.quantity,
                 subtotal: extra.price * item.quantity,
                 isExtra: true,
-              } as never);
+              } as GroupedProduct);
             }
           }
         });
       } else {
-        // Producto sin extras o con extras sin precio definido
-        const baseKey = `${item.product_name}-${item.price}`;
-        if (productMap.has(baseKey)) {
-          const existing = productMap.get(baseKey)!;
-          productMap.set(baseKey, {
+        // Producto sin extras
+        const key = `${item.product_name}-${item.price}`;
+        if (productMap.has(key)) {
+          const existing = productMap.get(key)!;
+          productMap.set(key, {
             ...existing,
             quantity: existing.quantity + item.quantity,
             subtotal: existing.subtotal + item.subtotal,
-            hasExtras: existing.hasExtras || processedExtras.hasExtras,
           });
         } else {
-          productMap.set(baseKey, {
+          productMap.set(key, {
             product_name: item.product_name,
             price: item.price,
             quantity: item.quantity,
             subtotal: item.subtotal,
-            hasExtras: processedExtras.hasExtras,
+            hasExtras: false,
           });
         }
       }
@@ -508,17 +530,14 @@ export default function Dashboard({
       return;
     }
 
-    // Calcular totales CORREGIDOS - Aplicar /1.08 a CADA producto
+    // Calcular totales CORREGIDOS - Sumar los subtotales reales
     const totalQuantity = products.reduce(
       (sum, product) => sum + product.quantity,
       0
     );
 
-    // Aplicar /1.08 a cada subtotal antes de sumar
-    const totalSales = products.reduce(
-      (sum, product) => sum + product.subtotal / 1.08,
-      0
-    );
+    // Usar el total real de las ventas (sin dividir entre 1.08)
+    const totalSales = calculateTotalSalesForReports();
 
     // Crear CSV con encabezados
     let csvContent = "No.,Producto,Precio Unitario,Cantidad,Total,Tipo\n";
@@ -531,11 +550,11 @@ export default function Dashboard({
         ? "Con Extras"
         : "Producto";
 
-      // Aplicar /1.08 a CADA precio y subtotal
+      // MOSTRAR PRECIOS REALES (sin dividir entre 1.08)
       csvContent += `"${rowNumber}","${product.product_name}","${formatCurrency(
-        product.price / 1.08 // Precio sin IVA
+        product.price // Precio REAL con IVA incluido
       )}","${product.quantity}","${formatCurrency(
-        product.subtotal / 1.08 // Subtotal sin IVA
+        product.subtotal // Subtotal REAL con IVA incluido
       )}","${tipo}"\n`;
       rowNumber++;
     });
@@ -567,17 +586,14 @@ export default function Dashboard({
       return;
     }
 
-    // Calcular totales CORREGIDOS - Aplicar /1.08 a CADA producto
+    // Calcular totales CORREGIDOS - Usar el total real de las ventas
     const totalQuantity = products.reduce(
       (sum, product) => sum + product.quantity,
       0
     );
 
-    // Aplicar /1.08 a cada subtotal antes de sumar
-    const totalSales = products.reduce(
-      (sum, product) => sum + product.subtotal / 1.08,
-      0
-    );
+    // Usar el total real de las ventas (sin dividir entre 1.08)
+    const totalSales = calculateTotalSalesForReports();
 
     // Crear contenido HTML para el PDF
     const content = `
@@ -756,11 +772,11 @@ export default function Dashboard({
               <td class="text-center">${index + 1}</td>
               <td>${product.product_name}</td>
               <td class="text-right">${formatCurrency(
-                product.price / 1.08
+                product.price // Precio REAL con IVA
               )}</td>
               <td class="text-center">${product.quantity}</td>
               <td class="text-right">${formatCurrency(
-                product.subtotal / 1.08
+                product.subtotal // Subtotal REAL con IVA
               )}</td>
               <td>${
                 product.isExtra
@@ -810,6 +826,7 @@ export default function Dashboard({
       }, 500);
     }
   };
+
   // FUNCIÓN CORREGIDA: Generar PDF del ticket con cálculos correctos
   const generateTicketPDF = (ticketData: TicketData) => {
     const { sale, items } = ticketData;
@@ -988,6 +1005,7 @@ export default function Dashboard({
       }, 500);
     }
   };
+
   // Calcular estadísticas de encuestas
   const feedbackStats = {
     total: customerFeedback.length,
@@ -1019,9 +1037,9 @@ export default function Dashboard({
     );
   }
 
-  // Calcular estadísticas combinadas
+  // Calcular estadísticas combinadas CORREGIDAS
   const combinedStats = {
-    totalRevenue: salesSummary?.totalSales || dailyStats?.totalRevenue || 0,
+    totalRevenue: calculateTotalRevenue(), // Usar función corregida
     totalItems: salesSummary?.totalItems || dailyStats?.totalItemsSold || 0,
     totalOrders: salesSummary?.totalOrders || dailyStats?.totalOrders || 0,
     activeOrders: todayOrders.length,
@@ -1129,7 +1147,7 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Estadísticas Principales */}
+      {/* Estadísticas Principales CORREGIDAS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <div className="flex items-center gap-4">
@@ -1139,7 +1157,7 @@ export default function Dashboard({
             <div>
               <p className="text-sm text-gray-600">Ingresos Totales</p>
               <p className="text-2xl font-bold text-gray-800">
-                {formatCurrency(combinedStats.totalRevenue / 1.08)}
+                {formatCurrency(combinedStats.totalRevenue)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 {salesSummary?.saleCount || 0} ventas procesadas
@@ -1273,8 +1291,7 @@ export default function Dashboard({
                           </p>
                           <p className="text-sm text-gray-500">
                             Mesa {feedback.table_id} • {feedback.order_count}{" "}
-                            órdenes •{" "}
-                            {formatCurrency(feedback.total_amount / 1.08)}
+                            órdenes • {formatCurrency(feedback.total_amount)}
                           </p>
                         </div>
                       </div>
@@ -1434,7 +1451,7 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Detalle de Ventas Históricas */}
+      {/* Detalle de Ventas Históricas CORREGIDO */}
       {salesSummary && salesSummary.saleCount > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -1445,7 +1462,7 @@ export default function Dashboard({
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <p className="font-semibold text-green-800">Total Cobrado</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(salesSummary.totalSales / 1.08)}
+                {formatCurrency(calculateTotalCollected())}
               </p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
@@ -1471,7 +1488,7 @@ export default function Dashboard({
             <div className="text-center p-4 bg-indigo-50 rounded-lg">
               <p className="font-semibold text-indigo-800">Ticket Promedio</p>
               <p className="text-2xl font-bold text-indigo-600">
-                {formatCurrency(salesSummary.averageSale / 1.08)}
+                {formatCurrency(salesSummary.averageSale)}
               </p>
             </div>
           </div>
@@ -1509,7 +1526,7 @@ export default function Dashboard({
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      {formatCurrency(sale.total_amount / 1.08)}
+                      {formatCurrency(sale.total_amount)}
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(sale.closed_at).toLocaleTimeString("es-MX")}
@@ -1590,7 +1607,7 @@ export default function Dashboard({
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-gray-600">Total Gastado</p>
                     <p className="font-semibold text-green-600">
-                      {formatCurrency(selectedFeedback.total_amount / 1.08)}
+                      {formatCurrency(selectedFeedback.total_amount)}
                     </p>
                   </div>
                 </div>
