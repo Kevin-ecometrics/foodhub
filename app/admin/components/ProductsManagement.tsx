@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
 import { FaPlus, FaEdit, FaSpinner, FaStar } from "react-icons/fa";
-import { Product } from "../types";
+import { Product, ProductFormData } from "../types";
 import ProductForm from "./ProductForm";
 import StarRating from "./StarRating";
 
@@ -22,7 +22,7 @@ export default function ProductsManagement({
   const [productsLoading, setProductsLoading] = useState(false);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState({
+  const [productForm, setProductForm] = useState<ProductFormData>({
     name: "",
     description: "",
     price: "",
@@ -32,6 +32,7 @@ export default function ProductsManagement({
     is_available: true,
     is_favorite: false,
     rating: "0",
+    extras: [],
   });
 
   useEffect(() => {
@@ -44,10 +45,23 @@ export default function ProductsManagement({
       const { data, error } = await supabase
         .from("products")
         .select("*")
-        .order("is_favorite", { ascending: false }) // Favoritos primero
+        .order("is_favorite", { ascending: false })
         .order("name", { ascending: true });
+
       if (error) throw error;
-      setProducts(data || []);
+
+      // Mapear los datos para asegurar que tengan la estructura correcta
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mappedProducts = (data || []).map((product: any) => ({
+        ...product,
+        rating: parseFloat(product.rating) || 0,
+        rating_count: product.rating_count || 0,
+        created_at: product.created_at || new Date().toISOString(),
+        updated_at: product.updated_at || new Date().toISOString(),
+        extras: product.extras || [],
+      })) as Product[];
+
+      setProducts(mappedProducts);
     } catch (error) {
       console.error("Error loading products:", error);
       onError("Error cargando los productos");
@@ -91,11 +105,13 @@ export default function ProductsManagement({
         is_favorite: productForm.is_favorite,
         rating: parseFloat(productForm.rating) || 0,
         rating_count: 0,
+        extras: productForm.extras || [], // INCLUIR EXTRAS
       };
 
       const { error } = await supabase
         .from("products")
         .insert([productData as never]);
+
       if (error) throw error;
 
       setShowProductForm(false);
@@ -109,8 +125,10 @@ export default function ProductsManagement({
         is_available: true,
         is_favorite: false,
         rating: "0",
+        extras: [],
       });
       await loadProducts();
+      alert("✅ Producto creado con extras correctamente");
     } catch (error) {
       console.error("Error creating product:", error);
       onError("Error creando el producto");
@@ -137,12 +155,14 @@ export default function ProductsManagement({
         is_available: productForm.is_available,
         is_favorite: productForm.is_favorite,
         rating: parseFloat(productForm.rating) || 0,
+        extras: productForm.extras || [], // INCLUIR EXTRAS
       };
 
       const { error } = await supabase
         .from("products")
         .update(productData as never)
         .eq("id", editingProduct.id);
+
       if (error) throw error;
 
       setShowProductForm(false);
@@ -157,8 +177,10 @@ export default function ProductsManagement({
         is_available: true,
         is_favorite: false,
         rating: "0",
+        extras: [],
       });
       await loadProducts();
+      alert("✅ Producto actualizado con extras correctamente");
     } catch (error) {
       console.error("Error updating product:", error);
       onError("Error actualizando el producto");
@@ -177,19 +199,23 @@ export default function ProductsManagement({
       is_available: product.is_available,
       is_favorite: product.is_favorite,
       rating: product.rating.toString(),
+      extras: product.extras || [], // CARGAR EXTRAS EXISTENTES
     });
     setShowProductForm(true);
   };
 
   const toggleProductAvailability = async (product: Product) => {
     try {
-      const updateData: ProductUpdate = {
+      const updateData = {
         is_available: !product.is_available,
+        updated_at: new Date().toISOString(),
       };
+
       const { error } = await supabase
         .from("products")
         .update(updateData as never)
         .eq("id", product.id);
+
       if (error) throw error;
       await loadProducts();
     } catch (error) {
@@ -200,13 +226,16 @@ export default function ProductsManagement({
 
   const toggleProductFavorite = async (product: Product) => {
     try {
-      const updateData: ProductUpdate = {
+      const updateData = {
         is_favorite: !product.is_favorite,
+        updated_at: new Date().toISOString(),
       };
+
       const { error } = await supabase
         .from("products")
         .update(updateData as never)
         .eq("id", product.id);
+
       if (error) throw error;
       await loadProducts();
     } catch (error) {
@@ -241,6 +270,7 @@ export default function ProductsManagement({
               is_available: true,
               is_favorite: false,
               rating: "0",
+              extras: [],
             });
             setShowProductForm(true);
           }}
@@ -330,6 +360,12 @@ export default function ProductsManagement({
                           <div className="text-sm text-gray-500 truncate max-w-xs">
                             {product.description}
                           </div>
+                          {/* MOSTRAR EXTRAS SI EXISTEN */}
+                          {product.extras && product.extras.length > 0 && (
+                            <div className="text-xs text-green-600 mt-1">
+                              +{product.extras.length} extras disponibles
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>

@@ -41,8 +41,8 @@ const CATEGORIES = [
     description: "Tus items recientes de esta orden",
   },
   {
-    id: "refill",
-    name: "Refill",
+    id: "drinks",
+    name: "Drinks",
     icon: "🥤",
     description: "Refill de bebidas",
   },
@@ -103,11 +103,126 @@ export default function MenuPage() {
   const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
 
-  // NUEVOS ESTADOS PARA NOTAS
+  // ESTADOS PARA NOTAS Y EXTRAS
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [notes, setNotes] = useState("");
   const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
+  const [selectedExtras, setSelectedExtras] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  // Función para formatear notas y extras (MEJORADA)
+  const formatItemNotes = (notes: string | null) => {
+    if (!notes) return null;
+
+    // Detectar si tiene información de extras con precios
+    const hasPricedExtras = notes.includes("(+$");
+
+    if (hasPricedExtras) {
+      // Separar notas principales de extras
+      const parts = notes.split(" | ");
+      const mainNotes = parts.find(
+        (part) => !part.includes("Extras:") && !part.includes("Total:")
+      );
+      const extrasPart = parts.find((part) => part.includes("Extras:"));
+      const totalPart = parts.find((part) => part.includes("Total:"));
+
+      return (
+        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          {/* Notas principales */}
+          {mainNotes && (
+            <div className="flex items-start gap-2">
+              <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">
+                <span className="font-medium">Instrucciones:</span> {mainNotes}
+              </span>
+            </div>
+          )}
+
+          {/* Extras con precios */}
+          {extrasPart && (
+            <div className="flex items-start gap-2">
+              <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-green-700">
+                  Extras agregados:
+                </span>
+                <div className="mt-1 ml-2 space-y-1">
+                  {extrasPart
+                    .replace("Extras: ", "")
+                    .split(", ")
+                    .map((extra, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-green-600">
+                          • {extra.split(" (+$")[0]}
+                        </span>
+                        <span className="text-green-700 font-medium">
+                          {extra.match(/\(\+\$([^)]+)\)/)?.[1] || ""}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Total si está presente */}
+          {totalPart && (
+            <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
+              <FaStickyNote className="text-blue-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm font-medium text-blue-700">
+                {totalPart}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Detectar extras simples (sin precios)
+    if (notes.includes("Extras:")) {
+      const parts = notes.split(" | ");
+      let mainNotes = "";
+      let extrasText = "";
+
+      parts.forEach((part) => {
+        if (part.startsWith("Extras:")) {
+          extrasText = part.replace("Extras: ", "");
+        } else {
+          mainNotes = part;
+        }
+      });
+
+      return (
+        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg">
+          {mainNotes && (
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Nota:</span> {mainNotes}
+            </p>
+          )}
+          {extrasText && (
+            <p className="text-sm text-green-700">
+              <span className="font-medium">Extras:</span> {extrasText}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Notas normales
+    return (
+      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+        <p className="text-sm text-yellow-800 flex items-center gap-1">
+          <FaStickyNote className="text-yellow-600" />
+          <span className="font-medium">Nota:</span> {notes}
+        </p>
+      </div>
+    );
+  };
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -214,6 +329,123 @@ export default function MenuPage() {
     setFavoriteItems(favorites);
   };
 
+  // FUNCIONES PARA MANEJAR EXTRAS
+  const handleExtraToggle = (extraName: string) => {
+    setSelectedExtras((prev) => ({
+      ...prev,
+      [extraName]: !prev[extraName],
+    }));
+  };
+
+  const calculateTotalWithExtras = () => {
+    if (!selectedProduct) return 0;
+
+    const basePrice = selectedProduct.price;
+    const extrasTotal = Object.entries(selectedExtras)
+      .filter(([_, isSelected]) => isSelected)
+      .reduce((total, [extraName]) => {
+        const extra = selectedProduct.extras?.find((e) => e.name === extraName);
+        return total + (extra?.price || 0);
+      }, 0);
+
+    return basePrice + extrasTotal;
+  };
+
+  const resetExtras = () => {
+    setSelectedExtras({});
+    setNotes("");
+    setSelectedProduct(null);
+    setEditingItem(null);
+  };
+
+  // FUNCIONES PARA EL MODAL DE NOTAS Y EXTRAS
+  const handleAddToCartWithNotes = (product: Product) => {
+    setSelectedProduct(product);
+    setNotes("");
+    setSelectedExtras({});
+    setEditingItem(null);
+    setShowNotesModal(true);
+  };
+
+  const handleEditNotes = (item: OrderItem) => {
+    const product = products.find((p) => p.id === item.product_id);
+    if (product) {
+      setSelectedProduct(product);
+      setNotes(item.notes || "");
+      setSelectedExtras({});
+      setEditingItem(item);
+      setShowNotesModal(true);
+    }
+  };
+
+  const handleConfirmAddWithNotes = async () => {
+    if (!selectedProduct) return;
+
+    setAddingProduct(selectedProduct.id);
+    try {
+      // Calcular el precio total con extras
+      const basePrice = selectedProduct.price;
+      const extrasTotal = Object.entries(selectedExtras)
+        .filter(([_, isSelected]) => isSelected)
+        .reduce((total, [extraName]) => {
+          const extra = selectedProduct.extras?.find(
+            (e) => e.name === extraName
+          );
+          return total + (extra?.price || 0);
+        }, 0);
+
+      const totalPrice = basePrice + extrasTotal;
+
+      // Preparar notas incluyendo los extras seleccionados
+      const selectedExtrasList = Object.entries(selectedExtras)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([extraName]) => {
+          const extra = selectedProduct.extras?.find(
+            (e) => e.name === extraName
+          );
+          return {
+            name: extraName,
+            price: extra?.price || 0,
+          };
+        });
+
+      let finalNotes = notes;
+      if (selectedExtrasList.length > 0) {
+        const extrasDetails = selectedExtrasList
+          .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
+          .join(", ");
+
+        const extrasText = `Extras: ${extrasDetails}`;
+        finalNotes = notes ? `${notes} | ${extrasText}` : extrasText;
+
+        // Agregar información del total si hay extras
+        if (extrasTotal > 0) {
+          finalNotes += ` | Total: $${totalPrice.toFixed(2)}`;
+        }
+      }
+
+      if (editingItem) {
+        // Editar item existente CON PRECIO ACTUALIZADO
+        await updateCartItem(
+          editingItem.id,
+          editingItem.quantity,
+          finalNotes,
+          totalPrice
+        );
+      } else {
+        // Agregar nuevo producto con notas, extras y PRECIO CORRECTO
+        await addToCart(selectedProduct, 1, finalNotes, totalPrice);
+      }
+
+      setShowNotesModal(false);
+      resetExtras();
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    } finally {
+      setAddingProduct(null);
+    }
+  };
+
   // Suscripción para detectar liberación de mesa
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
@@ -242,59 +474,6 @@ export default function MenuPage() {
       subscription.unsubscribe();
     };
   }, [tableId, currentTableId]);
-
-  // NUEVA FUNCIÓN: Abrir modal para agregar producto con notas
-  const handleAddToCartWithNotes = (product: Product) => {
-    setSelectedProduct(product);
-    setNotes("");
-    setEditingItem(null);
-    setShowNotesModal(true);
-  };
-
-  // NUEVA FUNCIÓN: Abrir modal para editar notas de un item existente
-  const handleEditNotes = (item: OrderItem) => {
-    const product = products.find((p) => p.id === item.product_id);
-    if (product) {
-      setSelectedProduct(product);
-      setNotes(item.notes || "");
-      setEditingItem(item);
-      setShowNotesModal(true);
-    }
-  };
-
-  // NUEVA FUNCIÓN: Confirmar agregar/editar producto con notas
-  const handleConfirmAddWithNotes = async () => {
-    if (!selectedProduct) return;
-
-    setAddingProduct(selectedProduct.id);
-    try {
-      if (editingItem) {
-        // Editar notas de un item existente
-        await updateCartItem(editingItem.id, editingItem.quantity, notes);
-      } else {
-        // Agregar nuevo producto con notas
-        await addToCart(selectedProduct, 1, notes);
-      }
-
-      // Animación de confirmación
-      const button = document.getElementById(`product-${selectedProduct.id}`);
-      if (button) {
-        button.classList.add("bg-green-500");
-        setTimeout(() => {
-          button.classList.remove("bg-green-500");
-        }, 500);
-      }
-
-      setShowNotesModal(false);
-      setSelectedProduct(null);
-      setNotes("");
-      setEditingItem(null);
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-    } finally {
-      setAddingProduct(null);
-    }
-  };
 
   // FUNCIÓN ORIGINAL: Agregar producto sin notas (mantenida para compatibilidad)
   const handleAddToCart = async (product: Product) => {
@@ -449,7 +628,7 @@ export default function MenuPage() {
         return getPopularItems();
       default:
         const categoryMap: { [key: string]: string } = {
-          refill: "Refill",
+          drinks: "Drinks",
           combos: "Combos",
           breakfast: "Breakfast",
           lunch: "Lunch",
@@ -614,7 +793,35 @@ export default function MenuPage() {
 
       <div className="bg-white shadow-sm sticky top-16 z-20 overflow-x-auto">
         <div className="flex gap-2 px-4 py-4 max-w-7xl mx-auto">
-          {CATEGORIES.map((category) => (
+          {CATEGORIES.filter((category) => {
+            // Determinar cuántos productos hay en esta categoría
+            let productsCount = 0;
+
+            switch (category.id) {
+              case "favorites":
+                productsCount = favoriteItems.length;
+                break;
+              case "repite-item":
+                productsCount = recentItems.length;
+                break;
+              case "popular":
+                productsCount = getPopularItems().length;
+                break;
+              default:
+                const categoryMap: { [key: string]: string } = {
+                  drinks: "Drinks",
+                  combos: "Combos",
+                  breakfast: "Breakfast",
+                  lunch: "Lunch",
+                  dinner: "Dinner",
+                };
+                productsCount = products.filter(
+                  (product) => product.category === categoryMap[category.id]
+                ).length;
+            }
+
+            return productsCount > 0; // Solo mostrar categorías con productos
+          }).map((category) => (
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.id)}
@@ -738,6 +945,16 @@ export default function MenuPage() {
                     {product.description}
                   </p>
 
+                  {/* Mostrar extras disponibles */}
+                  {product.extras && product.extras.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-green-600 font-medium">
+                        +{product.extras.filter((e) => e.is_available).length}{" "}
+                        extras disponibles
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="text-2xl font-bold text-blue-600">
@@ -799,14 +1016,9 @@ export default function MenuPage() {
                     </div>
                   </div>
 
-                  {/* Mostrar notas si existen */}
+                  {/* Mostrar notas si existen - MEJORADO */}
                   {isInCart && currentNotes && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-xs text-yellow-800 flex items-center gap-1">
-                        <FaStickyNote className="text-yellow-600" />
-                        <strong>Nota:</strong> {currentNotes}
-                      </p>
-                    </div>
+                    <div className="mt-2">{formatItemNotes(currentNotes)}</div>
                   )}
                 </div>
               </div>
@@ -825,65 +1037,177 @@ export default function MenuPage() {
           )}
       </main>
 
-      {/* MODAL DE NOTAS */}
+      {/* MODAL DE NOTAS MEJORADO CON EXTRAS */}
       {showNotesModal && selectedProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b sticky top-0 bg-white z-10">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                   <FaStickyNote className="text-blue-600" />
-                  {editingItem ? "Editar Notas" : "Agregar al Carrito"}
+                  {editingItem ? "Editar Pedido" : "Personalizar Pedido"}
                 </h2>
                 <button
                   onClick={() => {
                     setShowNotesModal(false);
-                    setSelectedProduct(null);
-                    setNotes("");
-                    setEditingItem(null);
+                    resetExtras();
                   }}
                   className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
                   ✕
                 </button>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-800">
-                  {selectedProduct.name}
-                </h3>
-                <p className="text-lg font-bold text-blue-600">
-                  ${selectedProduct.price.toFixed(2)}
-                </p>
-                {selectedProduct.description && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedProduct.description}
-                  </p>
-                )}
+
+              {/* Información del producto */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <div className="flex items-start gap-3">
+                  {selectedProduct.image_url && (
+                    <img
+                      src={selectedProduct.image_url}
+                      alt={selectedProduct.name}
+                      className="w-16 h-16 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-800 text-lg">
+                      {selectedProduct.name}
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {selectedProduct.description}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-lg font-bold text-blue-600">
+                        ${selectedProduct.price.toFixed(2)}
+                      </span>
+                      {selectedProduct.preparation_time && (
+                        <span className="text-sm text-gray-500 flex items-center gap-1">
+                          <FaClock className="text-xs" />
+                          {selectedProduct.preparation_time} min
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Notas para la preparación (opcional):
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ej: Sin tomate, extra queso, bien cocido, sin picante, etc."
-                className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                maxLength={200}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {notes.length}/200 caracteres - Estas notas se enviarán a cocina
-              </p>
+              {/* SECCIÓN DE EXTRAS */}
+              {selectedProduct.extras && selectedProduct.extras.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <FaPlus className="text-green-600" />
+                    Agregar Extras
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedProduct.extras
+                      .filter((extra) => extra.is_available)
+                      .map((extra, index) => (
+                        <label
+                          key={index}
+                          className={`flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                            selectedExtras[extra.name]
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={!!selectedExtras[extra.name]}
+                              onChange={() => handleExtraToggle(extra.name)}
+                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            />
+                            <div>
+                              <span className="font-medium text-gray-800">
+                                {extra.name}
+                              </span>
+                              <p className="text-sm text-gray-600">
+                                +${extra.price.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                          {selectedExtras[extra.name] && (
+                            <FaCheck className="text-green-600" />
+                          )}
+                        </label>
+                      ))}
+                  </div>
 
-              <div className="mt-6 flex gap-3">
+                  {/* Resumen de extras seleccionados */}
+                  {Object.keys(selectedExtras).filter(
+                    (key) => selectedExtras[key]
+                  ).length > 0 && (
+                    <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm font-medium text-blue-800">
+                        Extras seleccionados:
+                      </p>
+                      <ul className="text-sm text-blue-700 mt-1">
+                        {Object.entries(selectedExtras)
+                          .filter(([_, isSelected]) => isSelected)
+                          .map(([extraName]) => {
+                            const extra = selectedProduct.extras?.find(
+                              (e) => e.name === extraName
+                            );
+                            return (
+                              <li
+                                key={extraName}
+                                className="flex justify-between"
+                              >
+                                <span>• {extraName}</span>
+                                <span>+${extra?.price.toFixed(2)}</span>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SECCIÓN DE NOTAS */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <FaStickyNote className="inline mr-2 text-yellow-600" />
+                  Instrucciones especiales (opcional):
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ej: Sin tomate, extra queso, bien cocido, sin picante, sin sal, etc."
+                  className="w-full h-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  maxLength={200}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {notes.length}/200 caracteres
+                </p>
+              </div>
+
+              {/* RESUMEN FINAL Y PRECIO */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-800">Total:</span>
+                  <span className="text-2xl font-bold text-green-600">
+                    ${calculateTotalWithExtras().toFixed(2)}
+                  </span>
+                </div>
+                {calculateTotalWithExtras() > selectedProduct.price && (
+                  <p className="text-sm text-gray-600 mt-1 text-right">
+                    (Base: ${selectedProduct.price.toFixed(2)} + Extras: $
+                    {(
+                      calculateTotalWithExtras() - selectedProduct.price
+                    ).toFixed(2)}
+                    )
+                  </p>
+                )}
+              </div>
+
+              {/* BOTONES DE ACCIÓN */}
+              <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setShowNotesModal(false);
-                    setSelectedProduct(null);
-                    setNotes("");
-                    setEditingItem(null);
+                    resetExtras();
                   }}
                   className="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition"
                 >
@@ -995,7 +1319,7 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* MODAL DEL CARRITO */}
+      {/* MODAL DEL CARRITO - MEJORADO */}
       {showCart && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-end animate-in slide-in-from-right">
           <div className="bg-white w-full max-w-md h-full overflow-y-auto">
@@ -1017,22 +1341,6 @@ export default function MenuPage() {
                 >
                   ✕
                 </button>
-              </div>
-
-              {/* Resumen rápido */}
-              <div className="grid grid-cols-2 gap-4 text-center">
-                {/* <div className="bg-blue-50 p-3 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {cartItemsCount}
-                  </div>
-                  <div className="text-xs text-gray-600">Items en carrito</div>
-                </div>
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    ${cartTotal.toFixed(2)}
-                  </div>
-                  <div className="text-xs text-gray-600">Subtotal</div>
-                </div> */}
               </div>
             </div>
 
@@ -1092,12 +1400,11 @@ export default function MenuPage() {
                         <p className="text-lg font-bold text-blue-600">
                           ${item.price.toFixed(2)}
                         </p>
+
+                        {/* NOTAS Y EXTRAS MEJORADOS EN EL CARRITO */}
                         {item.notes && (
-                          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                            <p className="text-sm text-yellow-800 flex items-center gap-1">
-                              <FaStickyNote className="text-yellow-600 text-xs" />
-                              <strong>Nota:</strong> {item.notes}
-                            </p>
+                          <div className="mt-2">
+                            {formatItemNotes(item.notes)}
                           </div>
                         )}
                       </div>
@@ -1135,25 +1442,9 @@ export default function MenuPage() {
                 {/* Resumen y acciones */}
                 <div className="p-6 bg-gray-50  sticky bottom-0">
                   <div className="space-y-2 mb-6">
-                    {/* <div className="flex justify-between text-sm">
-                      <span>Items en carrito:</span>
-                      <span>{cartItemsCount}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>${cartTotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Tax (8%):</span>
-                      <span>${(cartTotal * 0.08).toFixed(2)}</span>
-                    </div> */}
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>
                       <span>${cartTotal.toFixed(2)}</span>
-
-                      {/* <span className="text-blue-600">
-                        ${(cartTotal * 1.08).toFixed(2)}
-                      </span> */}
                     </div>
 
                     {/* Tiempo estimado */}

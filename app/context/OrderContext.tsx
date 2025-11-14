@@ -34,12 +34,14 @@ interface OrderContextType {
   addToCart: (
     product: Product,
     quantity?: number,
-    notes?: string
+    notes?: string,
+    customPrice?: number
   ) => Promise<void>;
   updateCartItem: (
     itemId: string,
     quantity: number,
-    notes?: string
+    notes?: string,
+    customPrice?: number
   ) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => void;
@@ -394,16 +396,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const addToCart = async (
     product: Product,
     quantity: number = 1,
-    notes?: string
+    notes?: string,
+    customPrice?: number
   ) => {
     if (!currentOrder) throw new Error("No active order");
 
     try {
+      const price = customPrice !== undefined ? customPrice : product.price;
       const newItem = await orderItemsService.addItemToOrder(
         currentOrder.id,
         product,
         quantity,
-        notes
+        notes,
+        price
       );
 
       setOrderItems((prev) => [...prev, newItem]);
@@ -425,7 +430,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const updateCartItem = async (
     itemId: string,
     quantity: number,
-    notes?: string
+    notes?: string,
+    customPrice?: number
   ) => {
     if (quantity < 1) {
       await removeFromCart(itemId);
@@ -433,7 +439,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      await orderItemsService.updateItemQuantity(itemId, quantity, notes);
+      await orderItemsService.updateItemQuantity(
+        itemId,
+        quantity,
+        notes,
+        customPrice
+      );
 
       // Actualizar estado local
       setOrderItems((prev) =>
@@ -442,6 +453,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...item,
                 quantity,
+                price: customPrice !== undefined ? customPrice : item.price,
                 notes: notes !== undefined ? notes : item.notes, // Mantener notas existentes si no se proporcionan nuevas
               }
             : item
@@ -452,7 +464,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         // Calcular nuevo total
         const newTotal = orderItems.reduce((total, item) => {
           if (item.id === itemId) {
-            return total + item.price * quantity;
+            const itemPrice =
+              customPrice !== undefined ? customPrice : item.price;
+            return total + itemPrice * quantity;
           }
           return total + item.price * item.quantity;
         }, 0);

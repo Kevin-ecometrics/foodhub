@@ -26,15 +26,18 @@ export const orderItemsService = {
     orderId: string, 
     product: Product, 
     quantity: number = 1, 
-    notes?: string
+    notes?: string,
+    customPrice?: number
   ): Promise<OrderItem> {
+
+    const price = customPrice !== undefined ? customPrice : product.price;
     const { data, error } = await supabase
       .from('order_items')
       .insert({
         order_id: orderId,
         product_id: product.id,
         product_name: product.name,
-        price: product.price,
+        price: price,
         quantity,
         notes: notes || null,
         status: 'ordered'
@@ -59,7 +62,8 @@ export const orderItemsService = {
   },
 
   // ACTUALIZADO: Actualizar cantidad y notas de un item
-  async updateItemQuantity(itemId: string, quantity: number, notes?: string): Promise<OrderItem> {
+  async updateItemQuantity(itemId: string, quantity: number, notes?: string, customPrice?: number): Promise<OrderItem> {
+
     const updateData: any = { 
       quantity,
       updated_at: new Date().toISOString()
@@ -68,6 +72,10 @@ export const orderItemsService = {
     // Solo actualizar notes si se proporciona (puede ser string vacío para eliminar notas)
     if (notes !== undefined) {
       updateData.notes = notes || null
+    }
+
+    if (customPrice !== undefined) {
+      updateData.price = customPrice
     }
 
     const { data, error } = await supabase

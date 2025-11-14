@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
+import { productsService } from "@/app/lib/supabase/products"; // IMPORTAR EL SERVICE
 import { FaSpinner } from "react-icons/fa";
 
 interface Product {
@@ -16,6 +17,7 @@ interface Product {
   is_favorite: boolean;
   rating: number;
   rating_count: number;
+  extras?: never[];
 }
 
 interface ProductsManagementProps {
@@ -36,14 +38,9 @@ export default function ProductsManagement({
   const loadProducts = async () => {
     setProductsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("is_favorite", { ascending: false })
-        .order("name", { ascending: true });
-
-      if (error) throw error;
-      setProducts(data || []);
+      // USAR EL SERVICE EN LUGAR DE SUPABASE DIRECTAMENTE
+      const productsData = await productsService.getProducts();
+      setProducts(productsData as never);
     } catch (error) {
       console.error("Error loading products:", error);
       onError("Error cargando los productos");
@@ -55,15 +52,12 @@ export default function ProductsManagement({
   const toggleProductAvailability = async (product: Product) => {
     setUpdatingProduct(product.id);
     try {
-      const { error } = await supabase
-        .from("products")
-        .update({
-          is_available: !product.is_available,
-          updated_at: new Date().toISOString(),
-        } as never)
-        .eq("id", product.id);
-
-      if (error) throw error;
+      // USAR EL SERVICE PARA ACTUALIZAR
+      await productsService.updateProductWithExtras(product.id, {
+        ...product,
+        is_available: !product.is_available,
+        extras: product.extras || [], // INCLUIR LOS EXTRAS
+      });
 
       // Actualizar el estado local inmediatamente
       setProducts((prev) =>
@@ -150,6 +144,12 @@ export default function ProductsManagement({
                             {formatCurrency(product.price)}
                             {product.preparation_time &&
                               ` • ${product.preparation_time} min`}
+                            {/* MOSTRAR EXTRAS SI EXISTEN */}
+                            {product.extras && product.extras.length > 0 && (
+                              <div className="text-green-600 mt-1">
+                                +{product.extras.length} extras disponibles
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -199,6 +199,9 @@ export default function ProductsManagement({
         <p className="text-sm text-blue-700">
           • Los productos marcados como No Disponible no aparecerán en el menú
           de los clientes
+        </p>
+        <p className="text-sm text-blue-700">
+          • Los productos con extras mostrarán
         </p>
       </div>
     </div>

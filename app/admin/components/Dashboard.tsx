@@ -11,8 +11,10 @@ import {
   FaFileExport,
   FaReceipt,
   FaTimes,
-  FaMoneyBillWave,
-  FaCreditCard,
+  FaPlus,
+  FaStar,
+  FaComment,
+  FaUser,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -42,13 +44,34 @@ interface SalesItem {
   price: number;
   quantity: number;
   subtotal: number;
-  notes?: string;
+  notes?: string | null;
 }
 
 // Interfaz para el ticket
 interface TicketData {
   sale: SalesHistory;
   items: SalesItem[];
+}
+
+// Interfaz para extras procesados
+interface ProcessedExtras {
+  hasExtras: boolean;
+  extrasList: string[];
+  extrasTotal: number;
+  basePrice: number;
+  finalPrice: number;
+}
+
+// Interfaz para las encuestas de satisfacción
+interface CustomerFeedback {
+  id: string;
+  table_id: string;
+  customer_name: string;
+  rating: number;
+  comment: string | null;
+  order_count: number;
+  total_amount: number;
+  created_at: string;
 }
 
 export default function Dashboard({
@@ -70,6 +93,13 @@ export default function Dashboard({
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
   const [loadingTicket, setLoadingTicket] = useState(false);
+  const [customerFeedback, setCustomerFeedback] = useState<CustomerFeedback[]>(
+    []
+  );
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] =
+    useState<CustomerFeedback | null>(null);
 
   // Actualizar dateInput cuando selectedDate cambie
   useEffect(() => {
@@ -84,6 +114,40 @@ export default function Dashboard({
       setSalesItems([]);
     }
   }, [salesHistory]);
+
+  // Cargar encuestas de satisfacción
+  useEffect(() => {
+    loadCustomerFeedback();
+  }, [selectedDate]);
+
+  // Función para cargar las encuestas de satisfacción
+  const loadCustomerFeedback = async () => {
+    setLoadingFeedback(true);
+    try {
+      const { data, error } = await supabase
+        .from("customer_feedback")
+        .select("*")
+        .gte("created_at", selectedDate.toISOString().split("T")[0])
+        .lt(
+          "created_at",
+          new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0]
+        )
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error cargando encuestas:", error);
+        throw error;
+      }
+
+      setCustomerFeedback(data || []);
+    } catch (error) {
+      console.error("Error al cargar encuestas:", error);
+    } finally {
+      setLoadingFeedback(false);
+    }
+  };
 
   // Función REAL para obtener items de venta desde Supabase
   const loadSalesItems = async () => {
@@ -125,6 +189,93 @@ export default function Dashboard({
     }
   };
 
+  // FUNCIÓN MEJORADA: Procesar extras desde las notas
+  const processExtrasFromNotes = (
+    notes: string | null | undefined
+  ): ProcessedExtras => {
+    if (!notes) {
+      return {
+        hasExtras: false,
+        extrasList: [],
+        extrasTotal: 0,
+        basePrice: 0,
+        finalPrice: 0,
+      };
+    }
+
+    // Detectar si tiene información de extras con precios
+    const hasPricedExtras = notes.includes("(+$");
+
+    if (hasPricedExtras) {
+      // Separar notas principales de extras
+      const parts = notes.split(" | ");
+      const mainNotes = parts.find(
+        (part) => !part.includes("Extras:") && !part.includes("Total:")
+      );
+      const extrasPart = parts.find((part) => part.includes("Extras:"));
+      const totalPart = parts.find((part) => part.includes("Total:"));
+
+      let extrasList: string[] = [];
+      let extrasTotal = 0;
+
+      // Procesar extras con precios
+      if (extrasPart) {
+        const extrasText = extrasPart.replace("Extras: ", "");
+        extrasList = extrasText.split(", ").map((extra) => {
+          const priceMatch = extra.match(/\(\+\$([^)]+)\)/);
+          const price = priceMatch ? parseFloat(priceMatch[1]) : 0;
+          extrasTotal += price;
+          return extra;
+        });
+      }
+
+      // Obtener precio base y final
+      let basePrice = 0;
+      let finalPrice = 0;
+
+      if (totalPart) {
+        const totalMatch = totalPart.match(/Total: \$([\d.]+)/);
+        finalPrice = totalMatch ? parseFloat(totalMatch[1]) : 0;
+        basePrice = finalPrice - extrasTotal;
+      }
+
+      return {
+        hasExtras: true,
+        extrasList,
+        extrasTotal,
+        basePrice,
+        finalPrice,
+      };
+    }
+
+    // Detectar extras simples (sin precios)
+    if (notes.includes("Extras:")) {
+      const parts = notes.split(" | ");
+      const extrasPart = parts.find((part) => part.startsWith("Extras:"));
+
+      if (extrasPart) {
+        const extrasText = extrasPart.replace("Extras: ", "");
+        const extrasList = extrasText.split(", ");
+
+        return {
+          hasExtras: true,
+          extrasList,
+          extrasTotal: 0, // No sabemos el precio en este caso
+          basePrice: 0,
+          finalPrice: 0,
+        };
+      }
+    }
+
+    return {
+      hasExtras: false,
+      extrasList: [],
+      extrasTotal: 0,
+      basePrice: 0,
+      finalPrice: 0,
+    };
+  };
+
   // Función para cargar los items de una venta específica
   const loadTicketItems = async (sale: SalesHistory) => {
     setLoadingTicket(true);
@@ -138,6 +289,12 @@ export default function Dashboard({
     } finally {
       setLoadingTicket(false);
     }
+  };
+
+  // Función para mostrar los detalles de una encuesta
+  const showFeedbackDetails = (feedback: CustomerFeedback) => {
+    setSelectedFeedback(feedback);
+    setShowFeedbackModal(true);
   };
 
   const formatCurrency = (amount: number): string => {
@@ -168,40 +325,68 @@ export default function Dashboard({
   };
 
   // Función para obtener el texto del método de pago
-  const getPaymentMethodText = (method: "cash" | "terminal" | null): string => {
+  const getPaymentMethodText = (method: string | null): string => {
     switch (method) {
-      case "cash":
-        return "EFECTIVO";
-      case "terminal":
-        return "TERMINAL";
+      case "ticket":
+        return "TICKET";
       default:
         return "NO ESPECIFICADO";
     }
   };
 
   // Función para obtener el icono del método de pago
-  const getPaymentMethodIcon = (method: "cash" | "terminal" | null) => {
+  const getPaymentMethodIcon = (method: string | null) => {
     switch (method) {
-      case "cash":
-        return <FaMoneyBillWave className="text-green-600" />;
-      case "terminal":
-        return <FaCreditCard className="text-blue-600" />;
+      case "ticket":
+        return <FaReceipt className="text-blue-600" />;
       default:
         return <FaDollarSign className="text-gray-600" />;
     }
   };
 
   // Función para obtener el color del método de pago
-  const getPaymentMethodColor = (
-    method: "cash" | "terminal" | null
-  ): string => {
+  const getPaymentMethodColor = (method: string | null): string => {
     switch (method) {
-      case "cash":
-        return "bg-green-100 text-green-800 border-green-300";
-      case "terminal":
+      case "ticket":
         return "bg-blue-100 text-blue-800 border-blue-300";
       default:
         return "bg-gray-100 text-gray-800 border-gray-300";
+    }
+  };
+
+  // Función para obtener el color de la calificación
+  const getRatingColor = (rating: number): string => {
+    switch (rating) {
+      case 1:
+        return "bg-red-100 text-red-800 border-red-300";
+      case 2:
+        return "bg-orange-100 text-orange-800 border-orange-300";
+      case 3:
+        return "bg-yellow-100 text-yellow-800 border-yellow-300";
+      case 4:
+        return "bg-lime-100 text-lime-800 border-lime-300";
+      case 5:
+        return "bg-green-100 text-green-800 border-green-300";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300";
+    }
+  };
+
+  // Función para obtener el texto de la calificación
+  const getRatingText = (rating: number): string => {
+    switch (rating) {
+      case 1:
+        return "Muy mala";
+      case 2:
+        return "Mala";
+      case 3:
+        return "Regular";
+      case 4:
+        return "Buena";
+      case 5:
+        return "Excelente";
+      default:
+        return "Sin calificar";
     }
   };
 
@@ -216,25 +401,59 @@ export default function Dashboard({
     setShowDateFilter(false);
   };
 
-  // FUNCIÓN: Agrupar productos para reportes
+  // FUNCIÓN: Agrupar productos para reportes (INCLUYENDO EXTRAS)
   const getGroupedProducts = () => {
     const productMap = new Map();
 
     salesItems.forEach((item) => {
-      const key = `${item.product_name}-${item.price}`;
-      if (productMap.has(key)) {
-        const existing = productMap.get(key);
-        productMap.set(key, {
+      const processedExtras = processExtrasFromNotes(item.notes);
+
+      // Producto base
+      const baseKey = `${item.product_name}-${item.price}`;
+      if (productMap.has(baseKey)) {
+        const existing = productMap.get(baseKey);
+        productMap.set(baseKey, {
           ...existing,
           quantity: existing.quantity + item.quantity,
           subtotal: existing.subtotal + item.subtotal,
+          hasExtras: existing.hasExtras || processedExtras.hasExtras,
         });
       } else {
-        productMap.set(key, {
+        productMap.set(baseKey, {
           product_name: item.product_name,
           price: item.price,
           quantity: item.quantity,
           subtotal: item.subtotal,
+          hasExtras: processedExtras.hasExtras,
+        });
+      }
+
+      // Si hay extras, agregarlos como productos separados
+      if (processedExtras.hasExtras && processedExtras.extrasList.length > 0) {
+        processedExtras.extrasList.forEach((extra) => {
+          const extraPriceMatch = extra.match(/\(\+\$([^)]+)\)/);
+          const extraPrice = extraPriceMatch
+            ? parseFloat(extraPriceMatch[1])
+            : 0;
+          const extraName = extra.split(" (+$")[0];
+
+          const extraKey = `EXTRA: ${extraName}-${extraPrice}`;
+          if (productMap.has(extraKey)) {
+            const existing = productMap.get(extraKey);
+            productMap.set(extraKey, {
+              ...existing,
+              quantity: existing.quantity + item.quantity,
+              subtotal: existing.subtotal + extraPrice * item.quantity,
+            });
+          } else {
+            productMap.set(extraKey, {
+              product_name: `+ ${extraName}`,
+              price: extraPrice,
+              quantity: item.quantity,
+              subtotal: extraPrice * item.quantity,
+              isExtra: true,
+            });
+          }
         });
       }
     });
@@ -242,7 +461,7 @@ export default function Dashboard({
     return Array.from(productMap.values());
   };
 
-  // FUNCIÓN: Generar Excel de productos vendidos
+  // FUNCIÓN: Generar Excel de productos vendidos (INCLUYENDO EXTRAS)
   const generateProductsExcelReport = () => {
     const products = getGroupedProducts();
 
@@ -262,18 +481,26 @@ export default function Dashboard({
     );
 
     // Crear CSV con encabezados
-    let csvContent = "No.,Producto,Precio Unitario,Cantidad Vendida,Total\n";
+    let csvContent =
+      "No.,Producto,Precio Unitario,Cantidad Vendida,Total,Tipo\n";
 
     products.forEach((product, index) => {
+      const tipo = product.isExtra
+        ? "Extra"
+        : product.hasExtras
+        ? "Con Extras"
+        : "Producto";
       csvContent += `"${index + 1}","${product.product_name}","${formatCurrency(
         product.price
-      )}","${product.quantity}","${formatCurrency(product.subtotal)}"\n`;
+      )}","${product.quantity}","${formatCurrency(
+        product.subtotal
+      )}","${tipo}"\n`;
     });
 
     // Agregar totales al final
     csvContent += `\n"","TOTALES","","${totalQuantity}","${formatCurrency(
       totalSales
-    )}"`;
+    )}",""`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -288,7 +515,7 @@ export default function Dashboard({
     URL.revokeObjectURL(url);
   };
 
-  // FUNCIÓN: Generar PDF del reporte de productos vendidos
+  // FUNCIÓN: Generar PDF del reporte de productos vendidos (INCLUYENDO EXTRAS)
   const generateProductsPDFReport = () => {
     const products = getGroupedProducts();
 
@@ -393,6 +620,10 @@ export default function Dashboard({
           .products-table tr:nth-child(even) { 
             background: #f9fafb; 
           }
+          .extra-row { 
+            background: #f0f9ff !important; 
+            font-style: italic;
+          }
           .totals-section { 
             margin-top: 20px; 
             padding-top: 15px; 
@@ -458,18 +689,26 @@ export default function Dashboard({
               <th class="text-right">Precio Unitario</th>
               <th class="text-center">Cantidad</th>
               <th class="text-right">Total</th>
+              <th>Tipo</th>
             </tr>
           </thead>
           <tbody>
             ${products
               .map(
                 (product, index) => `
-              <tr>
+              <tr class="${product.isExtra ? "extra-row" : ""}">
                 <td class="text-center">${index + 1}</td>
                 <td>${product.product_name}</td>
                 <td class="text-right">${formatCurrency(product.price)}</td>
                 <td class="text-center">${product.quantity}</td>
                 <td class="text-right">${formatCurrency(product.subtotal)}</td>
+                <td>${
+                  product.isExtra
+                    ? "Extra"
+                    : product.hasExtras
+                    ? "Con Extras"
+                    : "Producto"
+                }</td>
               </tr>
             `
               )
@@ -512,7 +751,7 @@ export default function Dashboard({
     }
   };
 
-  // FUNCIÓN: Generar PDF del ticket con cálculos correctos
+  // FUNCIÓN: Generar PDF del ticket con cálculos correctos (INCLUYENDO EXTRAS)
   const generateTicketPDF = (ticketData: TicketData) => {
     const { sale, items } = ticketData;
 
@@ -540,29 +779,18 @@ export default function Dashboard({
           .restaurant-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
           .ticket-info { margin-bottom: 10px; padding: 5px 0; }
           .payment-method { 
-            background-color: ${
-              sale.payment_method === "cash"
-                ? "#d1fae5"
-                : sale.payment_method === "terminal"
-                ? "#dbeafe"
-                : "#f3f4f6"
-            }; 
+            background-color: #dbeafe; 
             padding: 5px; 
             text-align: center; 
             margin: 5px 0; 
             border-radius: 4px; 
             font-weight: bold;
-            color: ${
-              sale.payment_method === "cash"
-                ? "#065f46"
-                : sale.payment_method === "terminal"
-                ? "#1e40af"
-                : "#374151"
-            };
+            color: #1e40af;
           }
           .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
           .items-table th { border-bottom: 1px dashed #000; padding: 5px 2px; text-align: left; }
           .items-table td { padding: 4px 2px; border-bottom: 1px dotted #ccc; }
+          .extra-item { font-style: italic; color: #666; font-size: 11px; padding-left: 15px !important; }
           .text-right { text-align: right; }
           .text-center { text-align: center; }
           .totals { margin-top: 10px; padding-top: 10px; border-top: 2px dashed #000; }
@@ -603,21 +831,53 @@ export default function Dashboard({
           </thead>
           <tbody>
             ${items
-              .map(
-                (item) => `
-              <tr>
-                <td>${item.product_name}</td>
-                <td class="text-right">${item.quantity}</td>
-                <td class="text-right">${formatCurrency(item.price)}</td>
-                <td class="text-right">${formatCurrency(item.subtotal)}</td>
-              </tr>
-              ${
-                item.notes
-                  ? `<tr><td colspan="4" style="font-size: 10px; padding-left: 10px;">→ ${item.notes}</td></tr>`
-                  : ""
-              }
-            `
-              )
+              .map((item) => {
+                const processedExtras = processExtrasFromNotes(item.notes);
+                let rows = `
+                    <tr>
+                      <td>${item.product_name}</td>
+                      <td class="text-right">${item.quantity}</td>
+                      <td class="text-right">${formatCurrency(item.price)}</td>
+                      <td class="text-right">${formatCurrency(
+                        item.subtotal
+                      )}</td>
+                    </tr>
+                  `;
+
+                // Agregar extras si existen
+                if (
+                  processedExtras.hasExtras &&
+                  processedExtras.extrasList.length > 0
+                ) {
+                  processedExtras.extrasList.forEach((extra) => {
+                    const extraPriceMatch = extra.match(/\(\+\$([^)]+)\)/);
+                    const extraPrice = extraPriceMatch
+                      ? parseFloat(extraPriceMatch[1])
+                      : 0;
+                    const extraName = extra.split(" (+$")[0];
+
+                    rows += `
+                        <tr class="extra-item">
+                          <td>+ ${extraName}</td>
+                          <td class="text-right">${item.quantity}</td>
+                          <td class="text-right">${formatCurrency(
+                            extraPrice
+                          )}</td>
+                          <td class="text-right">${formatCurrency(
+                            extraPrice * item.quantity
+                          )}</td>
+                        </tr>
+                      `;
+                  });
+                }
+
+                // Agregar notas si existen (que no sean extras)
+                if (item.notes && !processedExtras.hasExtras) {
+                  rows += `<tr class="extra-item"><td colspan="4">→ ${item.notes}</td></tr>`;
+                }
+
+                return rows;
+              })
               .join("")}
           </tbody>
         </table>
@@ -660,6 +920,26 @@ export default function Dashboard({
     }
   };
 
+  // Calcular estadísticas de encuestas
+  const feedbackStats = {
+    total: customerFeedback.length,
+    averageRating:
+      customerFeedback.length > 0
+        ? customerFeedback.reduce((sum, feedback) => sum + feedback.rating, 0) /
+          customerFeedback.length
+        : 0,
+    ratingDistribution: [1, 2, 3, 4, 5].map((rating) => ({
+      rating,
+      count: customerFeedback.filter((f) => f.rating === rating).length,
+      percentage:
+        customerFeedback.length > 0
+          ? (customerFeedback.filter((f) => f.rating === rating).length /
+              customerFeedback.length) *
+            100
+          : 0,
+    })),
+  };
+
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   if (dataLoading) {
@@ -682,8 +962,7 @@ export default function Dashboard({
 
   // Calcular estadísticas de métodos de pago
   const paymentMethodStats = {
-    cash: salesHistory.filter((sale) => sale.payment_method === "cash").length,
-    terminal: salesHistory.filter((sale) => sale.payment_method === "terminal")
+    ticket: salesHistory.filter((sale) => sale.payment_method === "ticket")
       .length,
     unspecified: salesHistory.filter((sale) => !sale.payment_method).length,
   };
@@ -744,7 +1023,7 @@ export default function Dashboard({
               )}
             </div>
 
-            {/* Botones de exportación ACTUALIZADOS - AMBOS PARA PRODUCTOS */}
+            {/* Botones de exportación */}
             <div className="flex gap-2">
               <button
                 onClick={generateProductsExcelReport}
@@ -838,21 +1117,130 @@ export default function Dashboard({
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <FaTable className="text-purple-600 text-xl" />
+              <FaStar className="text-purple-600 text-xl" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Ticket Promedio</p>
+              <p className="text-sm text-gray-600">Satisfacción Clientes</p>
               <p className="text-2xl font-bold text-gray-800">
-                {formatCurrency(
-                  combinedStats.totalOrders > 0
-                    ? combinedStats.totalRevenue / combinedStats.totalOrders
-                    : 0
-                )}
+                {feedbackStats.averageRating.toFixed(1)}
+                <span className="text-sm text-gray-500">/5</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Por orden procesada</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {feedbackStats.total} encuestas
+              </p>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Sección de Encuestas de Satisfacción */}
+      <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <FaStar className="text-yellow-500" />
+            Encuestas de Satisfacción
+          </h3>
+          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+            {loadingFeedback
+              ? "Cargando..."
+              : `${feedbackStats.total} encuestas`}
+          </span>
+        </div>
+
+        {customerFeedback.length > 0 ? (
+          <div className="space-y-4">
+            {/* Distribución de calificaciones */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h4 className="font-semibold text-gray-700 mb-3">
+                Distribución de Calificaciones
+              </h4>
+              <div className="space-y-2">
+                {feedbackStats.ratingDistribution.map(
+                  ({ rating, count, percentage }) => (
+                    <div key={rating} className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 w-16">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <FaStar
+                            key={star}
+                            className={`text-sm ${
+                              star <= rating
+                                ? "text-yellow-500 fill-current"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex-1 bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-yellow-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-sm text-gray-600 w-16 text-right">
+                        {count} ({percentage.toFixed(0)}%)
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Lista de encuestas */}
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {customerFeedback.map((feedback) => (
+                <button
+                  key={feedback.id}
+                  onClick={() => showFeedbackDetails(feedback)}
+                  className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <FaUser className="text-blue-600 text-sm" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {feedback.customer_name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Mesa {feedback.table_id} • {feedback.order_count}{" "}
+                            órdenes • {formatCurrency(feedback.total_amount)}
+                          </p>
+                        </div>
+                      </div>
+                      {feedback.comment && (
+                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                          {feedback.comment}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${getRatingColor(
+                          feedback.rating
+                        )}`}
+                      >
+                        <FaStar className="text-sm" />
+                        <span className="font-semibold">{feedback.rating}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatDateTime(feedback.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <FaStar className="text-4xl text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">
+              No hay encuestas de satisfacción para esta fecha
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Estadísticas de Métodos de Pago */}
@@ -862,38 +1250,19 @@ export default function Dashboard({
             <FaDollarSign className="text-green-600" />
             Métodos de Pago Utilizados
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaMoneyBillWave className="text-green-600 text-xl" />
-                <p className="font-semibold text-green-800">Efectivo</p>
-              </div>
-              <p className="text-2xl font-bold text-green-600">
-                {paymentMethodStats.cash}
-              </p>
-              <p className="text-sm text-green-700">
-                {salesSummary.saleCount > 0
-                  ? Math.round(
-                      (paymentMethodStats.cash / salesSummary.saleCount) * 100
-                    )
-                  : 0}
-                %
-              </p>
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <FaCreditCard className="text-blue-600 text-xl" />
-                <p className="font-semibold text-blue-800">Terminal</p>
+                <FaReceipt className="text-blue-600 text-xl" />
+                <p className="font-semibold text-blue-800">Ticket</p>
               </div>
               <p className="text-2xl font-bold text-blue-600">
-                {paymentMethodStats.terminal}
+                {paymentMethodStats.ticket}
               </p>
               <p className="text-sm text-blue-700">
                 {salesSummary.saleCount > 0
                   ? Math.round(
-                      (paymentMethodStats.terminal / salesSummary.saleCount) *
-                        100
+                      (paymentMethodStats.ticket / salesSummary.saleCount) * 100
                     )
                   : 0}
                 %
@@ -967,7 +1336,7 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Detalle de Ventas Históricas - ACTUALIZADO CON MÉTODO DE PAGO */}
+      {/* Detalle de Ventas Históricas */}
       {salesSummary && salesSummary.saleCount > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -1009,7 +1378,7 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* Lista de ventas históricas - ACTUALIZADA CON MÉTODO DE PAGO */}
+          {/* Lista de ventas históricas */}
           <div className="mt-6">
             <h4 className="font-semibold text-gray-700 mb-3">
               Detalle de Ventas (Click para ver ticket):
@@ -1055,7 +1424,111 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* MODAL DEL TICKET - ACTUALIZADO CON MÉTODO DE PAGO */}
+      {/* MODAL DE DETALLES DE ENCUESTA */}
+      {showFeedbackModal && selectedFeedback && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  <FaStar className="text-yellow-500" />
+                  Detalles de Encuesta
+                </h2>
+                <button
+                  onClick={() => setShowFeedbackModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <FaUser className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {selectedFeedback.customer_name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Mesa {selectedFeedback.table_id}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-4 rounded-lg border ${getRatingColor(
+                    selectedFeedback.rating
+                  )}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold">Calificación</span>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <FaStar
+                          key={star}
+                          className={`text-lg ${
+                            star <= selectedFeedback.rating
+                              ? "text-yellow-500 fill-current"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {getRatingText(selectedFeedback.rating)}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-gray-600">Órdenes</p>
+                    <p className="font-semibold text-gray-800">
+                      {selectedFeedback.order_count}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-gray-600">Total Gastado</p>
+                    <p className="font-semibold text-green-600">
+                      {formatCurrency(selectedFeedback.total_amount)}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedFeedback.comment && (
+                  <div>
+                    <p className="font-semibold text-gray-700 mb-2">
+                      Comentario:
+                    </p>
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <p className="text-gray-700 italic">
+                        {selectedFeedback.comment}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-sm text-gray-500">
+                  <p>Fecha: {formatDateTime(selectedFeedback.created_at)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 rounded-b-2xl">
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DEL TICKET */}
       {showTicketModal && selectedTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1113,31 +1586,65 @@ export default function Dashboard({
             <div className="p-6">
               <h3 className="font-semibold text-gray-800 mb-4">Productos:</h3>
               <div className="space-y-3">
-                {selectedTicket.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between items-center p-3 border border-gray-200 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">
-                        {item.product_name}
-                      </p>
-                      {item.notes && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          <strong>Nota:</strong> {item.notes}
-                        </p>
+                {selectedTicket.items.map((item) => {
+                  const processedExtras = processExtrasFromNotes(item.notes);
+                  return (
+                    <div key={item.id}>
+                      {/* Producto principal */}
+                      <div className="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-800">
+                            {item.product_name}
+                          </p>
+                          {item.notes && !processedExtras.hasExtras && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              <strong>Nota:</strong> {item.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-gray-800">
+                            {item.quantity} × {formatCurrency(item.price)}
+                          </p>
+                          <p className="font-semibold text-green-600">
+                            {formatCurrency(item.subtotal)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Mostrar extras si existen */}
+                      {processedExtras.hasExtras && (
+                        <div className="ml-4 mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-blue-600">
+                            <FaPlus className="text-xs" />
+                            <span className="font-medium">
+                              Extras incluidos:
+                            </span>
+                          </div>
+                          {processedExtras.extrasList.map((extra, index) => {
+                            const extraPriceMatch =
+                              extra.match(/\(\+\$([^)]+)\)/);
+                            const extraPrice = extraPriceMatch
+                              ? parseFloat(extraPriceMatch[1])
+                              : 0;
+
+                            return (
+                              <div
+                                key={index}
+                                className="flex justify-between items-center text-sm text-gray-600 ml-4"
+                              >
+                                <span>• {extra}</span>
+                                <span className="text-green-600">
+                                  {item.quantity} × {formatCurrency(extraPrice)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-gray-800">
-                        {item.quantity} × {formatCurrency(item.price)}
-                      </p>
-                      <p className="font-semibold text-green-600">
-                        {formatCurrency(item.subtotal)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Cálculos de totales en el modal */}

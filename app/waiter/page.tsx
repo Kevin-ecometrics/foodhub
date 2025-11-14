@@ -200,8 +200,6 @@ export default function WaiterDashboard() {
     };
   };
 
-  // ... (el resto de las funciones se mantienen igual)
-
   const handleAcknowledgeNotification = async (notificationId: string) => {
     setProcessing(notificationId);
     try {
@@ -335,8 +333,23 @@ export default function WaiterDashboard() {
     alert(error);
   };
 
+  // FUNCIÓN CORREGIDA: Calcular el total REAL incluyendo extras
   const calculateTableTotal = (table: TableWithOrder) => {
-    return table.orders.reduce((total, order) => total + order.total_amount, 0);
+    // Calcular el total REAL sumando todos los items con sus precios actualizados
+    return table.orders.reduce((total, order) => {
+      // Si la orden tiene items, sumar item.price * item.quantity (que ya incluye extras)
+      if (order.order_items && Array.isArray(order.order_items)) {
+        const orderTotal = order.order_items.reduce(
+          (orderSum: number, item: any) => {
+            return orderSum + item.price * item.quantity;
+          },
+          0
+        );
+        return total + orderTotal;
+      }
+      // Si no hay items, usar total_amount como fallback
+      return total + order.total_amount;
+    }, 0);
   };
 
   if (loading) {

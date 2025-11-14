@@ -32,7 +32,7 @@ export interface SalesHistory {
   order_count: number;
   item_count: number;
   created_at: string;
-  payment_method: 'cash' | 'terminal' | null; 
+  payment_method: 'cash' | 'terminal' | 'ticket' | null; 
   closed_at: string;
 }
 
@@ -75,6 +75,7 @@ export interface Product {
   rating_count: number; 
   created_at: string;
   updated_at: string;
+  extras?: ProductExtra[];
 }
 
 export type AdminSection = "dashboard" | "tables" | "products";
@@ -95,10 +96,18 @@ export interface ProductFormData {
   is_available: boolean;
   is_favorite: boolean;
   rating: string; 
+  extras?: ProductExtra[];
+}
+
+export interface ProductExtra {
+  id?: string;
+  name: string;
+  price: number;
+  is_available: boolean;
 }
 
 // Credenciales fijas del administrador
 export const ADMIN_CREDENTIALS = {
   username: "admin",
-  password: "restaurant2024",
+  password: "restaurant",
 };

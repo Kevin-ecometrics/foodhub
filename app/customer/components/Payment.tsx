@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { supabase } from "@/app/lib/supabase/client";
 import axios from "axios";
 import {
   FaArrowLeft,
@@ -17,6 +18,9 @@ import {
   FaFileInvoiceDollar,
   FaEnvelope,
   FaTimes,
+  FaStickyNote,
+  FaPlus,
+  FaStar,
 } from "react-icons/fa";
 
 interface PaymentSummary {
@@ -41,6 +45,105 @@ interface InvoiceModalProps {
   onConfirm: (email: string) => void;
   isLoading: boolean;
 }
+
+// Componente para la encuesta de satisfacción
+const SatisfactionSurvey = ({
+  onSubmit,
+  onSkip,
+  tableId,
+  customerName,
+}: {
+  onSubmit: (rating: number, comment: string) => void;
+  onSkip: () => void;
+  tableId: string | null;
+  customerName: string;
+}) => {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [hoveredRating, setHoveredRating] = useState(0);
+
+  const handleSubmit = () => {
+    if (rating > 0) {
+      onSubmit(rating, comment);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg p-6 max-w-md w-full mx-4">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <FaStar className="text-yellow-500 text-2xl" />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-800 mb-2">
+          ¡Cuéntanos tu experiencia!
+        </h3>
+        <p className="text-gray-600">¿Cómo calificarías tu experiencia hoy?</p>
+      </div>
+
+      {/* Calificación con estrellas */}
+      <div className="mb-6">
+        <div className="flex justify-center gap-2 mb-4">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => setRating(star)}
+              onMouseEnter={() => setHoveredRating(star)}
+              onMouseLeave={() => setHoveredRating(0)}
+              className="text-4xl transition-transform hover:scale-110"
+            >
+              <FaStar
+                className={
+                  star <= (hoveredRating || rating)
+                    ? "text-yellow-500 fill-current"
+                    : "text-gray-300"
+                }
+              />
+            </button>
+          ))}
+        </div>
+        <div className="text-center text-sm text-gray-500">
+          {rating === 0 && "Selecciona una calificación"}
+          {rating === 1 && "Muy mala"}
+          {rating === 2 && "Mala"}
+          {rating === 3 && "Regular"}
+          {rating === 4 && "Buena"}
+          {rating === 5 && "Excelente"}
+        </div>
+      </div>
+
+      {/* Comentario */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Comentario (opcional)
+        </label>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="¿Algo que nos quieras contar sobre tu experiencia?"
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+        />
+      </div>
+
+      {/* Botones */}
+      <div className="flex gap-3">
+        <button
+          onClick={onSkip}
+          className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+        >
+          Omitir
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={rating === 0}
+          className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Enviar Encuesta
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // Componente Modal para capturar el correo
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -199,6 +302,8 @@ export default function PaymentPage() {
     useOrder();
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [surveyCompleted, setSurveyCompleted] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [loading, setLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
@@ -206,6 +311,140 @@ export default function PaymentPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+
+  // Función para guardar la encuesta en Supabase
+  const saveSurveyToDatabase = async (rating: number, comment: string) => {
+    try {
+      // Cast payload to any to satisfy Supabase overload types when there is no generated typing for the table
+      const { data, error } = await supabase.from("customer_feedback").insert([
+        {
+          table_id: tableId || currentTableId,
+          customer_name: customerSummaries[0]?.customerName || "Cliente",
+          rating: rating,
+          comment: comment || null,
+          order_count: allOrders.length,
+          total_amount: paymentSummary.total,
+          created_at: new Date().toISOString(),
+        },
+      ] as never);
+
+      if (error) {
+        console.error("Error guardando encuesta:", error);
+        throw error;
+      }
+
+      console.log("✅ Encuesta guardada exitosamente");
+      return true;
+    } catch (error) {
+      console.error("Error al guardar la encuesta:", error);
+      return false;
+    }
+  };
+
+  // Función para formatear notas y extras
+  const formatItemNotes = (notes: string | null) => {
+    if (!notes) return null;
+
+    const hasPricedExtras = notes.includes("(+$");
+
+    if (hasPricedExtras) {
+      const parts = notes.split(" | ");
+      const mainNotes = parts.find(
+        (part) => !part.includes("Extras:") && !part.includes("Total:")
+      );
+      const extrasPart = parts.find((part) => part.includes("Extras:"));
+      const totalPart = parts.find((part) => part.includes("Total:"));
+
+      return (
+        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          {mainNotes && (
+            <div className="flex items-start gap-2">
+              <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">
+                <span className="font-medium">Instrucciones:</span> {mainNotes}
+              </span>
+            </div>
+          )}
+
+          {extrasPart && (
+            <div className="flex items-start gap-2">
+              <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-green-700">
+                  Extras agregados:
+                </span>
+                <div className="mt-1 ml-2 space-y-1">
+                  {extrasPart
+                    .replace("Extras: ", "")
+                    .split(", ")
+                    .map((extra, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-green-600">
+                          • {extra.split(" (+$")[0]}
+                        </span>
+                        <span className="text-green-700 font-medium">
+                          {extra.match(/\(\+\$([^)]+)\)/)?.[1] || ""}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {totalPart && (
+            <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
+              <FaReceipt className="text-blue-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm font-medium text-blue-700">
+                {totalPart}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (notes.includes("Extras:")) {
+      const parts = notes.split(" | ");
+      let mainNotes = "";
+      let extrasText = "";
+
+      parts.forEach((part) => {
+        if (part.startsWith("Extras:")) {
+          extrasText = part.replace("Extras: ", "");
+        } else {
+          mainNotes = part;
+        }
+      });
+
+      return (
+        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg">
+          {mainNotes && (
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Nota:</span> {mainNotes}
+            </p>
+          )}
+          {extrasText && (
+            <p className="text-sm text-green-700">
+              <span className="font-medium">Extras:</span> {extrasText}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+        <p className="text-sm text-yellow-800 flex items-center gap-1">
+          <FaStickyNote className="text-yellow-600" />
+          <span className="font-medium">Nota:</span> {notes}
+        </p>
+      </div>
+    );
+  };
 
   // Cargar órdenes pendientes de pago
   useEffect(() => {
@@ -310,15 +549,35 @@ export default function PaymentPage() {
 
   // Countdown para redirección después del pago
   useEffect(() => {
-    if (paymentConfirmed && countdown > 0) {
+    if (paymentConfirmed && countdown > 0 && surveyCompleted) {
       const timer = setTimeout(() => {
         setCountdown(countdown - 1);
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (paymentConfirmed && countdown === 0) {
+    } else if (paymentConfirmed && countdown === 0 && surveyCompleted) {
       router.push("/");
     }
-  }, [paymentConfirmed, countdown, router]);
+  }, [paymentConfirmed, countdown, surveyCompleted, router]);
+
+  // Función para manejar el envío de la encuesta
+  const handleSurveySubmit = async (rating: number, comment: string) => {
+    try {
+      await saveSurveyToDatabase(rating, comment);
+      setSurveyCompleted(true);
+      setShowSurvey(false);
+    } catch (error) {
+      console.error("Error al enviar encuesta:", error);
+      // Continuar aunque falle la encuesta
+      setSurveyCompleted(true);
+      setShowSurvey(false);
+    }
+  };
+
+  // Función para omitir la encuesta
+  const handleSurveySkip = () => {
+    setSurveyCompleted(true);
+    setShowSurvey(false);
+  };
 
   // Función para generar PDF del ticket
   const handleGeneratePDF = async () => {
@@ -391,6 +650,26 @@ export default function PaymentPage() {
             }
             .item-price { 
               text-align: right;
+            }
+            .notes-section { 
+              background: #f9fafb; 
+              padding: 8px; 
+              border-radius: 4px; 
+              margin-top: 5px; 
+              font-size: 11px;
+            }
+            .notes-main { 
+              color: #92400e; 
+              margin-bottom: 4px;
+            }
+            .extras-section { 
+              color: #065f46; 
+              margin-top: 4px;
+            }
+            .extra-item { 
+              display: flex; 
+              justify-content: space-between; 
+              margin-bottom: 2px;
             }
             .order-separator { 
               border-top: 1px solid #e5e7eb; 
@@ -483,7 +762,15 @@ export default function PaymentPage() {
                         Cantidad: ${item.quantity} • ${formatCurrency(
                       item.price
                     )} c/u
-                        ${item.notes ? `<br>Nota: ${item.notes}` : ""}
+                        ${
+                          item.notes
+                            ? `
+                          <div class="notes-section">
+                            ${formatNotesForPDF(item.notes)}
+                          </div>
+                        `
+                            : ""
+                        }
                       </div>
                     </div>
                     <div class="item-price">
@@ -548,6 +835,76 @@ export default function PaymentPage() {
     } finally {
       setGeneratingPdf(false);
     }
+  };
+
+  // Función auxiliar para formatear notas en el PDF
+  const formatNotesForPDF = (notes: string) => {
+    if (!notes) return "";
+
+    // Detectar si tiene información de extras con precios
+    const hasPricedExtras = notes.includes("(+$");
+
+    if (hasPricedExtras) {
+      const parts = notes.split(" | ");
+      const mainNotes = parts.find(
+        (part) => !part.includes("Extras:") && !part.includes("Total:")
+      );
+      const extrasPart = parts.find((part) => part.includes("Extras:"));
+      const totalPart = parts.find((part) => part.includes("Total:"));
+
+      let result = "";
+
+      if (mainNotes) {
+        result += `<div class="notes-main"><strong>Instrucciones:</strong> ${mainNotes}</div>`;
+      }
+
+      if (extrasPart) {
+        result += `<div class="extras-section"><strong>Extras:</strong>`;
+        extrasPart
+          .replace("Extras: ", "")
+          .split(", ")
+          .forEach((extra) => {
+            const extraName = extra.split(" (+$")[0];
+            const extraPrice = extra.match(/\(\+\$([^)]+)\)/)?.[1] || "";
+            result += `<div class="extra-item">• ${extraName} +${extraPrice}</div>`;
+          });
+        result += `</div>`;
+      }
+
+      if (totalPart) {
+        result += `<div style="margin-top: 5px; font-weight: bold; color: #1e40af;">${totalPart}</div>`;
+      }
+
+      return result;
+    }
+
+    // Detectar extras simples (sin precios)
+    if (notes.includes("Extras:")) {
+      const parts = notes.split(" | ");
+      let mainNotes = "";
+      let extrasText = "";
+
+      parts.forEach((part) => {
+        if (part.startsWith("Extras:")) {
+          extrasText = part.replace("Extras: ", "");
+        } else {
+          mainNotes = part;
+        }
+      });
+
+      let result = "";
+      if (mainNotes) {
+        result += `<div class="notes-main"><strong>Nota:</strong> ${mainNotes}</div>`;
+      }
+      if (extrasText) {
+        result += `<div class="extras-section"><strong>Extras:</strong> ${extrasText}</div>`;
+      }
+
+      return result;
+    }
+
+    // Notas normales
+    return `<div class="notes-main"><strong>Nota:</strong> ${notes}</div>`;
   };
 
   // Función para abrir el modal de facturación
@@ -641,6 +998,7 @@ export default function PaymentPage() {
     try {
       // Confirmar el pago visualmente (solo redirección)
       setPaymentConfirmed(true);
+      setShowSurvey(true);
 
       console.log("✅ Pago confirmado:", {
         tableId: tableId || currentTableId,
@@ -772,55 +1130,78 @@ export default function PaymentPage() {
     );
   }
 
+  // PANTALLA DE CONFIRMACIÓN DE PAGO CON ENCUESTA
   if (paymentConfirmed) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full mx-4 text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <FaCheck className="text-4xl text-green-500" />
-          </div>
-
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            ¡Pago Confirmado!
-          </h2>
-
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <p className="text-sm text-gray-600">
-              Comensales:{" "}
-              <span className="font-semibold">{customerSummaries.length}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Órdenes pagadas:{" "}
-              <span className="font-semibold">{allOrders.length}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Total pagado:{" "}
-              <span className="font-semibold text-green-600">
-                {formatCurrency(paymentSummary.total)}
-              </span>
-            </p>
-          </div>
-
-          <p className="text-gray-600 mb-4">
-            Gracias por su preferencia. ¡Esperamos verle pronto!
-          </p>
-
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
-              <FaClock />
-              <span className="font-semibold">
-                Redirigiendo en {countdown} segundos...
-              </span>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full space-y-6">
+          {/* Tarjeta de confirmación de pago */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FaCheck className="text-4xl text-green-500" />
             </div>
-            <p className="text-sm text-blue-600">
-              Será dirigido automáticamente a la página principal
+
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">
+              ¡Pago Confirmado!
+            </h2>
+
+            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-sm text-gray-500">Comensales</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {customerSummaries.length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Órdenes pagadas</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {allOrders.length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Total pagado</p>
+                  <p className="text-lg font-semibold text-green-600">
+                    {formatCurrency(paymentSummary.total)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-gray-600 mb-6">
+              Gracias por su preferencia. ¡Esperamos verle pronto!
             </p>
+
+            {surveyCompleted && (
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
+                  <FaClock />
+                  <span className="font-semibold">
+                    Redirigiendo en {countdown} segundos...
+                  </span>
+                </div>
+                <p className="text-sm text-blue-600">
+                  Será dirigido automáticamente a la página principal
+                </p>
+              </div>
+            )}
           </div>
+
+          {/* Componente de encuesta */}
+          {showSurvey && (
+            <SatisfactionSurvey
+              onSubmit={handleSurveySubmit}
+              onSkip={handleSurveySkip}
+              tableId={tableId}
+              customerName={customerSummaries[0]?.customerName || "Cliente"}
+            />
+          )}
         </div>
       </div>
     );
   }
 
+  // INTERFAZ PRINCIPAL DE PAGO
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-8">
@@ -925,11 +1306,7 @@ export default function PaymentPage() {
                                     <div className="text-sm text-gray-500 mt-1">
                                       Cantidad: {item.quantity}
                                     </div>
-                                    {item.notes && (
-                                      <p className="text-sm text-gray-500 mt-1">
-                                        Nota: {item.notes}
-                                      </p>
-                                    )}
+                                    {formatItemNotes(item.notes)}
                                   </div>
                                   <div className="text-right">
                                     <div className="font-medium text-gray-800">
@@ -947,7 +1324,6 @@ export default function PaymentPage() {
                           ))}
                         </div>
 
-                        {/* Separador entre órdenes del mismo cliente */}
                         {orderIndex < customerSummary.orders.length - 1 && (
                           <div className="border-t border-gray-200 my-4"></div>
                         )}
@@ -955,7 +1331,6 @@ export default function PaymentPage() {
                     ))}
                   </div>
 
-                  {/* Separador entre clientes */}
                   {customerIndex < customerSummaries.length - 1 && (
                     <div className="border-t border-gray-300 my-6"></div>
                   )}
@@ -988,9 +1363,7 @@ export default function PaymentPage() {
 
           {/* Botones de Acción */}
           <div className="flex flex-col gap-4">
-            {/* Primera fila de botones */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              {/* Botón para Guardar PDF */}
               <button
                 onClick={handleGeneratePDF}
                 disabled={generatingPdf}
@@ -1017,12 +1390,10 @@ export default function PaymentPage() {
                   ? "Procesando Factura..."
                   : "Facturar Compra"}
               </button>
-              {/* Botón de Confirmación de Pago desde el Context */}
               {renderPaymentButton()}
             </div>
           </div>
 
-          {/* Mensaje informativo cuando hay notificación */}
           {notificationState.hasPendingBill && (
             <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-center gap-2 text-yellow-800">

@@ -20,6 +20,8 @@ import {
   FaMoneyBillWave,
   FaCreditCard,
   FaQuestion,
+  FaStickyNote,
+  FaPlus,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -75,15 +77,121 @@ export default function HistoryPage() {
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
 
-  // NUEVOS ESTADOS PARA EL MÉTODO DE PAGO
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
-    string | null
-  >(null);
-  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
-
   // Refs para prevenir loops infinitos
   const isSubscribedRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
+
+  // Función para formatear notas y extras
+  const formatItemNotes = (notes: string | null) => {
+    if (!notes) return null;
+
+    // Detectar si tiene información de extras con precios
+    const hasPricedExtras = notes.includes("(+$");
+
+    if (hasPricedExtras) {
+      // Separar notas principales de extras
+      const parts = notes.split(" | ");
+      const mainNotes = parts.find(
+        (part) => !part.includes("Extras:") && !part.includes("Total:")
+      );
+      const extrasPart = parts.find((part) => part.includes("Extras:"));
+      const totalPart = parts.find((part) => part.includes("Total:"));
+
+      return (
+        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          {/* Notas principales */}
+          {mainNotes && (
+            <div className="flex items-start gap-2">
+              <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">
+                <span className="font-medium">Instrucciones:</span> {mainNotes}
+              </span>
+            </div>
+          )}
+
+          {/* Extras con precios */}
+          {extrasPart && (
+            <div className="flex items-start gap-2">
+              <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-green-700">
+                  Extras agregados:
+                </span>
+                <div className="mt-1 ml-2 space-y-1">
+                  {extrasPart
+                    .replace("Extras: ", "")
+                    .split(", ")
+                    .map((extra, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-green-600">
+                          • {extra.split(" (+$")[0]}
+                        </span>
+                        <span className="text-green-700 font-medium">
+                          {extra.match(/\(\+\$([^)]+)\)/)?.[1] || ""}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Total si está presente */}
+          {totalPart && (
+            <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
+              <FaReceipt className="text-blue-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm font-medium text-blue-700">
+                {totalPart}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Detectar extras simples (sin precios)
+    if (notes.includes("Extras:")) {
+      const parts = notes.split(" | ");
+      let mainNotes = "";
+      let extrasText = "";
+
+      parts.forEach((part) => {
+        if (part.startsWith("Extras:")) {
+          extrasText = part.replace("Extras: ", "");
+        } else {
+          mainNotes = part;
+        }
+      });
+
+      return (
+        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg">
+          {mainNotes && (
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Nota:</span> {mainNotes}
+            </p>
+          )}
+          {extrasText && (
+            <p className="text-sm text-green-700">
+              <span className="font-medium">Extras:</span> {extrasText}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Notas normales
+    return (
+      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+        <p className="text-sm text-yellow-800 flex items-center gap-1">
+          <FaStickyNote className="text-yellow-600" />
+          <span className="font-medium">Nota:</span> {notes}
+        </p>
+      </div>
+    );
+  };
 
   // Cargar usuarios de la mesa
   useEffect(() => {
@@ -310,21 +418,13 @@ export default function HistoryPage() {
     }
   };
 
-  // NUEVA FUNCIÓN: Manejar solicitud de cuenta con método de pago
+  // NUEVA FUNCIÓN: Manejar solicitud de ticket
   const handleBillRequest = async () => {
-    // Resetear selección y mostrar modal de selección
-    setSelectedPaymentMethod(null);
     setShowPaymentMethodModal(true);
-    setShowPaymentConfirmation(false);
   };
 
-  // NUEVA FUNCIÓN: Confirmar solicitud de cuenta con método de pago
-  const confirmBillRequest = async () => {
-    if (!selectedPaymentMethod) {
-      alert("Por favor selecciona un método de pago");
-      return;
-    }
-
+  // NUEVA FUNCIÓN: Confirmar solicitud de ticket
+  const confirmTicketRequest = async () => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
 
@@ -333,29 +433,13 @@ export default function HistoryPage() {
       await historyService.requestBill(
         parseInt(targetTableId.toString()),
         currentOrder?.id,
-        selectedPaymentMethod
+        "ticket"
       );
 
-      let methodText = "";
-      switch (selectedPaymentMethod) {
-        case "cash":
-          methodText = "en efectivo";
-          break;
-        case "terminal":
-          methodText = "con terminal";
-          break;
-        default:
-          methodText = "";
-      }
+      alert("✅ Se ha solicitado el ticket. El mesero te lo traerá pronto.");
 
-      alert(
-        `✅ Se ha solicitado la cuenta ${methodText}. El mesero te traerá tu factura.`
-      );
-
-      // Cerrar modales
+      // Cerrar modal
       setShowPaymentMethodModal(false);
-      setShowPaymentConfirmation(false);
-      setSelectedPaymentMethod(null);
 
       setTimeout(() => {
         router.push(
@@ -363,30 +447,16 @@ export default function HistoryPage() {
         );
       }, 1000);
     } catch (error) {
-      console.error("Error requesting bill:", error);
-      alert("❌ Error al solicitar la cuenta");
+      console.error("Error requesting ticket:", error);
+      alert("❌ Error al solicitar el ticket");
     } finally {
       setBillLoading(false);
     }
   };
 
-  // NUEVA FUNCIÓN: Manejar selección de método de pago
-  const handlePaymentMethodSelect = (method: string) => {
-    setSelectedPaymentMethod(method);
-    setShowPaymentConfirmation(true);
-  };
-
-  // NUEVA FUNCIÓN: Cancelar selección
-  const handleCancelSelection = () => {
-    setSelectedPaymentMethod(null);
-    setShowPaymentConfirmation(false);
-  };
-
-  // NUEVA FUNCIÓN: Cancelar todo el proceso
-  const handleCancelPayment = () => {
+  // NUEVA FUNCIÓN: Cancelar solicitud
+  const handleCancelTicket = () => {
     setShowPaymentMethodModal(false);
-    setShowPaymentConfirmation(false);
-    setSelectedPaymentMethod(null);
   };
 
   // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
@@ -614,95 +684,6 @@ export default function HistoryPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* Orden Actual del Usuario */}
-        {/* {currentOrder && orderItems.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FaUtensils />
-              Orden Actual de {currentOrder.customer_name}
-              <span className="text-sm font-normal bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                En preparación
-              </span>
-            </h2>
-
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="bg-gray-800 text-white p-6 text-center">
-                <h3 className="text-xl font-bold">RESTAURANTE</h3>
-                <p className="text-gray-300 text-sm">Mesa {targetTableId}</p>
-                <p className="text-gray-300 text-sm">
-                  Cliente: {currentOrder.customer_name}
-                </p>
-                <p className="text-gray-300 text-sm">
-                  Orden #: {currentOrder.id.slice(-8)}
-                </p>
-                <p className="text-gray-300 text-sm">
-                  {new Date(currentOrder.created_at).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="p-6">
-                <div className="space-y-4 mb-6">
-                  {orderItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-start py-3 border-b border-gray-100"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="font-semibold text-gray-800">
-                              {item.product_name}
-                            </span>
-                            {item.notes && (
-                              <p className="text-sm text-gray-500 mt-1">
-                                Nota: {item.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium text-gray-800">
-                              {formatCurrency(item.price * item.quantity)}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {formatCurrency(item.price)} × {item.quantity}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-t border-gray-200 pt-4 space-y-2">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Subtotal:</span>
-                    <span>
-                      {formatCurrency(currentOrderCalculations.subtotal)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Impuestos (16%):</span>
-                    <span>
-                      {formatCurrency(currentOrderCalculations.taxAmount)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold text-gray-800 border-t border-gray-200 pt-2">
-                    <span>Total:</span>
-                    <span>
-                      {formatCurrency(currentOrderCalculations.total)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-4 text-center text-sm text-gray-500">
-                <p>¡Gracias por su preferencia!</p>
-                <p>Para solicitar la cuenta, presione el botón Cuenta</p>
-              </div>
-            </div>
-          </div>
-        )} */}
-
         {/* Historial de Órdenes Agrupadas por Cliente */}
         {customerSummaries.length > 0 && (
           <div className="mb-8">
@@ -779,11 +760,8 @@ export default function HistoryPage() {
                                     <div className="text-sm text-gray-500 mt-1">
                                       Cantidad: {item.quantity}
                                     </div>
-                                    {item.notes && (
-                                      <p className="text-sm text-gray-500 mt-1">
-                                        Nota: {item.notes}
-                                      </p>
-                                    )}
+                                    {/* NOTAS Y EXTRAS MEJORADOS */}
+                                    {formatItemNotes(item.notes)}
                                   </div>
                                   <div className="text-right">
                                     <div className="font-medium text-gray-800">
@@ -846,181 +824,47 @@ export default function HistoryPage() {
         )}
       </main>
 
-      {/* MODAL DE SELECCIÓN DE MÉTODO DE PAGO MEJORADO */}
+      {/* MODAL SIMPLIFICADO PARA SOLICITAR TICKET */}
       {showPaymentMethodModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FaReceipt className="text-blue-600 text-2xl" />
+              </div>
+
               <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                {showPaymentConfirmation ? "Confirmar Pago" : "Método de Pago"}
+                Solicitar Ticket
               </h2>
-              <p className="text-gray-600">
-                {showPaymentConfirmation
-                  ? `¿Confirmar solicitud de cuenta ${
-                      selectedPaymentMethod === "cash"
-                        ? "en efectivo"
-                        : "con terminal"
-                    }?`
-                  : "Selecciona cómo deseas pagar la cuenta"}
+
+              <p className="text-gray-600 mb-6">
+                ¿Deseas solicitar el ticket de tu cuenta? El mesero te lo traerá
+                a la mesa.
               </p>
-            </div>
 
-            {!showPaymentConfirmation ? (
-              /* PANTALLA DE SELECCIÓN */
-              <div className="p-6 space-y-4">
-                {/* Opción Efectivo */}
+              <div className="flex gap-3">
                 <button
-                  onClick={() => handlePaymentMethodSelect("cash")}
+                  onClick={handleCancelTicket}
                   disabled={billLoading}
-                  className={`w-full p-4 border-2 rounded-xl transition flex items-center justify-between gap-3 disabled:opacity-50 ${
-                    selectedPaymentMethod === "cash"
-                      ? "border-green-500 bg-green-50"
-                      : "border-green-200 hover:border-green-500 hover:bg-green-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        selectedPaymentMethod === "cash"
-                          ? "bg-green-200"
-                          : "bg-green-100"
-                      }`}
-                    >
-                      <FaMoneyBillWave className="text-green-600" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-semibold text-gray-800">
-                        Efectivo
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Pagar con dinero en efectivo
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      selectedPaymentMethod === "cash"
-                        ? "border-green-500 bg-green-500"
-                        : "border-gray-300"
-                    }`}
-                  >
-                    {selectedPaymentMethod === "cash" && (
-                      <FaCheck className="text-white text-xs" />
-                    )}
-                  </div>
-                </button>
-
-                {/* Opción Terminal */}
-                <button
-                  onClick={() => handlePaymentMethodSelect("terminal")}
-                  disabled={billLoading}
-                  className={`w-full p-4 border-2 rounded-xl transition flex items-center justify-between gap-3 disabled:opacity-50 ${
-                    selectedPaymentMethod === "terminal"
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-blue-200 hover:border-blue-500 hover:bg-blue-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        selectedPaymentMethod === "terminal"
-                          ? "bg-blue-200"
-                          : "bg-blue-100"
-                      }`}
-                    >
-                      <FaCreditCard className="text-blue-600" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-semibold text-gray-800">
-                        Terminal
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Pagar con tarjeta
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      selectedPaymentMethod === "terminal"
-                        ? "border-blue-500 bg-blue-500"
-                        : "border-gray-300"
-                    }`}
-                  >
-                    {selectedPaymentMethod === "terminal" && (
-                      <FaCheck className="text-white text-xs" />
-                    )}
-                  </div>
-                </button>
-              </div>
-            ) : (
-              /* PANTALLA DE CONFIRMACIÓN */
-              <div className="p-6">
-                <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                  <div className="flex items-center justify-center gap-3 mb-3">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                        selectedPaymentMethod === "cash"
-                          ? "bg-green-100"
-                          : "bg-blue-100"
-                      }`}
-                    >
-                      {selectedPaymentMethod === "cash" ? (
-                        <FaMoneyBillWave className="text-green-600 text-xl" />
-                      ) : (
-                        <FaCreditCard className="text-blue-600 text-xl" />
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <h3 className="font-bold text-lg text-gray-800">
-                        {selectedPaymentMethod === "cash"
-                          ? "Efectivo"
-                          : "Terminal"}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {selectedPaymentMethod === "cash"
-                          ? "Pagarás con dinero en efectivo"
-                          : "Pagarás con tarjeta bancaria"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCancelSelection}
-                    disabled={billLoading}
-                    className="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition disabled:opacity-50"
-                  >
-                    Cambiar
-                  </button>
-                  <button
-                    onClick={confirmBillRequest}
-                    disabled={billLoading}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {billLoading ? (
-                      <FaSpinner className="animate-spin" />
-                    ) : (
-                      <FaCheck />
-                    )}
-                    {billLoading ? "Enviando..." : "Confirmar"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* BOTÓN CANCELAR (solo en pantalla de selección) */}
-            {!showPaymentConfirmation && (
-              <div className="p-4 border-t bg-gray-50">
-                <button
-                  onClick={handleCancelPayment}
-                  className="w-full px-4 py-3 text-gray-600 hover:text-gray-800 transition font-medium rounded-xl hover:bg-gray-100"
-                  disabled={billLoading}
+                  className="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition disabled:opacity-50"
                 >
                   Cancelar
                 </button>
+
+                <button
+                  onClick={confirmTicketRequest}
+                  disabled={billLoading}
+                  className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {billLoading ? (
+                    <FaSpinner className="animate-spin" />
+                  ) : (
+                    <FaCheck />
+                  )}
+                  {billLoading ? "Enviando..." : "Pedir Ticket"}
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

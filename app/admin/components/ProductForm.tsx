@@ -1,6 +1,6 @@
 "use client";
-import { FaPlus, FaEdit, FaStar, FaRegStar } from "react-icons/fa";
-import { Product, ProductFormData } from "../types";
+import { FaPlus, FaEdit, FaStar, FaRegStar, FaTrash } from "react-icons/fa";
+import { Product, ProductFormData, ProductExtra } from "../types";
 import StarRating from "./StarRating";
 
 interface ProductFormProps {
@@ -20,7 +20,7 @@ export default function ProductForm({
 }: ProductFormProps) {
   const handleChange = (
     field: keyof ProductFormData,
-    value: string | boolean | File | number
+    value: string | boolean | File | number | ProductExtra[]
   ) => {
     onFormChange({
       ...productForm,
@@ -30,6 +30,48 @@ export default function ProductForm({
 
   const handleRatingChange = (rating: number) => {
     handleChange("rating", rating.toString());
+  };
+
+  // Funciones para manejar extras
+  const addExtra = () => {
+    const newExtra: ProductExtra = {
+      name: "",
+      price: 0,
+      is_available: true,
+    };
+
+    const currentExtras = productForm.extras || [];
+    handleChange("extras", [...currentExtras, newExtra]);
+  };
+
+  const removeExtra = (index: number) => {
+    const currentExtras = productForm.extras || [];
+    const newExtras = currentExtras.filter((_, i) => i !== index);
+    handleChange("extras", newExtras);
+  };
+
+  const updateExtra = (
+    index: number,
+    field: keyof ProductExtra,
+    value: string | number | boolean
+  ) => {
+    const currentExtras = productForm.extras || [];
+    const newExtras = [...currentExtras];
+    newExtras[index] = {
+      ...newExtras[index],
+      [field]: value,
+    };
+    handleChange("extras", newExtras);
+  };
+
+  const toggleExtraAvailability = (index: number) => {
+    const currentExtras = productForm.extras || [];
+    const newExtras = [...currentExtras];
+    newExtras[index] = {
+      ...newExtras[index],
+      is_available: !newExtras[index].is_available,
+    };
+    handleChange("extras", newExtras);
   };
 
   const renderPreview = () => {
@@ -89,7 +131,7 @@ export default function ProductForm({
               <option value="Lunch">Lunch</option>
               <option value="Dinner">Dinner</option>
               <option value="Combos">Combos</option>
-              <option value="Refill">Refill</option>
+              <option value="Drinks">Drinks</option>
             </select>
           </div>
           <div>
@@ -252,6 +294,140 @@ export default function ProductForm({
               required
             />
           </div>
+
+          {/* SECCIÓN DE EXTRAS */}
+          <div className="md:col-span-2">
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Extras del Producto
+              </label>
+              <button
+                type="button"
+                onClick={addExtra}
+                className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+              >
+                <FaPlus className="text-xs" />
+                Agregar Extra
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {(productForm.extras || []).map((extra, index) => (
+                <div
+                  key={index}
+                  className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Nombre del Extra
+                      </label>
+                      <input
+                        type="text"
+                        value={extra.name}
+                        onChange={(e) =>
+                          updateExtra(index, "name", e.target.value)
+                        }
+                        placeholder="Ej: Queso extra, Tocino, etc."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Precio Extra ($)
+                      </label>
+                      <input
+                        type="text"
+                        value={extra.price}
+                        onChange={(e) => {
+                          // Permitir solo números y punto decimal
+                          const value = e.target.value.replace(/[^0-9.]/g, "");
+                          // Evitar múltiples puntos decimales
+                          const parts = value.split(".");
+                          const formattedValue =
+                            parts.length > 2
+                              ? parts[0] + "." + parts.slice(1).join("")
+                              : value;
+
+                          updateExtra(
+                            index,
+                            "price",
+                            formattedValue === ""
+                              ? 0
+                              : parseFloat(formattedValue) || 0
+                          );
+                        }}
+                        onBlur={(e) => {
+                          // Formatear al salir del input
+                          const value = parseFloat(e.target.value) || 0;
+                          updateExtra(index, "price", value);
+                        }}
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Disponible
+                        </label>
+                        <div className="flex items-center h-full px-3 border border-gray-300 rounded-lg bg-white">
+                          <label className="flex items-center gap-2 cursor-pointer w-full py-2">
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={extra.is_available}
+                                onChange={() => toggleExtraAvailability(index)}
+                                className="sr-only"
+                              />
+                              <div
+                                className={`w-8 h-4 flex items-center rounded-full p-1 transition-colors ${
+                                  extra.is_available
+                                    ? "bg-green-500"
+                                    : "bg-gray-300"
+                                }`}
+                              >
+                                <div
+                                  className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${
+                                    extra.is_available
+                                      ? "translate-x-4"
+                                      : "translate-x-0"
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                            <span className="text-xs text-gray-700">
+                              {extra.is_available ? "Sí" : "No"}
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeExtra(index)}
+                        className="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 transition"
+                      >
+                        <FaTrash className="text-xs" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(productForm.extras || []).length === 0 && (
+                <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
+                  <p className="text-gray-500 text-sm">
+                    No hay extras agregados. Haz clic en Agregar Extra para
+                    añadir opciones adicionales.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Imagen del Producto

@@ -100,7 +100,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-600 text-center">
             <strong>Demo:</strong> usuario: <code>admin</code> / contraseña:{" "}
-            <code>restaurant2024</code>
+            <code>restaurant</code>
           </p>
         </div>
       </div>

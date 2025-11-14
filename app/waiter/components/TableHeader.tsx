@@ -4,8 +4,10 @@ import {
   FaDollarSign,
   FaSpinner,
   FaBell,
+  FaReceipt,
   FaMoneyBillWave,
   FaCreditCard,
+  FaQuestion,
 } from "react-icons/fa";
 
 interface TableHeaderProps {
@@ -77,23 +79,44 @@ export default function TableHeader({
       : null;
 
   // Determinar el texto y estilo según el método de pago
+  // const getPaymentMethodInfo = (paymentMethod: string | null) => {
+  //   if (paymentMethod === "cash") {
+  //     return {
+  //       text: "Pago en Efectivo",
+  //       icon: FaMoneyBillWave,
+  //       bgColor: "bg-green-100",
+  //       textColor: "text-green-800",
+  //       borderColor: "border-green-300",
+  //     };
+  //   } else {
+  //     // terminal o cualquier otro valor
+  //     return {
+  //       text: "Pago con Terminal",
+  //       icon: FaCreditCard,
+  //       bgColor: "bg-blue-100",
+  //       textColor: "text-blue-800",
+  //       borderColor: "border-blue-300",
+  //     };
+  //   }
+  // };
+
   const getPaymentMethodInfo = (paymentMethod: string | null) => {
-    if (paymentMethod === "cash") {
+    if (paymentMethod === "ticket") {
       return {
-        text: "Pago en Efectivo",
-        icon: FaMoneyBillWave,
-        bgColor: "bg-green-100",
-        textColor: "text-green-800",
-        borderColor: "border-green-300",
-      };
-    } else {
-      // terminal o cualquier otro valor
-      return {
-        text: "Pago con Terminal",
-        icon: FaCreditCard,
+        text: "Ticket Solicitado",
+        icon: FaReceipt,
         bgColor: "bg-blue-100",
         textColor: "text-blue-800",
         borderColor: "border-blue-300",
+      };
+    } else {
+      // cualquier otro valor o null
+      return {
+        text: "Método no especificado",
+        icon: FaQuestion,
+        bgColor: "bg-gray-100",
+        textColor: "text-gray-800",
+        borderColor: "border-gray-300",
       };
     }
   };
