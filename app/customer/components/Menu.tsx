@@ -383,6 +383,32 @@ export default function MenuPage() {
   const handleConfirmAddWithNotes = async () => {
     if (!selectedProduct) return;
 
+    // ✅ VALIDACIÓN: Si hay texto en notes, debe tener al menos 2 caracteres no vacíos
+    const trimmedNotes = notes.trim();
+    if (trimmedNotes.length > 0 && trimmedNotes.length < 2) {
+      alert(
+        "❌ Las instrucciones especiales deben tener al menos 2 caracteres válidos."
+      );
+      return;
+    }
+
+    // ✅ VALIDACIÓN: Si no hay extras seleccionados y no hay notas, usar el método simple
+    const hasExtras = Object.values(selectedExtras).some((value) => value);
+    if (!hasExtras && !trimmedNotes) {
+      // Usar el método simple de agregar al carrito sin notas
+      setAddingProduct(selectedProduct.id);
+      try {
+        await addToCart(selectedProduct);
+        setShowNotesModal(false);
+        resetExtras();
+      } catch (error) {
+        console.error("Error adding to cart:", error);
+      } finally {
+        setAddingProduct(null);
+      }
+      return;
+    }
+
     setAddingProduct(selectedProduct.id);
     try {
       // Calcular el precio total con extras
@@ -411,14 +437,16 @@ export default function MenuPage() {
           };
         });
 
-      let finalNotes = notes;
+      let finalNotes = trimmedNotes; // Usar el texto validado
       if (selectedExtrasList.length > 0) {
         const extrasDetails = selectedExtrasList
           .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
           .join(", ");
 
         const extrasText = `Extras: ${extrasDetails}`;
-        finalNotes = notes ? `${notes} | ${extrasText}` : extrasText;
+        finalNotes = trimmedNotes
+          ? `${trimmedNotes} | ${extrasText}`
+          : extrasText;
 
         // Agregar información del total si hay extras
         if (extrasTotal > 0) {
@@ -426,7 +454,18 @@ export default function MenuPage() {
         }
       }
 
-      if (editingItem) {
+      // ✅ NUEVA LÓGICA: Verificar si ya existe un item IDÉNTICO en el carrito
+      const existingItem = orderItems.find(
+        (item) =>
+          item.product_id === selectedProduct.id &&
+          item.notes === finalNotes &&
+          item.price === totalPrice
+      );
+
+      if (existingItem) {
+        // ✅ Si existe un item idéntico, incrementar la cantidad
+        await updateCartItem(existingItem.id, existingItem.quantity + 1);
+      } else if (editingItem) {
         // Editar item existente CON PRECIO ACTUALIZADO
         await updateCartItem(
           editingItem.id,
@@ -1252,6 +1291,7 @@ export default function MenuPage() {
               )}
 
               {/* SECCIÓN DE NOTAS */}
+              {/* SECCIÓN DE NOTAS */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   <FaStickyNote className="inline mr-2 text-yellow-600" />
@@ -1261,12 +1301,24 @@ export default function MenuPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej: Sin tomate, extra queso, bien cocido, sin picante, sin sal, etc."
-                  className="w-full h-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className={`w-full h-24 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
+                    notes.trim().length > 0 && notes.trim().length < 2
+                      ? "border-red-500 bg-red-50"
+                      : "border-gray-300"
+                  }`}
                   maxLength={200}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  {notes.length}/200 caracteres
-                </p>
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-500">
+                    {notes.length}/200 caracteres
+                  </p>
+                  {/* ✅ Mensaje de validación */}
+                  {notes.trim().length > 0 && notes.trim().length < 2 && (
+                    <p className="text-xs text-red-500 font-medium">
+                      Mínimo 2 caracteres válidos
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* RESUMEN FINAL Y PRECIO */}
@@ -1301,8 +1353,11 @@ export default function MenuPage() {
                 </button>
                 <button
                   onClick={handleConfirmAddWithNotes}
-                  disabled={addingProduct === selectedProduct.id}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={
+                    addingProduct === selectedProduct.id ||
+                    (notes.trim().length > 0 && notes.trim().length < 2) // ✅ Deshabilitar si validación falla
+                  }
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {addingProduct === selectedProduct.id ? (
                     <FaSpinner className="animate-spin" />
