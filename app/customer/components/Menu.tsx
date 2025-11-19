@@ -601,11 +601,50 @@ export default function MenuPage() {
   };
 
   const getEstimatedTime = () => {
-    const totalTime = orderItems.reduce((total, item) => {
-      const product = products.find((p) => p.id === item.product_id);
-      return total + (product?.preparation_time || 10) * item.quantity;
-    }, 0);
-    return Math.min(Math.max(totalTime, 5), 45);
+    if (orderItems.length === 0) return 0;
+
+    // Cache de productos para evitar búsquedas repetidas
+    const productCache = new Map();
+
+    // Encontrar máximo tiempo y cantidad en una sola pasada
+    let maxPreparationTime = 0;
+    let maxQuantity = 0;
+    let uniqueProducts = 0;
+    const seenProducts = new Set();
+
+    orderItems.forEach((item) => {
+      // Cache de productos
+      let product = productCache.get(item.product_id);
+      if (!product) {
+        product = products.find((p) => p.id === item.product_id);
+        productCache.set(item.product_id, product);
+      }
+
+      // Máximo tiempo
+      const prepTime = product?.preparation_time || 10;
+      maxPreparationTime = Math.max(maxPreparationTime, prepTime);
+
+      // Máxima cantidad
+      maxQuantity = Math.max(maxQuantity, item.quantity);
+
+      // Productos únicos
+      if (!seenProducts.has(item.product_id)) {
+        seenProducts.add(item.product_id);
+        uniqueProducts++;
+      }
+    });
+
+    // Calcular multiplicador de cantidad
+    const quantityMultiplier =
+      maxQuantity > 5 ? 1.8 : maxQuantity > 3 ? 1.5 : maxQuantity > 1 ? 1.2 : 1;
+
+    // Tiempo base + complejidad
+    let estimatedTime = maxPreparationTime * quantityMultiplier;
+
+    if (uniqueProducts > 4) estimatedTime += 8;
+    else if (uniqueProducts > 2) estimatedTime += 5;
+
+    return Math.min(Math.max(estimatedTime, 10), 45);
   };
 
   const getPopularItems = () => {
@@ -1538,7 +1577,7 @@ export default function MenuPage() {
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaHistory className="text-2xl mb-1" />
-            <span className="text-xs font-medium">Historial</span>
+            <span className="text-xs font-medium">Cuenta</span>
           </button>
           <button
             onClick={() =>
