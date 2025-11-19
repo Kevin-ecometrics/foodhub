@@ -5,6 +5,7 @@ import { supabase } from "@/app/lib/supabase/client";
 import { FaPlus, FaEdit, FaQrcode, FaCog, FaSpinner } from "react-icons/fa";
 import { RestaurantTable } from "../types";
 import TableForm from "./TableForm";
+import QRCode from "qrcode";
 
 interface TablesManagementProps {
   onError: (error: string) => void;
@@ -190,33 +191,93 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     }
   };
 
-  const generateQRCode = (tableNumber: number) => {
+  const generateQRCode = async (tableNumber: number) => {
     const baseUrl = "https://foodhub-software.vercel.app";
     const url = `${baseUrl}/customer?table=${tableNumber}`;
 
-    // Usar QuickChart.io que es más confiable para logos
-    let qrUrl: string;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 300;
+      canvas.height = 300;
 
-    if (logoUrl) {
-      // Agregar timestamp único al logo URL para evitar cache
-      const logoUrlWithTimestamp = `${logoUrl.split("?")[0]}?t=${Date.now()}`;
+      if (logoUrl) {
+        // Método 1: Usar toCanvas con logo integrado
+        await QRCode.toCanvas(canvas, url, {
+          width: 300,
+          margin: 1,
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF",
+          },
+        });
 
-      // QuickChart.io soporta logos mejor
-      qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
-        url
-      )}&size=300&centerImageUrl=${encodeURIComponent(
-        logoUrlWithTimestamp
-      )}&centerImageWidth=75&centerImageHeight=75&margin=1`;
-    } else {
-      // QR normal sin logo
-      qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
+        // Integrar el logo directamente en el QR
+        await integrateLogoIntoQR(canvas, logoUrl);
+      } else {
+        // QR simple sin logo
+        await QRCode.toCanvas(canvas, url, {
+          width: 300,
+          margin: 1,
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF",
+          },
+        });
+      }
+
+      // Abrir en nueva pestaña como antes
+      const qrDataUrl = canvas.toDataURL("image/png");
+      const qrImageUrl = URL.createObjectURL(
+        await (await fetch(qrDataUrl)).blob()
+      );
+      window.open(qrImageUrl, "_blank");
+    } catch (error) {
+      console.error("Error generando QR:", error);
+      // Fallback
+      const fallbackUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
         url
       )}&size=300&margin=1`;
+      window.open(fallbackUrl, "_blank");
     }
-
-    console.log("📱 QR URL generada:", qrUrl);
-    window.open(qrUrl, "_blank");
   };
+
+  // Función para integrar el logo en el QR
+  const integrateLogoIntoQR = (
+    canvas: HTMLCanvasElement,
+    logoUrl: string
+  ): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("No context"));
+        return;
+      }
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = () => {
+        // Tamaño y posición para el logo integrado
+        const logoSize = 60;
+        const centerX = (canvas.width - logoSize) / 2;
+        const centerY = (canvas.height - logoSize) / 2;
+
+        // Crear un área "protegida" en el centro del QR
+        // Esto permite que el QR sea legible pero con espacio para el logo
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(centerX - 2, centerY - 2, logoSize + 4, logoSize + 4);
+
+        // Dibujar el logo
+        ctx.drawImage(img, centerX, centerY, logoSize, logoSize);
+
+        resolve();
+      };
+
+      img.onerror = () => reject(new Error("Error cargando logo"));
+      img.src = logoUrl;
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "available":
@@ -346,11 +407,11 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
 
                     <div className="flex gap-2 flex-wrap">
                       <button
-                        onClick={() =>
-                          generateQRCode(
+                        onClick={async () => {
+                          await generateQRCode(
                             table.number || parseInt(table.id.toString())
-                          )
-                        }
+                          );
+                        }}
                         className="flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition"
                       >
                         <FaQrcode />
