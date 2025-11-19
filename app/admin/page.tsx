@@ -9,6 +9,9 @@ import {
   FaBox,
   FaSignOutAlt,
   FaUser,
+  FaUpload,
+  FaImage,
+  FaTimes,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -33,11 +36,13 @@ export default function AdminPage() {
   const [todayOrders, setTodayOrders] = useState<OrderSummary[]>([]);
   const [popularProducts, setPopularProducts] = useState<PopularProduct[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
-
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [checkingLogo, setCheckingLogo] = useState(true);
   // NUEVOS ESTADOS PARA VENTAS
   const [salesHistory, setSalesHistory] = useState<SalesHistory[]>([]);
   const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
-
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
   // Estado para fecha seleccionada
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -47,6 +52,104 @@ export default function AdminPage() {
     end: new Date(),
   });
 
+  const handleLogoUpload = async (file: File) => {
+    // Validaciones
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor selecciona un archivo de imagen válido");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("La imagen debe ser menor a 5MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Generar nombre único con timestamp
+      const timestamp = Date.now();
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const fileName = `logo_${timestamp}.${fileExt}`;
+
+      // Subir la imagen con nombre único
+      const { error: uploadError } = await supabase.storage
+        .from("logo")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+        });
+
+      if (uploadError) {
+        console.error("❌ Error subiendo archivo:", uploadError);
+        throw uploadError;
+      }
+
+      // Obtener URL con timestamp para evitar cache
+      const { data: urlData } = supabase.storage
+        .from("logo")
+        .getPublicUrl(fileName);
+
+      if (urlData?.publicUrl) {
+        const urlTimestamp = new Date().getTime();
+        const urlWithTimestamp = `${urlData.publicUrl}?t=${urlTimestamp}`;
+        setLogoUrl(urlWithTimestamp);
+      }
+
+      alert("✅ Logo actualizado exitosamente");
+      setShowUploadModal(false);
+    } catch (error: any) {
+      console.error("Error subiendo logo:", error);
+      alert("❌ Error al subir el logo: " + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+  const checkExistingLogo = async () => {
+    setCheckingLogo(true);
+    try {
+      // Listar todos los archivos del bucket
+      const { data: files, error } = await supabase.storage
+        .from("logo")
+        .list("", {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" }, // Ordenar por fecha de creación descendente
+        });
+
+      if (error) {
+        setLogoUrl(null);
+        return;
+      }
+
+      if (files && files.length > 0) {
+        // Buscar el archivo más reciente que empiece con "logo_"
+        const latestLogo = files.find((file) => file.name.startsWith("logo_"));
+
+        if (latestLogo) {
+          // Obtener URL pública
+          const { data: urlData } = supabase.storage
+            .from("logo")
+            .getPublicUrl(latestLogo.name);
+
+          if (urlData?.publicUrl) {
+            // Agregar timestamp para evitar cache
+            const timestamp = new Date().getTime();
+            const urlWithTimestamp = `${urlData.publicUrl}?t=${timestamp}`;
+            setLogoUrl(urlWithTimestamp);
+          } else {
+            setLogoUrl(null);
+          }
+        } else {
+          setLogoUrl(null);
+        }
+      } else {
+        setLogoUrl(null);
+      }
+    } catch (error) {
+      setLogoUrl(null);
+    } finally {
+      setCheckingLogo(false);
+    }
+  };
   // NUEVA FUNCIÓN: Manejar cambio de rango de fechas
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
     setDateRange({ start: startDate, end: endDate });
@@ -563,7 +666,12 @@ export default function AdminPage() {
     }
   };
 
-  // Cargar datos cuando cambie la sección o la fecha seleccionada
+  // Cargar logo cuando el usuario se autentique
+  useEffect(() => {
+    checkExistingLogo();
+  }, []);
+
+  // Cargar datos del dashboard cuando cambie la sección o la fecha seleccionada
   useEffect(() => {
     if (isAuthenticated && activeSection === "dashboard") {
       loadDailyData(selectedDate);
@@ -606,8 +714,19 @@ export default function AdminPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <FaChartBar className="text-blue-600" />
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
+                {checkingLogo ? (
+                  <div className="animate-pulse bg-gray-300 w-full h-full"></div>
+                ) : logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Logo del negocio"
+                    className="w-full h-full object-cover"
+                    onError={() => setLogoUrl(null)} // Si falla la carga, mostrar icono
+                  />
+                ) : (
+                  <FaChartBar className="text-blue-600" />
+                )}
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800">
@@ -622,6 +741,13 @@ export default function AdminPage() {
               >
                 <FaUser />
                 Waiter
+              </button>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+              >
+                <FaUpload />
+                {logoUrl ? "Actualizar Logo" : "Subir Logo"}
               </button>
               <button
                 onClick={handleLogout}
@@ -702,6 +828,40 @@ export default function AdminPage() {
           <ProductsManagement onError={handleError} />
         )}
       </main>
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <FaImage className="text-purple-600" />
+                  {logoUrl ? "Actualizar Logo" : "Subir Logo"} del Negocio
+                </h2>
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                  disabled={uploading}
+                  className="w-full"
+                />
+                {uploading && <p className="text-blue-600 mt-2">Subiendo...</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

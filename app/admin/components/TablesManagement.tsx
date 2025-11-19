@@ -2,14 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
-import {
-  FaPlus,
-  FaEdit,
-  FaTrash,
-  FaQrcode,
-  FaCog,
-  FaSpinner,
-} from "react-icons/fa";
+import { FaPlus, FaEdit, FaQrcode, FaCog, FaSpinner } from "react-icons/fa";
 import { RestaurantTable } from "../types";
 import TableForm from "./TableForm";
 
@@ -21,6 +14,9 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [showLogoPreview, setShowLogoPreview] = useState(false);
+
   const [editingTable, setEditingTable] = useState<RestaurantTable | null>(
     null
   );
@@ -31,7 +27,38 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
 
   useEffect(() => {
     loadTables();
+    loadLatestLogo();
   }, []);
+
+  const loadLatestLogo = async () => {
+    try {
+      const { data: files, error } = await supabase.storage
+        .from("logo")
+        .list("", {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+
+      if (error) throw error;
+
+      if (files && files.length > 0) {
+        const latestLogo = files.find((file) => file.name.startsWith("logo_"));
+        if (latestLogo) {
+          const { data: urlData } = supabase.storage
+            .from("logo")
+            .getPublicUrl(latestLogo.name);
+
+          if (urlData?.publicUrl) {
+            const timestamp = new Date().getTime();
+            setLogoUrl(`${urlData.publicUrl}?t=${timestamp}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error loading logo:", error);
+    }
+  };
 
   const loadTables = async () => {
     setTablesLoading(true);
@@ -39,10 +66,12 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       const { data, error } = await supabase
         .from("tables")
         .select("*")
-        .order("created_at", { ascending: false }); // Ordenar por fecha de creación
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setTables(data || []);
+
+      await loadLatestLogo();
     } catch (error) {
       console.error("Error loading tables:", error);
       onError("Error cargando las mesas");
@@ -164,12 +193,30 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   const generateQRCode = (tableNumber: number) => {
     const baseUrl = "https://foodhub-software.vercel.app";
     const url = `${baseUrl}/customer?table=${tableNumber}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-      url
-    )}`;
+
+    // Usar QuickChart.io que es más confiable para logos
+    let qrUrl: string;
+
+    if (logoUrl) {
+      // Agregar timestamp único al logo URL para evitar cache
+      const logoUrlWithTimestamp = `${logoUrl.split("?")[0]}?t=${Date.now()}`;
+
+      // QuickChart.io soporta logos mejor
+      qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
+        url
+      )}&size=300&centerImageUrl=${encodeURIComponent(
+        logoUrlWithTimestamp
+      )}&centerImageWidth=60&centerImageHeight=60&margin=1`;
+    } else {
+      // QR normal sin logo
+      qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
+        url
+      )}&size=300&margin=1`;
+    }
+
+    console.log("📱 QR URL generada:", qrUrl);
     window.open(qrUrl, "_blank");
   };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "available":
@@ -330,6 +377,42 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
                     </div>
                   </div>
                 ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {showLogoPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">
+                  Vista Previa del Logo
+                </h2>
+                <button
+                  onClick={() => setShowLogoPreview(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="text-center">
+                {logoUrl ? (
+                  <div>
+                    <img
+                      src={logoUrl}
+                      alt="Logo preview"
+                      className="max-w-full h-auto mx-auto rounded-lg border"
+                    />
+                    <p className="text-sm text-gray-600 mt-2">
+                      URL: {logoUrl.substring(0, 50)}...
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No hay logo cargado</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
