@@ -12,6 +12,7 @@ import {
   FaUpload,
   FaImage,
   FaTimes,
+  FaSpinner,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -830,12 +831,12 @@ export default function AdminPage() {
       </main>
       {showUploadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                  <FaImage className="text-purple-600" />
-                  {logoUrl ? "Actualizar Logo" : "Subir Logo"} del Negocio
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
+            {/* Header simple */}
+            <div className="p-4 border-b">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  {logoUrl ? "Cambiar Logo" : "Agregar Logo"}
                 </h2>
                 <button
                   onClick={() => setShowUploadModal(false)}
@@ -844,8 +845,16 @@ export default function AdminPage() {
                   <FaTimes />
                 </button>
               </div>
+            </div>
 
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            {/* Contenido mínimo */}
+            <div className="p-6">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4">
+                <FaUpload className="text-gray-400 text-2xl mx-auto mb-3" />
+                <p className="text-gray-600 mb-4">
+                  Selecciona una imagen para el logo
+                </p>
+
                 <input
                   type="file"
                   accept="image/*"
@@ -854,9 +863,38 @@ export default function AdminPage() {
                     if (file) handleLogoUpload(file);
                   }}
                   disabled={uploading}
-                  className="w-full"
+                  className="hidden"
+                  id="logo-upload"
                 />
-                {uploading && <p className="text-blue-600 mt-2">Subiendo...</p>}
+                <label
+                  htmlFor="logo-upload"
+                  className={`inline-block px-4 py-2 rounded-lg font-medium ${
+                    uploading
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                  }`}
+                >
+                  {uploading ? "Subiendo..." : "Seleccionar Imagen"}
+                </label>
+              </div>
+
+              {uploading && (
+                <div className="text-center text-blue-600">
+                  <FaSpinner className="animate-spin inline mr-2" />
+                  Subiendo imagen...
+                </div>
+              )}
+            </div>
+
+            {/* Footer simple */}
+            <div className="p-4 border-t bg-gray-50 rounded-b-xl">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cerrar
+                </button>
               </div>
             </div>
           </div>
