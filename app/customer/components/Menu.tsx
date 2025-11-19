@@ -1042,51 +1042,63 @@ export default function MenuPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {isInCart && (
+                      {isInCart ? (
+                        // ✅ CUANDO ESTÁ EN EL CARRITO: Mostrar controles de cantidad [- 3 +]
+                        <>
+                          <button
+                            onClick={() => {
+                              const item = orderItems.find(
+                                (item) => item.product_id === product.id
+                              );
+                              if (item) {
+                                if (currentQuantity > 1) {
+                                  updateCartItem(item.id, currentQuantity - 1);
+                                } else {
+                                  removeFromCart(item.id);
+                                }
+                              }
+                            }}
+                            className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                          >
+                            <FaMinus className="text-sm" />
+                          </button>
+
+                          <span className="font-bold text-lg w-8 text-center bg-blue-100 text-blue-600 rounded py-1">
+                            {currentQuantity}
+                          </span>
+
+                          <button
+                            onClick={() => {
+                              const item = orderItems.find(
+                                (item) => item.product_id === product.id
+                              );
+                              if (item) {
+                                updateCartItem(item.id, currentQuantity + 1);
+                              }
+                            }}
+                            className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition"
+                          >
+                            <FaPlus className="text-sm" />
+                          </button>
+                        </>
+                      ) : (
+                        // ✅ CUANDO NO ESTÁ EN EL CARRITO: Mostrar botón "Agregar"
                         <button
-                          onClick={() => {
-                            const item = orderItems.find(
-                              (item) => item.product_id === product.id
-                            );
-                            if (item) {
-                              updateCartItem(item.id, currentQuantity - 1);
-                            }
-                          }}
-                          className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition"
+                          id={`product-${product.id}`}
+                          onClick={() => handleAddToCartWithNotes(product)}
+                          disabled={addingProduct === product.id}
+                          className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 hover:scale-105"
                         >
-                          <FaMinus className="text-sm" />
+                          {addingProduct === product.id ? (
+                            <FaSpinner className="animate-spin" />
+                          ) : (
+                            <>
+                              <FaPlus />
+                              Agregar
+                            </>
+                          )}
                         </button>
                       )}
-
-                      <button
-                        id={`product-${product.id}`}
-                        onClick={() => handleAddToCartWithNotes(product)}
-                        disabled={addingProduct === product.id}
-                        className={`px-4 py-2 rounded-full transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 ${
-                          isInCart
-                            ? "bg-green-600 text-white hover:bg-green-700 scale-105"
-                            : "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
-                        }`}
-                      >
-                        {addingProduct === product.id ? (
-                          <FaSpinner className="animate-spin" />
-                        ) : isInCart ? (
-                          <>
-                            <FaPlus />
-                            <span className="hidden sm:inline">
-                              Agregar más
-                            </span>
-                            <span className="sm:hidden">
-                              +{currentQuantity}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <FaPlus />
-                            Agregar
-                          </>
-                        )}
-                      </button>
                     </div>
                   </div>
 
