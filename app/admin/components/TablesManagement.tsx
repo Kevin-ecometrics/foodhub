@@ -206,7 +206,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         url
       )}&size=300&centerImageUrl=${encodeURIComponent(
         logoUrlWithTimestamp
-      )}&centerImageWidth=60&centerImageHeight=60&margin=1`;
+      )}&centerImageWidth=75&centerImageHeight=75&margin=1`;
     } else {
       // QR normal sin logo
       qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
