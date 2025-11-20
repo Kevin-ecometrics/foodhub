@@ -671,14 +671,24 @@ export default function HistoryPage() {
               {assistanceLoading ? "Enviando..." : "Ayuda"}
             </button>
 
-            <button
-              onClick={handleBillRequest}
-              disabled={billLoading}
-              className="flex-1 md:flex-none bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <FaReceipt />
-              {billLoading ? "Solicitando..." : "Cuenta"}
-            </button>
+            {customerSummaries.length >= 1 ? (
+              <button
+                onClick={handleBillRequest}
+                disabled={billLoading}
+                className="flex-1 md:flex-none bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <FaReceipt />
+                {billLoading ? "Solicitando..." : "Cuenta"}
+              </button>
+            ) : (
+              <button
+                disabled
+                className="flex-1 md:flex-none bg-gray-400 text-gray-200 px-4 py-2 rounded-full transition flex items-center justify-center gap-2 cursor-not-allowed"
+              >
+                <FaReceipt />
+                Cuenta
+              </button>
+            )}
           </div>
         </div>
       </header>

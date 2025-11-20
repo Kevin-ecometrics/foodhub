@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
@@ -383,18 +383,32 @@ export default function MenuPage() {
   const handleConfirmAddWithNotes = async () => {
     if (!selectedProduct) return;
 
-    // ✅ VALIDACIÓN: Si hay texto en notes, debe tener al menos 2 caracteres no vacíos
+    // ✅ VALIDACIÓN MEJORADA: Detectar si solo hay espacios vacíos
     const trimmedNotes = notes.trim();
-    if (trimmedNotes.length > 0 && trimmedNotes.length < 2) {
+
+    // Verificar si hay texto que no sean solo espacios
+    const hasValidNotes = trimmedNotes.length > 0;
+    const hasOnlySpaces = notes.length > 0 && trimmedNotes.length === 0;
+
+    // Si el usuario escribió algo pero solo son espacios, mostrar error
+    if (hasOnlySpaces) {
+      alert(
+        "❌ Las instrucciones especiales no pueden contener solo espacios en blanco."
+      );
+      return;
+    }
+
+    // ✅ VALIDACIÓN EXISTENTE: Si hay texto válido, debe tener al menos 2 caracteres
+    if (hasValidNotes && trimmedNotes.length < 2) {
       alert(
         "❌ Las instrucciones especiales deben tener al menos 2 caracteres válidos."
       );
       return;
     }
 
-    // ✅ VALIDACIÓN: Si no hay extras seleccionados y no hay notas, usar el método simple
+    // ✅ VALIDACIÓN: Si no hay extras seleccionados y no hay notas válidas, usar el método simple
     const hasExtras = Object.values(selectedExtras).some((value) => value);
-    if (!hasExtras && !trimmedNotes) {
+    if (!hasExtras && !hasValidNotes) {
       // Usar el método simple de agregar al carrito sin notas
       setAddingProduct(selectedProduct.id);
       try {
@@ -437,14 +451,14 @@ export default function MenuPage() {
           };
         });
 
-      let finalNotes = trimmedNotes; // Usar el texto validado
+      let finalNotes = hasValidNotes ? trimmedNotes : ""; // Usar el texto validado o vacío
       if (selectedExtrasList.length > 0) {
         const extrasDetails = selectedExtrasList
           .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
           .join(", ");
 
         const extrasText = `Extras: ${extrasDetails}`;
-        finalNotes = trimmedNotes
+        finalNotes = hasValidNotes
           ? `${trimmedNotes} | ${extrasText}`
           : extrasText;
 
@@ -794,33 +808,68 @@ export default function MenuPage() {
   };
 
   // Componente para el badge del carrito mejorado
-  const CartBadge = () => (
-    <button
-      onClick={() => setShowCart(true)}
-      className="relative bg-blue-600 text-white px-4 py-3 rounded-full hover:bg-blue-700 transition shadow-lg flex items-center gap-2 group"
-    >
-      <FaShoppingCart className="text-xl" />
-      <span className="font-bold">{cartItemsCount}</span>
-      <span className="hidden sm:inline">• ${cartTotal.toFixed(2)}</span>
+  // Componente para el badge del carrito mejorado - VERSIÓN CORREGIDA
+  const CartBadge = () => {
+    // Función para formatear la cantidad del badge
+    const formatBadgeCount = (count: number): string => {
+      if (count <= 99) {
+        return count.toString();
+      } else {
+        return "99+";
+      }
+    };
 
-      {cartItemsCount > 0 && (
-        <div className="absolute -top-1 -right-1">
-          <div className="relative">
-            <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white animate-pulse border-2 border-white">
-              {cartItemsCount}
+    // Función para determinar el tamaño del badge basado en la cantidad
+    const getBadgeSize = (count: number): string => {
+      if (count < 10) {
+        return "w-5 h-5 text-xs";
+      } else if (count < 100) {
+        return "w-6 h-6 text-xs";
+      } else {
+        return "w-7 h-7 text-[10px]";
+      }
+    };
+
+    return (
+      <button
+        onClick={() => setShowCart(true)}
+        className="relative bg-blue-600 text-white px-4 py-3 rounded-full hover:bg-blue-700 transition shadow-lg flex items-center gap-2 group"
+      >
+        <FaShoppingCart className="text-xl" />
+        <span className="font-bold">{cartItemsCount}</span>
+        <span className="hidden sm:inline">{formatCurrency(cartTotal)}</span>
+
+        {cartItemsCount > 0 && (
+          <div className="absolute -top-2 -right-2">
+            <div className="relative">
+              <div
+                className={`${getBadgeSize(
+                  cartItemsCount
+                )} bg-red-500 rounded-full flex items-center justify-center font-bold text-white animate-pulse border-2 border-white`}
+              >
+                {formatBadgeCount(cartItemsCount)}
+              </div>
+              <div className="absolute inset-0 rounded-full bg-red-400 animate-ping"></div>
             </div>
-            <div className="absolute inset-0 rounded-full bg-red-400 animate-ping"></div>
           </div>
-        </div>
-      )}
+        )}
 
-      {lastOrderSent && cartItemsCount === 0 && (
-        <div className="absolute -top-1 -right-1">
-          <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-        </div>
-      )}
-    </button>
-  );
+        {lastOrderSent && cartItemsCount === 0 && (
+          <div className="absolute -top-1 -right-1">
+            <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
 
   if (tableId === null || isLoading) {
     return (
@@ -1291,7 +1340,7 @@ export default function MenuPage() {
               )}
 
               {/* SECCIÓN DE NOTAS */}
-              {/* SECCIÓN DE NOTAS */}
+              {/* SECCIÓN DE NOTAS - MEJORADA */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   <FaStickyNote className="inline mr-2 text-yellow-600" />
@@ -1302,7 +1351,8 @@ export default function MenuPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej: Sin tomate, extra queso, bien cocido, sin picante, sin sal, etc."
                   className={`w-full h-24 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
-                    notes.trim().length > 0 && notes.trim().length < 2
+                    (notes.trim().length > 0 && notes.trim().length < 2) ||
+                    (notes.length > 0 && notes.trim().length === 0)
                       ? "border-red-500 bg-red-50"
                       : "border-gray-300"
                   }`}
@@ -1312,7 +1362,12 @@ export default function MenuPage() {
                   <p className="text-xs text-gray-500">
                     {notes.length}/200 caracteres
                   </p>
-                  {/* ✅ Mensaje de validación */}
+                  {/* ✅ Mensajes de validación MEJORADOS */}
+                  {notes.length > 0 && notes.trim().length === 0 && (
+                    <p className="text-xs text-red-500 font-medium">
+                      No se permiten solo espacios
+                    </p>
+                  )}
                   {notes.trim().length > 0 && notes.trim().length < 2 && (
                     <p className="text-xs text-red-500 font-medium">
                       Mínimo 2 caracteres válidos
@@ -1355,7 +1410,8 @@ export default function MenuPage() {
                   onClick={handleConfirmAddWithNotes}
                   disabled={
                     addingProduct === selectedProduct.id ||
-                    (notes.trim().length > 0 && notes.trim().length < 2) // ✅ Deshabilitar si validación falla
+                    (notes.trim().length > 0 && notes.trim().length < 2) || // ✅ Validación existente
+                    (notes.length > 0 && notes.trim().length === 0) // ✅ Nueva validación: solo espacios
                   }
                   className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1530,16 +1586,16 @@ export default function MenuPage() {
                           <h3 className="font-semibold text-gray-800">
                             {item.product_name}
                           </h3>
-                          <button
+                          {/* <button
                             onClick={() => handleEditNotes(item)}
                             className="text-gray-400 hover:text-blue-600 transition opacity-0 group-hover:opacity-100"
                             title="Editar notas"
                           >
                             <FaEdit className="text-sm" />
-                          </button>
+                          </button> */}
                         </div>
                         <p className="text-lg font-bold text-blue-600">
-                          ${item.price.toFixed(2)}
+                          {formatCurrency(item.price)}
                         </p>
 
                         {/* NOTAS Y EXTRAS MEJORADOS EN EL CARRITO */}
@@ -1585,7 +1641,7 @@ export default function MenuPage() {
                   <div className="space-y-2 mb-6">
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>
-                      <span>${cartTotal.toFixed(2)}</span>
+                      <span>{formatCurrency(cartTotal)}</span>
                     </div>
 
                     {/* Tiempo estimado */}

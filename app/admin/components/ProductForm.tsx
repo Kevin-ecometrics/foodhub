@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { FaPlus, FaEdit, FaStar, FaRegStar, FaTrash } from "react-icons/fa";
 import { Product, ProductFormData, ProductExtra } from "../types";
 import StarRating from "./StarRating";
+import { useState } from "react";
 
 interface ProductFormProps {
   editingProduct: Product | null;
@@ -18,10 +20,78 @@ export default function ProductForm({
   onCancel,
   onFormChange,
 }: ProductFormProps) {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateField = (field: string, value: any): string => {
+    switch (field) {
+      case "name":
+        if (!value || value.trim() === "") return "El nombre es obligatorio";
+        if (value.length > 100)
+          return "El nombre no puede tener más de 100 caracteres";
+        return "";
+
+      case "description":
+        if (!value || value.trim() === "")
+          return "La descripción es obligatoria";
+        if (value.length > 500)
+          return "La descripción no puede tener más de 500 caracteres";
+        return "";
+
+      case "price":
+        if (value === "" || value === null || value === undefined)
+          return "El precio es obligatorio";
+        const price = parseFloat(value);
+        if (isNaN(price)) return "El precio debe ser un número válido";
+        if (price < 0) return "El precio no puede ser negativo";
+        if (price > 10000) return "El precio no puede ser mayor a $10,000";
+        return "";
+
+      case "preparation_time":
+        if (value === "" || value === null || value === undefined)
+          return "El tiempo de preparación es obligatorio";
+        const time = parseInt(value);
+        if (isNaN(time)) return "El tiempo debe ser un número válido";
+        if (time < 1) return "El tiempo debe ser al menos 1 minuto";
+        if (time > 480)
+          return "El tiempo no puede ser mayor a 480 minutos (8 horas)";
+        return "";
+
+      case "rating":
+        if (value === "" || value === null || value === undefined)
+          return "La calificación es obligatoria";
+        const rating = parseFloat(value);
+        if (isNaN(rating)) return "La calificación debe ser un número válido";
+        if (rating < 0) return "La calificación no puede ser negativa";
+        if (rating > 5) return "La calificación no puede ser mayor a 5";
+        if (rating < 1) return "La calificación debe ser al menos 1";
+        return "";
+
+      case "category":
+        if (!value || value.trim() === "") return "La categoría es obligatoria";
+        return "";
+
+      default:
+        return "";
+    }
+  };
+
   const handleChange = (
     field: keyof ProductFormData,
     value: string | boolean | File | number | ProductExtra[]
   ) => {
+    // Validar el campo antes de actualizar
+    const error = validateField(field, value);
+
+    if (error) {
+      setErrors((prev) => ({ ...prev, [field]: error }));
+    } else {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+
     onFormChange({
       ...productForm,
       [field]: value,
@@ -29,7 +99,71 @@ export default function ProductForm({
   };
 
   const handleRatingChange = (rating: number) => {
+    // Validar que la calificación no sea 0
+    if (rating === 0) {
+      setErrors((prev) => ({
+        ...prev,
+        rating: "La calificación es obligatoria",
+      }));
+    } else {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.rating;
+        return newErrors;
+      });
+    }
     handleChange("rating", rating.toString());
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validar todos los campos antes de enviar
+    const newErrors: Record<string, string> = {};
+
+    const fieldsToValidate: (keyof ProductFormData)[] = [
+      "name",
+      "description",
+      "price",
+      "preparation_time",
+      "category",
+      "rating",
+    ];
+
+    fieldsToValidate.forEach((field) => {
+      const error = validateField(field, productForm[field]);
+      if (error) {
+        newErrors[field] = error;
+      }
+    });
+
+    // Validar extras si existen
+    if (productForm.extras && productForm.extras.length > 0) {
+      productForm.extras.forEach((extra, index) => {
+        if (!extra.name || extra.name.trim() === "") {
+          newErrors[`extra_name_${index}`] =
+            "El nombre del extra es obligatorio";
+        } else if (extra.name.length > 50) {
+          newErrors[`extra_name_${index}`] =
+            "El nombre del extra no puede tener más de 50 caracteres";
+        }
+
+        if (extra.price < 0) {
+          newErrors[`extra_price_${index}`] =
+            "El precio del extra no puede ser negativo";
+        } else if (extra.price > 1000) {
+          newErrors[`extra_price_${index}`] =
+            "El precio del extra no puede ser mayor a $1,000";
+        }
+      });
+    }
+
+    setErrors(newErrors);
+
+    // Si no hay errores, enviar el formulario
+    if (Object.keys(newErrors).length === 0) {
+      onSubmit(e);
+    }
   };
 
   // Funciones para manejar extras
@@ -47,6 +181,15 @@ export default function ProductForm({
   const removeExtra = (index: number) => {
     const currentExtras = productForm.extras || [];
     const newExtras = currentExtras.filter((_, i) => i !== index);
+
+    // Limpiar errores del extra eliminado
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[`extra_name_${index}`];
+      delete newErrors[`extra_price_${index}`];
+      return newErrors;
+    });
+
     handleChange("extras", newExtras);
   };
 
@@ -61,6 +204,38 @@ export default function ProductForm({
       ...newExtras[index],
       [field]: value,
     };
+
+    // Validar el campo del extra
+    const errorKey =
+      field === "name" ? `extra_name_${index}` : `extra_price_${index}`;
+    let error = "";
+
+    if (field === "name") {
+      if (!value || (value as string).trim() === "") {
+        error = "El nombre del extra es obligatorio";
+      } else if ((value as string).length > 50) {
+        error = "El nombre del extra no puede tener más de 50 caracteres";
+      }
+    } else if (field === "price") {
+      const priceValue =
+        typeof value === "string" ? parseFloat(value) : (value as number);
+      if (priceValue < 0) {
+        error = "El precio del extra no puede ser negativo";
+      } else if (priceValue > 1000) {
+        error = "El precio del extra no puede ser mayor a $1,000";
+      }
+    }
+
+    if (error) {
+      setErrors((prev) => ({ ...prev, [errorKey]: error }));
+    } else {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
+      });
+    }
+
     handleChange("extras", newExtras);
   };
 
@@ -102,29 +277,40 @@ export default function ProductForm({
         {editingProduct ? <FaEdit /> : <FaPlus />}
         {editingProduct ? "Editar Producto" : "Nuevo Producto"}
       </h3>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre del Producto
+              Nombre del Producto *
             </label>
             <input
               type="text"
               value={productForm.name}
               onChange={(e) => handleChange("name", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.name ? "border-red-500" : "border-gray-300"
+              }`}
+              maxLength={100}
+              placeholder="Máximo 100 caracteres"
             />
+            {errors.name && (
+              <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+            )}
+            <div className="text-xs text-gray-500 mt-1 text-right">
+              {productForm.name.length}/100
+            </div>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría
+              Categoría *
             </label>
             <select
               value={productForm.category}
               onChange={(e) => handleChange("category", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.category ? "border-red-500" : "border-gray-300"
+              }`}
             >
               <option value="">Seleccionar categoría</option>
               <option value="Breakfast">Breakfast</option>
@@ -133,31 +319,52 @@ export default function ProductForm({
               <option value="Combos">Combos</option>
               <option value="Drinks">Drinks</option>
             </select>
+            {errors.category && (
+              <p className="text-red-500 text-xs mt-1">{errors.category}</p>
+            )}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Precio ($)
+              Precio ($) *
             </label>
             <input
               type="number"
-              step="1"
+              step="0.01"
               min="0"
+              max="10000"
               value={productForm.price}
               onChange={(e) => handleChange("price", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.price ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder="0.00 - 10,000"
             />
+            {errors.price && (
+              <p className="text-red-500 text-xs mt-1">{errors.price}</p>
+            )}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tiempo de Preparación (minutos)
+              Tiempo de Preparación (minutos) *
             </label>
             <input
               type="number"
+              min="1"
+              max="480"
               value={productForm.preparation_time}
               onChange={(e) => handleChange("preparation_time", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.preparation_time ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder="1 - 480 minutos"
             />
+            {errors.preparation_time && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.preparation_time}
+              </p>
+            )}
           </div>
 
           {/* Línea con Calificación, Estado y Favorito */}
@@ -166,14 +373,21 @@ export default function ProductForm({
               {/* Calificación */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Calificación Inicial
+                  Calificación Inicial *
                 </label>
-                <div className="border border-gray-300 rounded-lg p-3 h-full">
+                <div
+                  className={`border rounded-lg p-3 h-full ${
+                    errors.rating ? "border-red-500" : "border-gray-300"
+                  }`}
+                >
                   <StarRating
                     rating={parseFloat(productForm.rating || "0")}
                     onRatingChange={handleRatingChange}
                     readonly={false}
                   />
+                  {errors.rating && (
+                    <p className="text-red-500 text-xs mt-2">{errors.rating}</p>
+                  )}
                   <p className="text-xs text-gray-500 mt-2">
                     Calificación inicial (1-5 estrellas)
                   </p>
@@ -284,15 +498,24 @@ export default function ProductForm({
 
           <div className="md:col-span-2 mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Descripción
+              Descripción *
             </label>
             <textarea
               value={productForm.description}
               onChange={(e) => handleChange("description", e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.description ? "border-red-500" : "border-gray-300"
+              }`}
+              maxLength={500}
+              placeholder="Máximo 500 caracteres"
             />
+            {errors.description && (
+              <p className="text-red-500 text-xs mt-1">{errors.description}</p>
+            )}
+            <div className="text-xs text-gray-500 mt-1 text-right">
+              {productForm.description.length}/500
+            </div>
           </div>
 
           {/* SECCIÓN DE EXTRAS */}
@@ -320,7 +543,7 @@ export default function ProductForm({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Nombre del Extra
+                        Nombre del Extra *
                       </label>
                       <input
                         type="text"
@@ -328,9 +551,22 @@ export default function ProductForm({
                         onChange={(e) =>
                           updateExtra(index, "name", e.target.value)
                         }
-                        placeholder="Ej: Queso extra, Tocino, etc."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="Ej: Queso extra, Tocino, etc. (máx. 50 caracteres)"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                          errors[`extra_name_${index}`]
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
+                        maxLength={50}
                       />
+                      {errors[`extra_name_${index}`] && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors[`extra_name_${index}`]}
+                        </p>
+                      )}
+                      <div className="text-xs text-gray-500 mt-1 text-right">
+                        {extra.name.length}/50
+                      </div>
                     </div>
 
                     <div>
@@ -338,34 +574,32 @@ export default function ProductForm({
                         Precio Extra ($)
                       </label>
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1000"
                         value={extra.price}
                         onChange={(e) => {
-                          // Permitir solo números y punto decimal
-                          const value = e.target.value.replace(/[^0-9.]/g, "");
-                          // Evitar múltiples puntos decimales
-                          const parts = value.split(".");
-                          const formattedValue =
-                            parts.length > 2
-                              ? parts[0] + "." + parts.slice(1).join("")
-                              : value;
-
                           updateExtra(
                             index,
                             "price",
-                            formattedValue === ""
+                            e.target.value === ""
                               ? 0
-                              : parseFloat(formattedValue) || 0
+                              : parseFloat(e.target.value) || 0
                           );
                         }}
-                        onBlur={(e) => {
-                          // Formatear al salir del input
-                          const value = parseFloat(e.target.value) || 0;
-                          updateExtra(index, "price", value);
-                        }}
-                        placeholder="0.00"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="0.00 - 1,000"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                          errors[`extra_price_${index}`]
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
                       />
+                      {errors[`extra_price_${index}`] && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors[`extra_price_${index}`]}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-end gap-2">
@@ -443,6 +677,7 @@ export default function ProductForm({
             {renderPreview()}
           </div>
         </div>
+
         <div className="flex gap-3">
           <button
             type="submit"
