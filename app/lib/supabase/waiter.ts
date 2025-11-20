@@ -114,17 +114,17 @@ interface SalesItemRow {
   notes?: string | null
 }
 
-interface WaiterNotificationRow {
-  id: string
-  table_id: number
-  order_id: string | null
-  type: NotificationType
-  message: string
-  status: NotificationStatus
-  payment_method: PaymentMethod // NUEVO CAMPO
-  created_at: string
-  updated_at?: string
-}
+// interface WaiterNotificationRow {
+//   id: string
+//   table_id: number
+//   order_id: string | null
+//   type: NotificationType
+//   message: string
+//   status: NotificationStatus
+//   payment_method: PaymentMethod // NUEVO CAMPO
+//   created_at: string
+//   updated_at?: string
+// }
 
 // Helpers tipados -> permitimos cualquier tipo (objeto o array)
 function assertUpdate<T>(data: T): T {
