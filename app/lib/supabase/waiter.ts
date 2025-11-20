@@ -237,8 +237,8 @@ export const waiterService = {
   },
 
   async saveSalesHistory(
-    tableId: number, 
-    tableNumber: number, 
+    tableId: number,
+    tableNumber: number,
     paymentMethod: PaymentMethod = null // NUEVO PARÁMETRO
   ): Promise<string> {
     try {
@@ -338,8 +338,8 @@ export const waiterService = {
   },
 
   async freeTableAndClean(
-    tableId: number, 
-    tableNumber: number, 
+    tableId: number,
+    tableNumber: number,
     paymentMethod: PaymentMethod = null // NUEVO PARÁMETRO
   ): Promise<void> {
     try {
