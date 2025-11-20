@@ -192,7 +192,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   const generateQRCode = async (tableNumber: number) => {
-    const baseUrl = "https://foodhub-software.vercel.app";
+    const baseUrl = "https://wayna.e-commetrics.com";
     const url = `${baseUrl}/customer?table=${tableNumber}`;
 
     try {

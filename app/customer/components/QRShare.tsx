@@ -17,7 +17,7 @@ export default function QRSharePage() {
 
   useEffect(() => {
     if (tableNumber) {
-      const baseUrl = "https://foodhub-software.vercel.app";
+      const baseUrl = "https://wayna.e-commetrics.com";
       // Incluir todos los parámetros en el QR
       const url = `${baseUrl}/customer?table=${tableNumber}`;
       setCurrentUrl(url);
