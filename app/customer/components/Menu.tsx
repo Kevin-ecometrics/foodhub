@@ -268,33 +268,61 @@ export default function MenuPage() {
     }
   }, [tableId]);
 
-  // Configurar observer para detectar categoría activa
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const category = entry.target.getAttribute('data-category');
-            if (category) {
-              setSelectedCategory(category);
-            }
-          }
-        });
-      },
-      {
-        root: null,
-        rootMargin: '-20% 0px -70% 0px',
-        threshold: 0.1
-      }
+useEffect(() => {
+  if (products.length === 0) return;
+
+  const handleScroll = () => {
+    const scrollPosition = window.scrollY + 100; // Offset para cuando la categoría está cerca del top
+
+    // Encontrar todas las categorías que tienen productos
+    const availableCategories = CATEGORIES.filter(
+      category => getProductsByCategory(category.id).length > 0
     );
 
-    // Observar todas las secciones de categorías
-    Object.values(categoryRefs.current).forEach(ref => {
-      if (ref) observer.observe(ref);
-    });
+    let currentActiveCategory = "favorites";
 
-    return () => observer.disconnect();
-  }, [products]);
+    // Buscar la categoría que está actualmente en vista
+    for (const category of availableCategories) {
+      const element = categoryRefs.current[category.id];
+      if (element) {
+        const elementTop = element.offsetTop;
+        const elementBottom = elementTop + element.offsetHeight;
+
+        // Si el scroll position está dentro de los límites de esta categoría
+        if (scrollPosition >= elementTop && scrollPosition < elementBottom) {
+          currentActiveCategory = category.id;
+          break;
+        }
+      }
+    }
+
+    // Solo actualizar si cambió la categoría
+    if (currentActiveCategory !== selectedCategory) {
+      setSelectedCategory(currentActiveCategory);
+    }
+  };
+
+  // Agregar event listener con throttling para mejor performance
+  let ticking = false;
+  const throttledScroll = () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        handleScroll();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  };
+
+  window.addEventListener('scroll', throttledScroll, { passive: true });
+  
+  // Ejecutar una vez al cargar para establecer la categoría inicial correcta
+  handleScroll();
+
+  return () => {
+    window.removeEventListener('scroll', throttledScroll);
+  };
+}, [products, selectedCategory]); // Dependencias necesarias
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -917,18 +945,21 @@ export default function MenuPage() {
   };
 
   // Función para hacer scroll a una categoría específica
-  const scrollToCategory = (categoryId: string) => {
-    const element = categoryRefs.current[categoryId];
-    if (element) {
-      const offset = 120;
-      const elementPosition = element.offsetTop - offset;
-      window.scrollTo({
-        top: elementPosition,
-        behavior: 'smooth'
-      });
-      setSelectedCategory(categoryId);
-    }
-  };
+const scrollToCategory = (categoryId: string) => {
+  const element = categoryRefs.current[categoryId];
+  if (element) {
+    const offset = 140; // Un poco más de offset para mejor visualización
+    const elementPosition = element.offsetTop - offset;
+    
+    // Actualizar inmediatamente la categoría seleccionada
+    setSelectedCategory(categoryId);
+    
+    window.scrollTo({
+      top: elementPosition,
+      behavior: 'smooth'
+    });
+  }
+};
 
   if (tableId === null || isLoading) {
     return (
@@ -1033,7 +1064,8 @@ export default function MenuPage() {
       </div>
 
       {/* Contenedor principal con todas las categorías */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6"   ref={containerRef}
+>
         {/* Renderizar todas las categorías con productos */}
         {CATEGORIES.filter(category => getProductsByCategory(category.id).length > 0)
           .map((category) => {
