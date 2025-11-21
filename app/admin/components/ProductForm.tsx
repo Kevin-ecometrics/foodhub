@@ -30,12 +30,12 @@ export default function ProductForm({
           return "El nombre no puede tener más de 100 caracteres";
         return "";
 
-      case "description":
-        if (!value || value.trim() === "")
-          return "La descripción es obligatoria";
-        if (value.length > 500)
-          return "La descripción no puede tener más de 500 caracteres";
-        return "";
+      // case "description":
+      //   if (!value || value.trim() === "")
+      //     return "La descripción es obligatoria";
+      //   if (value.length > 500)
+      //     return "La descripción no puede tener más de 500 caracteres";
+      //   return "";
 
       case "price":
         if (value === "" || value === null || value === undefined)
@@ -56,15 +56,15 @@ export default function ProductForm({
           return "El tiempo no puede ser mayor a 480 minutos (8 horas)";
         return "";
 
-      case "rating":
-        if (value === "" || value === null || value === undefined)
-          return "La calificación es obligatoria";
-        const rating = parseFloat(value);
-        if (isNaN(rating)) return "La calificación debe ser un número válido";
-        if (rating < 0) return "La calificación no puede ser negativa";
-        if (rating > 5) return "La calificación no puede ser mayor a 5";
-        if (rating < 1) return "La calificación debe ser al menos 1";
-        return "";
+      // case "rating":
+      //   if (value === "" || value === null || value === undefined)
+      //     return "La calificación es obligatoria";
+      //   const rating = parseFloat(value);
+      //   if (isNaN(rating)) return "La calificación debe ser un número válido";
+      //   if (rating < 0) return "La calificación no puede ser negativa";
+      //   if (rating > 5) return "La calificación no puede ser mayor a 5";
+      //   if (rating < 1) return "La calificación debe ser al menos 1";
+      //   return "";
 
       case "category":
         if (!value || value.trim() === "") return "La categoría es obligatoria";
@@ -98,20 +98,24 @@ export default function ProductForm({
     });
   };
 
+  // const handleRatingChange = (rating: number) => {
+  //   // Validar que la calificación no sea 0
+  //   if (rating === 0) {
+  //     setErrors((prev) => ({
+  //       ...prev,
+  //       rating: "La calificación es obligatoria",
+  //     }));
+  //   } else {
+  //     setErrors((prev) => {
+  //       const newErrors = { ...prev };
+  //       delete newErrors.rating;
+  //       return newErrors;
+  //     });
+  //   }
+  //   handleChange("rating", rating.toString());
+  // };
+
   const handleRatingChange = (rating: number) => {
-    // Validar que la calificación no sea 0
-    if (rating === 0) {
-      setErrors((prev) => ({
-        ...prev,
-        rating: "La calificación es obligatoria",
-      }));
-    } else {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.rating;
-        return newErrors;
-      });
-    }
     handleChange("rating", rating.toString());
   };
 
@@ -313,11 +317,12 @@ export default function ProductForm({
               }`}
             >
               <option value="">Seleccionar categoría</option>
-              <option value="Breakfast">Breakfast</option>
-              <option value="Lunch">Lunch</option>
-              <option value="Dinner">Dinner</option>
-              <option value="Combos">Combos</option>
-              <option value="Drinks">Drinks</option>
+              <option value="Wayna Drinks">Wayna Drinks</option>
+              <option value="Clasikitos">Clasikitos</option>
+              <option value="Strong Drinks">Strong Drinks</option>
+              <option value="Botanas">Botanas</option>
+              <option value="Cervezas">Cervezas</option>
+              <option value="Botellas">Botellas</option>
             </select>
             {errors.category && (
               <p className="text-red-500 text-xs mt-1">{errors.category}</p>
@@ -373,21 +378,22 @@ export default function ProductForm({
               {/* Calificación */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Calificación Inicial *
+                  Calificación Inicial 
                 </label>
                 <div
-                  className={`border rounded-lg p-3 h-full ${
-                    errors.rating ? "border-red-500" : "border-gray-300"
-                  }`}
+                  // className={`border rounded-lg p-3 h-full ${
+                  //   errors.rating ? "border-red-500" : "border-gray-300"
+                  // }`}
+                  className="border rounded-lg p-3 h-full border-gray-300"
                 >
                   <StarRating
                     rating={parseFloat(productForm.rating || "0")}
                     onRatingChange={handleRatingChange}
                     readonly={false}
                   />
-                  {errors.rating && (
+                  {/* {errors.rating && (
                     <p className="text-red-500 text-xs mt-2">{errors.rating}</p>
-                  )}
+                  )} */}
                   <p className="text-xs text-gray-500 mt-2">
                     Calificación inicial (1-5 estrellas)
                   </p>
@@ -498,21 +504,20 @@ export default function ProductForm({
 
           <div className="md:col-span-2 mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Descripción *
+              Descripción 
             </label>
             <textarea
               value={productForm.description}
               onChange={(e) => handleChange("description", e.target.value)}
               rows={3}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.description ? "border-red-500" : "border-gray-300"
-              }`}
+              // className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              //   errors.description ? "border-red-500" : "border-gray-300"
+              // }`}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300"
               maxLength={500}
               placeholder="Máximo 500 caracteres"
             />
-            {errors.description && (
-              <p className="text-red-500 text-xs mt-1">{errors.description}</p>
-            )}
+
             <div className="text-xs text-gray-500 mt-1 text-right">
               {productForm.description.length}/500
             </div>

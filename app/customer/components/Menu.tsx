@@ -41,21 +41,42 @@ const CATEGORIES = [
     icon: "🔄",
     description: "Tus items recientes de esta orden",
   },
-  {
-    id: "drinks",
-    name: "Drinks",
-    icon: "🥤",
-    description: "Refill de bebidas",
+   {
+    id: "Wayna Drinks",
+    name: "Wayna Drinks", 
+    icon: "🍹",
+    description: "Bebidas especiales Wayna",
   },
   {
-    id: "combos",
-    name: "Combos",
-    icon: "🍔",
-    description: "Combos especiales",
+    id: "Clasikitos",
+    name: "Clasikitos",
+    icon: "🎉", 
+    description: "Los clásicos favoritos",
   },
-  { id: "breakfast", name: "Breakfast", icon: "🍳", description: "Desayunos" },
-  { id: "lunch", name: "Lunch", icon: "🍱", description: "Almuerzos" },
-  { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
+  {
+    id: "Strong Drinks", 
+    name: "Strong Drinks",
+    icon: "🥃",
+    description: "Bebidas fuertes",
+  },
+  {
+    id: "Botanas",
+    name: "Botanas",
+    icon: "🍿",
+    description: "Snacks y botanas", 
+  },
+  {
+    id: "Cervezas",
+    name: "Cervezas",
+    icon: "🍺",
+    description: "Selección de cervezas",
+  },
+  {
+    id: "Botellas",
+    name: "Botellas", 
+    icon: "🍾",
+    description: "Botellas para compartir",
+  },
 ];
 
 interface TableUser {
@@ -721,16 +742,9 @@ export default function MenuPage() {
       case "popular":
         return getPopularItems();
       default:
-        const categoryMap: { [key: string]: string } = {
-          drinks: "Drinks",
-          combos: "Combos",
-          breakfast: "Breakfast",
-          lunch: "Lunch",
-          dinner: "Dinner",
-        };
-        return products.filter(
-          (product) => product.category === categoryMap[selectedCategory]
-        );
+      return products.filter(
+        (product) => product.category === selectedCategory
+      );
     }
   };
 
@@ -970,16 +984,10 @@ export default function MenuPage() {
                 productsCount = getPopularItems().length;
                 break;
               default:
-                const categoryMap: { [key: string]: string } = {
-                  drinks: "Drinks",
-                  combos: "Combos",
-                  breakfast: "Breakfast",
-                  lunch: "Lunch",
-                  dinner: "Dinner",
-                };
-                productsCount = products.filter(
-                  (product) => product.category === categoryMap[category.id]
-                ).length;
+                return products.filter(
+                  (product) => product.category === selectedCategory
+                );  
+
             }
 
             return productsCount > 0; // Solo mostrar categorías con productos
@@ -1053,12 +1061,12 @@ export default function MenuPage() {
                 className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
               >
                 {/* Badge de popularidad */}
-                {product.rating && product.rating >= 4.5 && (
-                  <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
-                    <FaFire className="text-xs" />
-                    Popular
-                  </div>
-                )}
+{product.rating !== null && product.rating !== undefined && product.rating >= 4.5 && (
+  <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+    <FaFire className="text-xs" />
+    Popular
+  </div>
+)}
 
                 {product.image_url ? (
                   <div className="relative overflow-hidden h-48">
