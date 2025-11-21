@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
 import { historyService } from "@/app/lib/supabase/history";
+
 const CATEGORIES = [
   {
     id: "favorites",
@@ -41,7 +42,7 @@ const CATEGORIES = [
     icon: "🔄",
     description: "Tus items recientes de esta orden",
   },
-   {
+  {
     id: "Wayna Drinks",
     name: "Wayna Drinks", 
     icon: "🍹",
@@ -125,6 +126,10 @@ export default function MenuPage() {
   const [tableUsers, setTableUsers] = useState<TableUser[]>([]);
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
+
+  // Referencias para las secciones de categorías
+  const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // ESTADOS PARA NOTAS Y EXTRAS
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -262,6 +267,34 @@ export default function MenuPage() {
       loadTableUsers(parseInt(tableId));
     }
   }, [tableId]);
+
+  // Configurar observer para detectar categoría activa
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const category = entry.target.getAttribute('data-category');
+            if (category) {
+              setSelectedCategory(category);
+            }
+          }
+        });
+      },
+      {
+        root: null,
+        rootMargin: '-20% 0px -70% 0px',
+        threshold: 0.1
+      }
+    );
+
+    // Observar todas las secciones de categorías
+    Object.values(categoryRefs.current).forEach(ref => {
+      if (ref) observer.observe(ref);
+    });
+
+    return () => observer.disconnect();
+  }, [products]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -733,8 +766,8 @@ export default function MenuPage() {
       .reduce((total, item) => total + item.quantity, 0);
   };
 
-  const getProductsByCategory = () => {
-    switch (selectedCategory) {
+  const getProductsByCategory = (categoryId: string) => {
+    switch (categoryId) {
       case "favorites":
         return favoriteItems;
       case "repite-item":
@@ -742,16 +775,16 @@ export default function MenuPage() {
       case "popular":
         return getPopularItems();
       default:
-      return products.filter(
-        (product) => product.category === selectedCategory
-      );
+        return products.filter(
+          (product) => product.category === categoryId
+        );
     }
   };
 
-  const getCategoryDescription = () => {
-    const category = CATEGORIES.find((cat) => cat.id === selectedCategory);
+  const getCategoryDescription = (categoryId: string) => {
+    const category = CATEGORIES.find((cat) => cat.id === categoryId);
 
-    switch (selectedCategory) {
+    switch (categoryId) {
       case "favorites":
         if (favoriteItems.length === 0) {
           return "No hay productos marcados como favoritos";
@@ -768,6 +801,7 @@ export default function MenuPage() {
         return category?.description || "";
     }
   };
+
   // Función para solicitar asistencia - VERSIÓN CORREGIDA
   const handleAssistanceRequest = async () => {
     const targetTableId = tableId || currentTableId;
@@ -822,9 +856,7 @@ export default function MenuPage() {
   };
 
   // Componente para el badge del carrito mejorado
-  // Componente para el badge del carrito mejorado - VERSIÓN CORREGIDA
   const CartBadge = () => {
-    // Función para formatear la cantidad del badge
     const formatBadgeCount = (count: number): string => {
       if (count <= 99) {
         return count.toString();
@@ -833,7 +865,6 @@ export default function MenuPage() {
       }
     };
 
-    // Función para determinar el tamaño del badge basado en la cantidad
     const getBadgeSize = (count: number): string => {
       if (count < 10) {
         return "w-5 h-5 text-xs";
@@ -885,6 +916,20 @@ export default function MenuPage() {
     }).format(amount);
   };
 
+  // Función para hacer scroll a una categoría específica
+  const scrollToCategory = (categoryId: string) => {
+    const element = categoryRefs.current[categoryId];
+    if (element) {
+      const offset = 120;
+      const elementPosition = element.offsetTop - offset;
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      });
+      setSelectedCategory(categoryId);
+    }
+  };
+
   if (tableId === null || isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -915,9 +960,7 @@ export default function MenuPage() {
             </div>
           </div>
 
-          {/* Botones en el header - SECCIÓN MODIFICADA */}
           <div className="flex items-center gap-2">
-            {/* Botón de Ayuda - NUEVO BOTÓN */}
             <button
               onClick={handleAssistanceRequest}
               disabled={assistanceLoading}
@@ -928,7 +971,6 @@ export default function MenuPage() {
               {assistanceLoading ? "Enviando..." : "Ayuda"}
             </button>
 
-            {/* Botón del Carrito (existente) */}
             <CartBadge />
           </div>
         </div>
@@ -967,34 +1009,16 @@ export default function MenuPage() {
         </div>
       )}
 
+      {/* Navegación de categorías */}
       <div className="bg-white shadow-sm sticky top-16 z-20 overflow-x-auto">
-        <div className="flex gap-2 px-4 py-4 max-w-7xl mx-auto">
+        <div className="flex gap-2 px-4 py-4 max-w-7xl mx-auto mt-4">
           {CATEGORIES.filter((category) => {
-            // Determinar cuántos productos hay en esta categoría
-            let productsCount = 0;
-
-            switch (category.id) {
-              case "favorites":
-                productsCount = favoriteItems.length;
-                break;
-              case "repite-item":
-                productsCount = recentItems.length;
-                break;
-              case "popular":
-                productsCount = getPopularItems().length;
-                break;
-              default:
-                return products.filter(
-                  (product) => product.category === selectedCategory
-                );  
-
-            }
-
-            return productsCount > 0; // Solo mostrar categorías con productos
+            const productsCount = getProductsByCategory(category.id).length;
+            return productsCount > 0;
           }).map((category) => (
             <button
               key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
+              onClick={() => scrollToCategory(category.id)}
               className={`flex flex-col items-center gap-1 px-4 py-3 rounded-2xl font-medium whitespace-nowrap transition min-w-[100px] ${
                 selectedCategory === category.id
                   ? "bg-blue-600 text-white shadow-md"
@@ -1008,215 +1032,198 @@ export default function MenuPage() {
         </div>
       </div>
 
+      {/* Contenedor principal con todas las categorías */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="mb-6 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              {CATEGORIES.find((c) => c.id === selectedCategory)?.name}
-            </h2>
-            <p className="text-sm text-gray-500">{getCategoryDescription()}</p>
-          </div>
-          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-            {getProductsByCategory().length} items
-          </span>
-        </div>
-
-        {selectedCategory === "favorites" && favoriteItems.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-2xl shadow-sm">
-            <div className="text-6xl mb-4">❤️</div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              No hay productos favoritos
-            </h3>
-            <p className="text-gray-500">
-              Los productos marcados como favoritos aparecerán aquí
-            </p>
-          </div>
-        )}
-
-        {selectedCategory === "repite-item" && recentItems.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-2xl shadow-sm">
-            <div className="text-6xl mb-4">🔄</div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              Aún no has realizado pedidos
-            </h3>
-            <p className="text-gray-500">
-              Tus pedidos anteriores aparecerán aquí para que puedas repetirlos
-              fácilmente
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {getProductsByCategory().map((product) => {
-            const isInCart = isProductInCart(product.id);
-            const currentQuantity = getProductQuantityInCart(product.id);
-            const currentNotes = getProductNotesInCart(product.id);
-            const totalRecentQuantity = getProductTotalQuantityInRecentOrders(
-              product.id
-            );
-
+        {/* Renderizar todas las categorías con productos */}
+        {CATEGORIES.filter(category => getProductsByCategory(category.id).length > 0)
+          .map((category) => {
+            const categoryProducts = getProductsByCategory(category.id);
+            
             return (
               <div
-                key={product.id}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
+                key={category.id}
+                ref={(el) => {
+                  categoryRefs.current[category.id] = el;
+                }}
+                data-category={category.id}
+                className="mb-12 scroll-mt-4"
               >
-                {/* Badge de popularidad */}
-{product.rating !== null && product.rating !== undefined && product.rating >= 4.5 && (
-  <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
-    <FaFire className="text-xs" />
-    Popular
-  </div>
-)}
-
-                {product.image_url ? (
-                  <div className="relative overflow-hidden h-48">
-                    <img
-                      src={
-                        product.image_url ||
-                        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
-                      }
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute top-2 right-2 bg-white px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
-                      {renderStarRating(product.rating || 0)}
-                    </div>
-
-                    {/* Badge de favorito */}
-                    {product.is_favorite && (
-                      <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
-                        <FaHeart className="text-xs" />
-                        Favorito
-                      </div>
-                    )}
-
-                    {/* Badge de cantidad en órdenes recientes */}
-                    {selectedCategory === "repite-item" &&
-                      totalRecentQuantity > 0 && (
-                        <div className="absolute bottom-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                          {totalRecentQuantity}x en pedidos anteriores
-                        </div>
-                      )}
-
-                    {/* Badge de en carrito actual */}
-                    {isInCart && (
-                      <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                        {currentQuantity} en carrito
-                      </div>
-                    )}
+                <div className="mb-6 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                      {category.name}
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      {getCategoryDescription(category.id)}
+                    </p>
                   </div>
-                ) : null}
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    {categoryProducts.length} items
+                  </span>
+                </div>
 
-                <div className="p-4">
-                  <h3 className="text-lg font-bold text-gray-800 mb-1">
-                    {product.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {product.description}
-                  </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categoryProducts.map((product) => {
+                    const isInCart = isProductInCart(product.id);
+                    const currentQuantity = getProductQuantityInCart(product.id);
+                    const currentNotes = getProductNotesInCart(product.id);
+                    const totalRecentQuantity = getProductTotalQuantityInRecentOrders(
+                      product.id
+                    );
 
-                  {/* Mostrar extras disponibles */}
-                  {product.extras && product.extras.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-xs text-green-600 font-medium">
-                        +{product.extras.filter((e) => e.is_available).length}{" "}
-                        extras disponibles
-                      </p>
-                    </div>
-                  )}
+                    return (
+                      <div
+                        key={product.id}
+                        className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
+                      >
+                        {/* Badge de popularidad */}
+                        {product.rating !== null && product.rating !== undefined && product.rating >= 4.5 && (
+                          <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+                            <FaFire className="text-xs" />
+                            Popular
+                          </div>
+                        )}
 
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="text-2xl font-bold text-blue-600">
-                        ${product.price.toFixed(2)}
-                      </span>
-                      {product.preparation_time && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          ⏱️ {product.preparation_time} min
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {isInCart ? (
-                        // ✅ CUANDO ESTÁ EN EL CARRITO: Mostrar controles de cantidad [- 3 +]
-                        <>
-                          <button
-                            onClick={() => {
-                              const item = orderItems.find(
-                                (item) => item.product_id === product.id
-                              );
-                              if (item) {
-                                if (currentQuantity > 1) {
-                                  updateCartItem(item.id, currentQuantity - 1);
-                                } else {
-                                  removeFromCart(item.id);
-                                }
+                        {product.image_url ? (
+                          <div className="relative overflow-hidden h-48">
+                            <img
+                              src={
+                                product.image_url ||
+                                "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
                               }
-                            }}
-                            className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-                          >
-                            <FaMinus className="text-sm" />
-                          </button>
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute top-2 right-2 bg-white px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
+                              {renderStarRating(product.rating || 0)}
+                            </div>
 
-                          <span className="font-bold text-lg w-8 text-center bg-blue-100 text-blue-600 rounded py-1">
-                            {currentQuantity}
-                          </span>
+                            {/* Badge de favorito */}
+                            {product.is_favorite && (
+                              <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <FaHeart className="text-xs" />
+                                Favorito
+                              </div>
+                            )}
 
-                          <button
-                            onClick={() => {
-                              const item = orderItems.find(
-                                (item) => item.product_id === product.id
-                              );
-                              if (item) {
-                                updateCartItem(item.id, currentQuantity + 1);
-                              }
-                            }}
-                            className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition"
-                          >
-                            <FaPlus className="text-sm" />
-                          </button>
-                        </>
-                      ) : (
-                        // ✅ CUANDO NO ESTÁ EN EL CARRITO: Mostrar botón "Agregar"
-                        <button
-                          id={`product-${product.id}`}
-                          onClick={() => handleAddToCartWithNotes(product)}
-                          disabled={addingProduct === product.id}
-                          className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 hover:scale-105"
-                        >
-                          {addingProduct === product.id ? (
-                            <FaSpinner className="animate-spin" />
-                          ) : (
-                            <>
-                              <FaPlus />
-                              Agregar
-                            </>
+                            {/* Badge de cantidad en órdenes recientes */}
+                            {category.id === "repite-item" &&
+                              totalRecentQuantity > 0 && (
+                                <div className="absolute bottom-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                                  {totalRecentQuantity}x en pedidos anteriores
+                                </div>
+                              )}
+
+                            {/* Badge de en carrito actual */}
+                            {isInCart && (
+                              <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                                {currentQuantity} en carrito
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        <div className="p-4">
+                          <h3 className="text-lg font-bold text-gray-800 mb-1">
+                            {product.name}
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-3">
+                            {product.description}
+                          </p>
+
+                          {/* Mostrar extras disponibles */}
+                          {product.extras && product.extras.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs text-green-600 font-medium">
+                                +{product.extras.filter((e) => e.is_available).length}{" "}
+                                extras disponibles
+                              </p>
+                            </div>
                           )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Mostrar notas si existen - MEJORADO */}
-                  {isInCart && currentNotes && (
-                    <div className="mt-2">{formatItemNotes(currentNotes)}</div>
-                  )}
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="text-2xl font-bold text-blue-600">
+                                ${product.price.toFixed(2)}
+                              </span>
+                              {product.preparation_time && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  ⏱️ {product.preparation_time} min
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {isInCart ? (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      const item = orderItems.find(
+                                        (item) => item.product_id === product.id
+                                      );
+                                      if (item) {
+                                        if (currentQuantity > 1) {
+                                          updateCartItem(item.id, currentQuantity - 1);
+                                        } else {
+                                          removeFromCart(item.id);
+                                        }
+                                      }
+                                    }}
+                                    className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                                  >
+                                    <FaMinus className="text-sm" />
+                                  </button>
+
+                                  <span className="font-bold text-lg w-8 text-center bg-blue-100 text-blue-600 rounded py-1">
+                                    {currentQuantity}
+                                  </span>
+
+                                  <button
+                                    onClick={() => {
+                                      const item = orderItems.find(
+                                        (item) => item.product_id === product.id
+                                      );
+                                      if (item) {
+                                        updateCartItem(item.id, currentQuantity + 1);
+                                      }
+                                    }}
+                                    className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition"
+                                  >
+                                    <FaPlus className="text-sm" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  id={`product-${product.id}`}
+                                  onClick={() => handleAddToCartWithNotes(product)}
+                                  disabled={addingProduct === product.id}
+                                  className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 hover:scale-105"
+                                >
+                                  {addingProduct === product.id ? (
+                                    <FaSpinner className="animate-spin" />
+                                  ) : (
+                                    <>
+                                      <FaPlus />
+                                      Agregar
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Mostrar notas si existen - MEJORADO */}
+                          {isInCart && currentNotes && (
+                            <div className="mt-2">{formatItemNotes(currentNotes)}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
-        </div>
-
-        {getProductsByCategory().length === 0 &&
-          selectedCategory !== "favorites" &&
-          selectedCategory !== "repite-item" && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">
-                No hay items en esta categoría
-              </p>
-            </div>
-          )}
       </main>
 
       {/* MODAL DE NOTAS MEJORADO CON EXTRAS */}
@@ -1347,7 +1354,6 @@ export default function MenuPage() {
                 </div>
               )}
 
-              {/* SECCIÓN DE NOTAS */}
               {/* SECCIÓN DE NOTAS - MEJORADA */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -1418,8 +1424,8 @@ export default function MenuPage() {
                   onClick={handleConfirmAddWithNotes}
                   disabled={
                     addingProduct === selectedProduct.id ||
-                    (notes.trim().length > 0 && notes.trim().length < 2) || // ✅ Validación existente
-                    (notes.length > 0 && notes.trim().length === 0) // ✅ Nueva validación: solo espacios
+                    (notes.trim().length > 0 && notes.trim().length < 2) ||
+                    (notes.length > 0 && notes.trim().length === 0)
                   }
                   className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1594,13 +1600,13 @@ export default function MenuPage() {
                           <h3 className="font-semibold text-gray-800">
                             {item.product_name}
                           </h3>
-                          {/* <button
+                          <button
                             onClick={() => handleEditNotes(item)}
                             className="text-gray-400 hover:text-blue-600 transition opacity-0 group-hover:opacity-100"
                             title="Editar notas"
                           >
                             <FaEdit className="text-sm" />
-                          </button> */}
+                          </button>
                         </div>
                         <p className="text-lg font-bold text-blue-600">
                           {formatCurrency(item.price)}
@@ -1645,7 +1651,7 @@ export default function MenuPage() {
                 </div>
 
                 {/* Resumen y acciones */}
-                <div className="p-6 bg-gray-50  sticky bottom-0">
+                <div className="p-6 bg-gray-50 sticky bottom-0">
                   <div className="space-y-2 mb-6">
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>
