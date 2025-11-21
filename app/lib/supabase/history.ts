@@ -13,6 +13,7 @@ export interface OrderWithItems {
 }
 
 export interface OrderItemWithProduct {
+  cancelled_quantity: number
   id: string
   order_id: string
   product_id: number
@@ -20,7 +21,7 @@ export interface OrderItemWithProduct {
   price: number
   quantity: number
   notes: string | null
-  status: 'ordered' | 'preparing' | 'ready' | 'served'
+  status: 'ordered' | 'preparing' | 'ready' | 'served' | 'cancelled'
   created_at: string
   updated_at: string
   products?: {
@@ -35,7 +36,7 @@ interface OrderFromSupabase {
   id: string
   table_id: number
   customer_name: string | null
-  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid'
+  status: 'active' | 'sent' | 'completed' | 'cancelled' | 'paid' 
   total_amount: number
   created_at: string
   updated_at: string

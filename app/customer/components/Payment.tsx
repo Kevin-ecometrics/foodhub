@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/customer/payment/page.tsx
 "use client";
 import { useState, useEffect } from "react";
@@ -21,6 +22,7 @@ import {
   FaStickyNote,
   FaPlus,
   FaStar,
+  FaBan,
 } from "react-icons/fa";
 
 interface PaymentSummary {
@@ -28,6 +30,8 @@ interface PaymentSummary {
   taxAmount: number;
   total: number;
   taxRate: number;
+  cancelledAmount: number;
+  cancelledUnitsCount: number;
 }
 
 interface CustomerOrderSummary {
@@ -37,6 +41,9 @@ interface CustomerOrderSummary {
   taxAmount: number;
   total: number;
   itemsCount: number;
+  cancelledItemsCount: number;
+  cancelledUnitsCount: number;
+  cancelledAmount: number;
 }
 
 interface InvoiceModalProps {
@@ -46,7 +53,6 @@ interface InvoiceModalProps {
   isLoading: boolean;
 }
 
-// Componente para la encuesta de satisfacción
 const SatisfactionSurvey = ({
   onSubmit,
   onSkip,
@@ -80,7 +86,6 @@ const SatisfactionSurvey = ({
         <p className="text-gray-600">¿Cómo calificarías tu experiencia hoy?</p>
       </div>
 
-      {/* Calificación con estrellas */}
       <div className="mb-6">
         <div className="flex justify-center gap-2 mb-4">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -111,7 +116,6 @@ const SatisfactionSurvey = ({
         </div>
       </div>
 
-      {/* Comentario */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Comentario (opcional)
@@ -125,7 +129,6 @@ const SatisfactionSurvey = ({
         />
       </div>
 
-      {/* Botones */}
       <div className="flex gap-3">
         <button
           onClick={onSkip}
@@ -145,7 +148,6 @@ const SatisfactionSurvey = ({
   );
 };
 
-// Componente Modal para capturar el correo
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
   isOpen,
   onClose,
@@ -188,7 +190,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-        {/* Header del Modal */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
@@ -212,7 +213,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           </button>
         </div>
 
-        {/* Contenido del Modal */}
         <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-4">
             <label
@@ -257,7 +257,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </p>
           </div>
 
-          {/* Botones del Modal */}
           <div className="flex gap-3">
             <button
               type="button"
@@ -291,6 +290,272 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   );
 };
 
+const renderOrderItem = (item: any) => {
+  const cancelledQty = item.cancelled_quantity || 0;
+  const activeQuantity = item.quantity - cancelledQty;
+  const isCancelled = activeQuantity === 0;
+  const isPartiallyCancelled = cancelledQty > 0 && activeQuantity > 0;
+
+  return (
+    <div
+      key={item.id}
+      className={`flex justify-between items-start py-3 border-b border-gray-100 ${
+        isCancelled
+          ? "bg-red-50 border-l-4 border-l-red-400 pl-3 opacity-75"
+          : isPartiallyCancelled
+          ? "bg-orange-50 border-l-4 border-l-orange-400 pl-3"
+          : ""
+      }`}
+    >
+      <div className="flex-1">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className={`font-medium text-base ${
+                  isCancelled ? "text-red-700 line-through" : "text-gray-800"
+                }`}
+              >
+                {item.product_name}
+              </span>
+              {isCancelled && (
+                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                  <FaBan className="text-xs" />
+                  Completamente Cancelado
+                </span>
+              )}
+              {isPartiallyCancelled && (
+                <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                  <FaBan className="text-xs" />
+                  Parcialmente Cancelado
+                </span>
+              )}
+            </div>
+
+            <div className="text-sm text-gray-600 mb-2">
+              <div className="flex items-center gap-2">
+                <span>
+                  Cantidad activa: <strong>{activeQuantity}</strong>
+                  {cancelledQty > 0 && (
+                    <span className="text-red-500 line-through ml-1">
+                      (de {item.quantity})
+                    </span>
+                  )}
+                </span>
+                <span>•</span>
+                <span>{formatCurrency(item.price)} c/u</span>
+              </div>
+              {cancelledQty > 0 && (
+                <div className="text-xs text-red-600 mt-1">
+                  {cancelledQty} unidad(es) cancelada(s)
+                </div>
+              )}
+            </div>
+
+            {formatItemNotes(item.notes)}
+          </div>
+          <div className="text-right ml-4">
+            <div
+              className={`font-semibold text-lg ${
+                isCancelled ? "text-red-700 line-through" : "text-gray-800"
+              }`}
+            >
+              {formatCurrency(item.price * activeQuantity)}
+            </div>
+            {cancelledQty > 0 && (
+              <div className="text-xs text-red-600 font-medium mt-1">
+                Cancelado: {formatCurrency(item.price * cancelledQty)}
+              </div>
+            )}
+            {(isCancelled || isPartiallyCancelled) && (
+              <div className="text-xs text-red-600 font-medium mt-1 bg-red-100 px-2 py-1 rounded">
+                No se cobrará
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const formatItemNotes = (notes: string | null) => {
+  if (!notes) return null;
+
+  const hasPricedExtras = notes.includes("(+$");
+
+  if (hasPricedExtras) {
+    const parts = notes.split(" | ");
+    const mainNotes = parts.find(
+      (part) => !part.includes("Extras:") && !part.includes("Total:")
+    );
+    const extrasPart = parts.find((part) => part.includes("Extras:"));
+    const totalPart = parts.find((part) => part.includes("Total:"));
+
+    return (
+      <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        {mainNotes && (
+          <div className="flex items-start gap-2">
+            <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700">
+              <span className="font-medium">Instrucciones:</span> {mainNotes}
+            </span>
+          </div>
+        )}
+
+        {extrasPart && (
+          <div className="flex items-start gap-2">
+            <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium text-green-700">
+                Extras agregados:
+              </span>
+              <div className="mt-1 ml-2 space-y-1">
+                {extrasPart
+                  .replace("Extras: ", "")
+                  .split(", ")
+                  .map((extra, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center"
+                    >
+                      <span className="text-green-600">
+                        • {extra.split(" (+$")[0]}
+                      </span>
+                      <span className="text-green-700 font-medium">
+                        {extra.match(/\(\+\$([^)]+)\)/)?.[1] || ""}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {totalPart && (
+          <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
+            <FaReceipt className="text-blue-500 mt-0.5 flex-shrink-0" />
+            <span className="text-sm font-medium text-blue-700">
+              {totalPart}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (notes.includes("Extras:")) {
+    const parts = notes.split(" | ");
+    let mainNotes = "";
+    let extrasText = "";
+
+    parts.forEach((part) => {
+      if (part.startsWith("Extras:")) {
+        extrasText = part.replace("Extras: ", "");
+      } else {
+        mainNotes = part;
+      }
+    });
+
+    return (
+      <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg">
+        {mainNotes && (
+          <p className="text-sm text-gray-700">
+            <span className="font-medium">Nota:</span> {mainNotes}
+          </p>
+        )}
+        {extrasText && (
+          <p className="text-sm text-green-700">
+            <span className="font-medium">Extras:</span> {extrasText}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+      <p className="text-sm text-yellow-800 flex items-center gap-1">
+        <FaStickyNote className="text-yellow-600" />
+        <span className="font-medium">Nota:</span> {notes}
+      </p>
+    </div>
+  );
+};
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  }).format(amount);
+};
+
+const formatNotesForPDF = (notes: string) => {
+  if (!notes) return "";
+
+  const hasPricedExtras = notes.includes("(+$");
+
+  if (hasPricedExtras) {
+    const parts = notes.split(" | ");
+    const mainNotes = parts.find(
+      (part) => !part.includes("Extras:") && !part.includes("Total:")
+    );
+    const extrasPart = parts.find((part) => part.includes("Extras:"));
+    const totalPart = parts.find((part) => part.includes("Total:"));
+
+    let result = "";
+
+    if (mainNotes) {
+      result += `<div class="notes-main"><strong>Instrucciones:</strong> ${mainNotes}</div>`;
+    }
+
+    if (extrasPart) {
+      result += `<div class="extras-section"><strong>Extras:</strong>`;
+      extrasPart
+        .replace("Extras: ", "")
+        .split(", ")
+        .forEach((extra) => {
+          const extraName = extra.split(" (+$")[0];
+          const extraPrice = extra.match(/\(\+\$([^)]+)\)/)?.[1] || "";
+          result += `<div class="extra-item">• ${extraName} +${extraPrice}</div>`;
+        });
+      result += `</div>`;
+    }
+
+    if (totalPart) {
+      result += `<div style="margin-top: 5px; font-weight: bold; color: #1e40af;">${totalPart}</div>`;
+    }
+
+    return result;
+  }
+
+  if (notes.includes("Extras:")) {
+    const parts = notes.split(" | ");
+    let mainNotes = "";
+    let extrasText = "";
+
+    parts.forEach((part) => {
+      if (part.startsWith("Extras:")) {
+        extrasText = part.replace("Extras: ", "");
+      } else {
+        mainNotes = part;
+      }
+    });
+
+    let result = "";
+    if (mainNotes) {
+      result += `<div class="notes-main"><strong>Nota:</strong> ${mainNotes}</div>`;
+    }
+    if (extrasText) {
+      result += `<div class="extras-section"><strong>Extras:</strong> ${extrasText}</div>`;
+    }
+
+    return result;
+  }
+
+  return `<div class="notes-main"><strong>Nota:</strong> ${notes}</div>`;
+};
+
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -312,10 +577,8 @@ export default function PaymentPage() {
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
-  // Función para guardar la encuesta en Supabase
   const saveSurveyToDatabase = async (rating: number, comment: string) => {
     try {
-      // Cast payload to any to satisfy Supabase overload types when there is no generated typing for the table
       const { data, error } = await supabase.from("customer_feedback").insert([
         {
           table_id: tableId || currentTableId,
@@ -341,112 +604,6 @@ export default function PaymentPage() {
     }
   };
 
-  // Función para formatear notas y extras
-  const formatItemNotes = (notes: string | null) => {
-    if (!notes) return null;
-
-    const hasPricedExtras = notes.includes("(+$");
-
-    if (hasPricedExtras) {
-      const parts = notes.split(" | ");
-      const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
-      );
-      const extrasPart = parts.find((part) => part.includes("Extras:"));
-      const totalPart = parts.find((part) => part.includes("Total:"));
-
-      return (
-        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          {mainNotes && (
-            <div className="flex items-start gap-2">
-              <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">
-                <span className="font-medium">Instrucciones:</span> {mainNotes}
-              </span>
-            </div>
-          )}
-
-          {extrasPart && (
-            <div className="flex items-start gap-2">
-              <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
-              <div className="text-sm">
-                <span className="font-medium text-green-700">
-                  Extras agregados:
-                </span>
-                <div className="mt-1 ml-2 space-y-1">
-                  {extrasPart
-                    .replace("Extras: ", "")
-                    .split(", ")
-                    .map((extra, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center"
-                      >
-                        <span className="text-green-600">
-                          • {extra.split(" (+$")[0]}
-                        </span>
-                        <span className="text-green-700 font-medium">
-                          {extra.match(/\(\+\$([^)]+)\)/)?.[1] || ""}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {totalPart && (
-            <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
-              <FaReceipt className="text-blue-500 mt-0.5 flex-shrink-0" />
-              <span className="text-sm font-medium text-blue-700">
-                {totalPart}
-              </span>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (notes.includes("Extras:")) {
-      const parts = notes.split(" | ");
-      let mainNotes = "";
-      let extrasText = "";
-
-      parts.forEach((part) => {
-        if (part.startsWith("Extras:")) {
-          extrasText = part.replace("Extras: ", "");
-        } else {
-          mainNotes = part;
-        }
-      });
-
-      return (
-        <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg">
-          {mainNotes && (
-            <p className="text-sm text-gray-700">
-              <span className="font-medium">Nota:</span> {mainNotes}
-            </p>
-          )}
-          {extrasText && (
-            <p className="text-sm text-green-700">
-              <span className="font-medium">Extras:</span> {extrasText}
-            </p>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-        <p className="text-sm text-yellow-800 flex items-center gap-1">
-          <FaStickyNote className="text-yellow-600" />
-          <span className="font-medium">Nota:</span> {notes}
-        </p>
-      </div>
-    );
-  };
-
-  // Cargar órdenes pendientes de pago
   useEffect(() => {
     const loadAllOrders = async () => {
       const targetTableId = tableId || currentTableId;
@@ -464,9 +621,21 @@ export default function PaymentPage() {
           (order) => order.status === "active" || order.status === "sent"
         );
 
-        setAllOrders(pendingOrders);
+        const processedOrders = pendingOrders.map((order) => ({
+          ...order,
+          order_items: order.order_items.map((item) => ({
+            ...item,
+            cancelled_quantity: item.cancelled_quantity || 0,
+            ...(item.status === "cancelled" &&
+              !item.cancelled_quantity && {
+                cancelled_quantity: item.quantity,
+              }),
+          })),
+        }));
 
-        if (pendingOrders.length === 0) {
+        setAllOrders(processedOrders);
+
+        if (processedOrders.length === 0) {
           setError("No hay órdenes pendientes de pago");
         }
       } catch (error) {
@@ -482,7 +651,6 @@ export default function PaymentPage() {
     }
   }, [tableId, currentTableId]);
 
-  // Agrupar órdenes por cliente
   const groupOrdersByCustomer = (): CustomerOrderSummary[] => {
     const customerMap = new Map<string, CustomerOrderSummary>();
 
@@ -497,57 +665,102 @@ export default function PaymentPage() {
           taxAmount: 0,
           total: 0,
           itemsCount: 0,
+          cancelledItemsCount: 0,
+          cancelledUnitsCount: 0,
+          cancelledAmount: 0,
         });
       }
 
       const customerSummary = customerMap.get(customerName)!;
       customerSummary.orders.push(order);
 
-      const orderSubtotal = order.order_items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
+      const orderCalculations = order.order_items.reduce(
+        (acc, item) => {
+          const cancelledQty = item.cancelled_quantity || 0;
+          const activeQuantity = item.quantity - cancelledQty;
+
+          if (activeQuantity === 0) {
+            acc.cancelledItemsCount++;
+          }
+
+          acc.cancelledUnitsCount += cancelledQty;
+
+          const itemTotal = item.price * activeQuantity;
+          acc.totalAmount += itemTotal;
+          acc.cancelledAmount += item.price * cancelledQty;
+
+          return acc;
+        },
+        {
+          cancelledItemsCount: 0,
+          cancelledUnitsCount: 0,
+          totalAmount: 0,
+          cancelledAmount: 0,
+        }
       );
 
-      customerSummary.subtotal += orderSubtotal;
-      customerSummary.itemsCount += order.order_items.length;
-    });
+      const taxRate = 0.08;
+      customerSummary.total += orderCalculations.totalAmount;
+      customerSummary.subtotal = customerSummary.total / (1 + taxRate);
+      customerSummary.taxAmount =
+        customerSummary.total - customerSummary.subtotal;
 
-    const taxRate = 0.08;
-    customerMap.forEach((customerSummary) => {
-      customerSummary.taxAmount = customerSummary.subtotal * taxRate;
-      customerSummary.total =
-        customerSummary.subtotal + customerSummary.taxAmount;
+      customerSummary.cancelledItemsCount +=
+        orderCalculations.cancelledItemsCount;
+      customerSummary.cancelledUnitsCount +=
+        orderCalculations.cancelledUnitsCount;
+      customerSummary.cancelledAmount += orderCalculations.cancelledAmount;
+
+      customerSummary.itemsCount += order.order_items.filter(
+        (item) => item.quantity - (item.cancelled_quantity || 0) > 0
+      ).length;
     });
 
     return Array.from(customerMap.values());
   };
 
-  // Calcular resumen de TODAS las órdenes pendientes
   const calculateTotalPaymentSummary = (): PaymentSummary => {
-    let totalConIva = 0;
+    let total = 0;
+    let cancelledAmount = 0;
+    let cancelledUnitsCount = 0;
 
     allOrders.forEach((order) => {
       order.order_items.forEach((item) => {
-        totalConIva += item.price * item.quantity;
+        const cancelledQty = item.cancelled_quantity || 0;
+        const activeQuantity = item.quantity - cancelledQty;
+
+        total += item.price * activeQuantity;
+        cancelledAmount += item.price * cancelledQty;
+        cancelledUnitsCount += cancelledQty;
       });
     });
 
     const taxRate = 0.08;
-    const subtotal = totalConIva / 1.08; // Extraemos el IVA
-    const taxAmount = totalConIva - subtotal;
+    const subtotal = total / (1 + taxRate);
+    const taxAmount = total - subtotal;
 
     return {
-      subtotal, // $100 (sin IVA)
-      taxAmount, // $8 (IVA)
-      total: totalConIva, // $108 (con IVA incluido)
+      subtotal,
+      taxAmount,
+      total,
       taxRate,
+      cancelledAmount,
+      cancelledUnitsCount,
     };
   };
 
   const customerSummaries = groupOrdersByCustomer();
   const paymentSummary = calculateTotalPaymentSummary();
 
-  // Countdown para redirección después del pago
+  const mesaCancelledAmount = customerSummaries.reduce(
+    (total, customer) => total + customer.cancelledAmount,
+    0
+  );
+  const mesaCancelledUnits = customerSummaries.reduce(
+    (total, customer) => total + customer.cancelledUnitsCount,
+    0
+  );
+
   useEffect(() => {
     if (paymentConfirmed && countdown > 0 && surveyCompleted) {
       const timer = setTimeout(() => {
@@ -559,7 +772,6 @@ export default function PaymentPage() {
     }
   }, [paymentConfirmed, countdown, surveyCompleted, router]);
 
-  // Función para manejar el envío de la encuesta
   const handleSurveySubmit = async (rating: number, comment: string) => {
     try {
       await saveSurveyToDatabase(rating, comment);
@@ -567,19 +779,16 @@ export default function PaymentPage() {
       setShowSurvey(false);
     } catch (error) {
       console.error("Error al enviar encuesta:", error);
-      // Continuar aunque falle la encuesta
       setSurveyCompleted(true);
       setShowSurvey(false);
     }
   };
 
-  // Función para omitir la encuesta
   const handleSurveySkip = () => {
     setSurveyCompleted(true);
     setShowSurvey(false);
   };
 
-  // Función para generar PDF del ticket
   const handleGeneratePDF = async () => {
     try {
       setGeneratingPdf(true);
@@ -711,6 +920,15 @@ export default function PaymentPage() {
               text-align: center; 
               margin-bottom: 10px;
             }
+            .cancelled-info {
+              background: #fef2f2;
+              border: 1px solid #fecaca;
+              border-radius: 6px;
+              padding: 10px;
+              margin: 10px 0;
+              font-size: 12px;
+              color: #dc2626;
+            }
           </style>
         </head>
         <body>
@@ -724,6 +942,17 @@ export default function PaymentPage() {
             Generado el ${new Date().toLocaleString("es-MX")}
           </div>
 
+          ${
+            mesaCancelledUnits > 0
+              ? `
+            <div class="cancelled-info">
+              <strong>Nota:</strong> Se excluyen ${mesaCancelledUnits} unidad(es) cancelada(s) 
+              por un total de ${formatCurrency(mesaCancelledAmount)}
+            </div>
+          `
+              : ""
+          }
+
           ${customerSummaries
             .map(
               (customerSummary) => `
@@ -731,9 +960,23 @@ export default function PaymentPage() {
               <div class="customer-header">
                 <div class="customer-name">${customerSummary.customerName}</div>
                 <div class="customer-total">${formatCurrency(
-                  customerSummary.subtotal
+                  customerSummary.total
                 )}</div>
               </div>
+
+              ${
+                customerSummary.cancelledUnitsCount > 0
+                  ? `
+                <div style="background: #fef2f2; padding: 8px; border-radius: 4px; margin-bottom: 10px; font-size: 11px; color: #dc2626;">
+                  <strong>Cancelados:</strong> ${
+                    customerSummary.cancelledUnitsCount
+                  } unidad(es) - ${formatCurrency(
+                      customerSummary.cancelledAmount
+                    )} excluido(s)
+                </div>
+              `
+                  : ""
+              }
 
               ${customerSummary.orders
                 .map(
@@ -743,9 +986,7 @@ export default function PaymentPage() {
                     ? `
                   <div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
                     <div style="font-size: 12px; color: #6b7280;">
-                      Orden #${order.id.slice(-8)} - ${getStatusText(
-                        order.status
-                      )}
+                      Orden #${order.id.slice(-8)}
                     </div>
                   </div>
                 `
@@ -753,32 +994,67 @@ export default function PaymentPage() {
                 }
 
                 ${order.order_items
-                  .map(
-                    (item) => `
-                  <div class="item-row">
-                    <div>
-                      <div class="item-name">${item.product_name}</div>
-                      <div class="item-details">
-                        Cantidad: ${item.quantity} • ${formatCurrency(
-                      item.price
-                    )} c/u
-                        ${
-                          item.notes
-                            ? `
-                          <div class="notes-section">
-                            ${formatNotesForPDF(item.notes)}
+                  .map((item) => {
+                    const cancelledQty = item.cancelled_quantity || 0;
+                    const activeQuantity = item.quantity - cancelledQty;
+                    const isCancelled = activeQuantity === 0;
+
+                    if (isCancelled) {
+                      return `
+                        <div class="item-row" style="opacity: 0.6; background: #fef2f2;">
+                          <div>
+                            <div class="item-name" style="text-decoration: line-through; color: #dc2626;">
+                              ${item.product_name} (CANCELADO)
+                            </div>
+                            <div class="item-details">
+                              Cantidad: ${item.quantity} • ${formatCurrency(
+                        item.price
+                      )} c/u
+                              ${
+                                item.notes
+                                  ? `
+                                <div class="notes-section">
+                                  ${formatNotesForPDF(item.notes)}
+                                </div>
+                              `
+                                  : ""
+                              }
+                            </div>
                           </div>
-                        `
-                            : ""
-                        }
+                          <div class="item-price" style="text-decoration: line-through; color: #dc2626;">
+                            ${formatCurrency(item.price * item.quantity)}
+                          </div>
+                        </div>
+                      `;
+                    }
+
+                    return `
+                      <div class="item-row">
+                        <div>
+                          <div class="item-name">${item.product_name}</div>
+                          <div class="item-details">
+                            Cantidad: ${activeQuantity}${
+                      cancelledQty > 0
+                        ? ` (de ${item.quantity}, ${cancelledQty} cancelada(s))`
+                        : ""
+                    } • ${formatCurrency(item.price)} c/u
+                            ${
+                              item.notes
+                                ? `
+                              <div class="notes-section">
+                                ${formatNotesForPDF(item.notes)}
+                              </div>
+                            `
+                                : ""
+                            }
+                          </div>
+                        </div>
+                        <div class="item-price">
+                          ${formatCurrency(item.price * activeQuantity)}
+                        </div>
                       </div>
-                    </div>
-                    <div class="item-price">
-                      ${formatCurrency(item.price * item.quantity)}
-                    </div>
-                  </div>
-                `
-                  )
+                    `;
+                  })
                   .join("")}
 
                 ${
@@ -793,7 +1069,21 @@ export default function PaymentPage() {
                 )
                 .join("")}
 
-
+              <div style="background: #f8fafc; padding: 10px; border-radius: 6px; margin-top: 10px;">
+                <div class="summary-row">
+                  <span>Subtotal:</span>
+                  <span>${formatCurrency(customerSummary.subtotal)}</span>
+                </div>
+                <div class="summary-row">
+                  <span>IVA (8%):</span>
+                  <span>${formatCurrency(customerSummary.taxAmount)}</span>
+                </div>
+                <div class="summary-row" style="font-weight: bold; border-top: 1px solid #e2e8f0; padding-top: 5px;">
+                  <span>Total:</span>
+                  <span>${formatCurrency(customerSummary.total)}</span>
+                </div>
+              </div>
+            </div>
           `
             )
             .join("")}
@@ -837,87 +1127,14 @@ export default function PaymentPage() {
     }
   };
 
-  // Función auxiliar para formatear notas en el PDF
-  const formatNotesForPDF = (notes: string) => {
-    if (!notes) return "";
-
-    // Detectar si tiene información de extras con precios
-    const hasPricedExtras = notes.includes("(+$");
-
-    if (hasPricedExtras) {
-      const parts = notes.split(" | ");
-      const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
-      );
-      const extrasPart = parts.find((part) => part.includes("Extras:"));
-      const totalPart = parts.find((part) => part.includes("Total:"));
-
-      let result = "";
-
-      if (mainNotes) {
-        result += `<div class="notes-main"><strong>Instrucciones:</strong> ${mainNotes}</div>`;
-      }
-
-      if (extrasPart) {
-        result += `<div class="extras-section"><strong>Extras:</strong>`;
-        extrasPart
-          .replace("Extras: ", "")
-          .split(", ")
-          .forEach((extra) => {
-            const extraName = extra.split(" (+$")[0];
-            const extraPrice = extra.match(/\(\+\$([^)]+)\)/)?.[1] || "";
-            result += `<div class="extra-item">• ${extraName} +${extraPrice}</div>`;
-          });
-        result += `</div>`;
-      }
-
-      if (totalPart) {
-        result += `<div style="margin-top: 5px; font-weight: bold; color: #1e40af;">${totalPart}</div>`;
-      }
-
-      return result;
-    }
-
-    // Detectar extras simples (sin precios)
-    if (notes.includes("Extras:")) {
-      const parts = notes.split(" | ");
-      let mainNotes = "";
-      let extrasText = "";
-
-      parts.forEach((part) => {
-        if (part.startsWith("Extras:")) {
-          extrasText = part.replace("Extras: ", "");
-        } else {
-          mainNotes = part;
-        }
-      });
-
-      let result = "";
-      if (mainNotes) {
-        result += `<div class="notes-main"><strong>Nota:</strong> ${mainNotes}</div>`;
-      }
-      if (extrasText) {
-        result += `<div class="extras-section"><strong>Extras:</strong> ${extrasText}</div>`;
-      }
-
-      return result;
-    }
-
-    // Notas normales
-    return `<div class="notes-main"><strong>Nota:</strong> ${notes}</div>`;
-  };
-
-  // Función para abrir el modal de facturación
   const handleOpenInvoiceModal = () => {
     setIsInvoiceModalOpen(true);
   };
 
-  // Función para cerrar el modal de facturación
   const handleCloseInvoiceModal = () => {
     setIsInvoiceModalOpen(false);
   };
 
-  // Función para facturar compra y enviar correo usando Axios
   const handleInvoiceRequest = async (email: string) => {
     try {
       setGeneratingInvoice(true);
@@ -931,11 +1148,16 @@ export default function PaymentPage() {
           taxAmount: summary.taxAmount,
           total: summary.total,
           itemsCount: summary.itemsCount,
+          cancelledItemsCount: summary.cancelledItemsCount,
+          cancelledUnitsCount: summary.cancelledUnitsCount,
+          cancelledAmount: summary.cancelledAmount,
         })),
         paymentSummary: {
           subtotal: paymentSummary.subtotal,
           taxAmount: paymentSummary.taxAmount,
           total: paymentSummary.total,
+          cancelledAmount: paymentSummary.cancelledAmount,
+          cancelledUnitsCount: paymentSummary.cancelledUnitsCount,
         },
         orders: allOrders.map((order) => ({
           id: order.id,
@@ -945,6 +1167,8 @@ export default function PaymentPage() {
             quantity: item.quantity,
             price: item.price,
             notes: item.notes,
+            cancelled_quantity: item.cancelled_quantity || 0,
+            activeQuantity: item.quantity - (item.cancelled_quantity || 0),
           })),
         })),
         timestamp: new Date().toISOString(),
@@ -993,29 +1217,21 @@ export default function PaymentPage() {
     }
   };
 
-  // Método de confirmación de pago SIMPLIFICADO usando el Context
   const handlePaymentConfirmation = async () => {
     try {
-      // Confirmar el pago visualmente (solo redirección)
       setPaymentConfirmed(true);
       setShowSurvey(true);
 
       console.log("✅ Pago confirmado:", {
         tableId: tableId || currentTableId,
         total: paymentSummary.total,
+        cancelledAmount: paymentSummary.cancelledAmount,
         customers: customerSummaries.map((c) => c.customerName),
       });
     } catch (error) {
       console.error("Error confirming payment:", error);
       alert("❌ Error al confirmar el pago. Intenta nuevamente.");
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
   };
 
   const getStatusText = (status: string) => {
@@ -1028,7 +1244,6 @@ export default function PaymentPage() {
     return statusMap[status] || status;
   };
 
-  // Renderizado condicional del botón SIMPLIFICADO usando el Context
   const renderPaymentButton = () => {
     const { checkingNotification, hasPendingBill } = notificationState;
 
@@ -1067,7 +1282,6 @@ export default function PaymentPage() {
     );
   };
 
-  // Mostrar loading mientras se obtiene el tableId
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -1130,12 +1344,10 @@ export default function PaymentPage() {
     );
   }
 
-  // PANTALLA DE CONFIRMACIÓN DE PAGO CON ENCUESTA
   if (paymentConfirmed) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full space-y-6">
-          {/* Tarjeta de confirmación de pago */}
           <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <FaCheck className="text-4xl text-green-500" />
@@ -1166,6 +1378,13 @@ export default function PaymentPage() {
                   </p>
                 </div>
               </div>
+              {mesaCancelledUnits > 0 && (
+                <div className="mt-4 p-3 bg-red-50 rounded-lg">
+                  <p className="text-sm text-red-600">
+                    Se excluyeron {mesaCancelledUnits} unidad(es) cancelada(s)
+                  </p>
+                </div>
+              )}
             </div>
 
             <p className="text-gray-600 mb-6">
@@ -1187,7 +1406,6 @@ export default function PaymentPage() {
             )}
           </div>
 
-          {/* Componente de encuesta */}
           {showSurvey && (
             <SatisfactionSurvey
               onSubmit={handleSurveySubmit}
@@ -1201,11 +1419,9 @@ export default function PaymentPage() {
     );
   }
 
-  // INTERFAZ PRINCIPAL DE PAGO
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-8">
-        {/* Header */}
         <header className="bg-white shadow-sm">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
@@ -1228,6 +1444,12 @@ export default function PaymentPage() {
                     {customerSummaries.length > 1 ? "es" : ""} •{" "}
                     {allOrders.length} orden{allOrders.length > 1 ? "es" : ""}
                   </p>
+                  {mesaCancelledUnits > 0 && (
+                    <p className="text-sm text-red-600 font-medium">
+                      {mesaCancelledUnits} unidad(es) cancelada(s) -{" "}
+                      {formatCurrency(mesaCancelledAmount)} excluido(s)
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -1241,24 +1463,25 @@ export default function PaymentPage() {
         </header>
 
         <main className="max-w-4xl mx-auto px-4 py-6">
-          {/* Resumen de todas las órdenes */}
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
-            {/* Header del Ticket */}
             <div className="bg-gray-800 text-white p-6 text-center">
               <h3 className="text-2xl font-bold">RESTAURANTE</h3>
               <p className="text-gray-300 text-sm">
                 Mesa {tableId || currentTableId}
               </p>
+              {mesaCancelledUnits > 0 && (
+                <p className="text-red-300 text-sm mt-2">
+                  {mesaCancelledUnits} unidad(es) cancelada(s) excluida(s)
+                </p>
+              )}
             </div>
 
-            {/* Lista de órdenes agrupadas por cliente */}
             <div className="p-6">
               {customerSummaries.map((customerSummary, customerIndex) => (
                 <div
                   key={customerSummary.customerName}
                   className="mb-8 last:mb-0"
                 >
-                  {/* Header del cliente */}
                   <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-200">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -1271,57 +1494,32 @@ export default function PaymentPage() {
                           </h4>
                           <p className="text-sm text-gray-500">
                             {customerSummary.itemsCount} item
+                            {customerSummary.itemsCount > 1 ? "s" : ""} activo
                             {customerSummary.itemsCount > 1 ? "s" : ""}
                           </p>
+                          {customerSummary.cancelledUnitsCount > 0 && (
+                            <p className="text-sm text-red-500">
+                              {customerSummary.cancelledUnitsCount} unidad(es)
+                              cancelada(s)
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      {/* <p className="text-lg font-semibold text-gray-800">
+                      <p className="text-lg font-semibold text-gray-800">
                         {formatCurrency(customerSummary.total)}
-                      </p> */}
-                      {/* <p className="text-sm text-gray-500">
-                        {formatCurrency(customerSummary.subtotal)}
-                      </p> */}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Items de todas las órdenes de este cliente */}
                   <div className="space-y-4 mb-4">
                     {customerSummary.orders.map((order, orderIndex) => (
                       <div key={order.id}>
-                        {/* Items de esta orden */}
                         <div className="space-y-3">
-                          {order.order_items.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex justify-between items-start py-2 border-b border-gray-100"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <span className="font-medium text-gray-800">
-                                      {item.product_name}
-                                    </span>
-                                    <div className="text-sm text-gray-500 mt-1">
-                                      Cantidad: {item.quantity}
-                                    </div>
-                                    {formatItemNotes(item.notes)}
-                                  </div>
-                                  <div className="text-right">
-                                    {/* <div className="font-medium text-gray-800">
-                                      {formatCurrency(
-                                        item.price * item.quantity
-                                      )}
-                                    </div> */}
-                                    <div className="text-sm text-gray-500">
-                                      {formatCurrency(item.price)} c/u
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                          {order.order_items.map((item) =>
+                            renderOrderItem(item)
+                          )}
                         </div>
 
                         {orderIndex < customerSummary.orders.length - 1 && (
@@ -1331,13 +1529,32 @@ export default function PaymentPage() {
                     ))}
                   </div>
 
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
+                      <span>Total de {customerSummary.customerName}:</span>
+                      <span>{formatCurrency(customerSummary.total)}</span>
+                    </div>
+
+                    {customerSummary.cancelledUnitsCount > 0 && (
+                      <div className="text-xs text-red-600 mt-2 space-y-1">
+                        <div>
+                          • {customerSummary.cancelledUnitsCount} unidad(es)
+                          cancelada(s)
+                        </div>
+                        <div>
+                          • {formatCurrency(customerSummary.cancelledAmount)}{" "}
+                          excluido(s) del total
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {customerIndex < customerSummaries.length - 1 && (
                     <div className="border-t border-gray-300 my-6"></div>
                   )}
                 </div>
               ))}
 
-              {/* Resumen FINAL de todos los pagos */}
               <div className="border-t border-gray-200 pt-6 space-y-3">
                 <div className="flex justify-between text-lg">
                   <span>Subtotal total:</span>
@@ -1351,17 +1568,26 @@ export default function PaymentPage() {
                   <span>TOTAL GENERAL:</span>
                   <span>{formatCurrency(paymentSummary.total)}</span>
                 </div>
+
+                {paymentSummary.cancelledUnitsCount > 0 && (
+                  <div className="bg-red-50 p-4 rounded-lg mt-4">
+                    <div className="text-sm text-red-700">
+                      <strong>Nota:</strong> Se excluyen{" "}
+                      {paymentSummary.cancelledUnitsCount} unidad(es)
+                      cancelada(s) por un total de{" "}
+                      {formatCurrency(paymentSummary.cancelledAmount)}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Footer del Ticket */}
             <div className="bg-gray-50 p-6 text-center text-sm text-gray-500 border-t">
               <p className="font-medium mb-2">¡Gracias por su preferencia!</p>
               <p>Presione Ya Pagué cuando haya completado el pago</p>
             </div>
           </div>
 
-          {/* Botones de Acción */}
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
@@ -1413,7 +1639,6 @@ export default function PaymentPage() {
         </main>
       </div>
 
-      {/* Modal para facturación */}
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
         onClose={handleCloseInvoiceModal}

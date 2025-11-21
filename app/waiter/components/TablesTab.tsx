@@ -5,6 +5,7 @@ interface TablesTabProps {
   tables: TableWithOrder[];
   processing: string | null;
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
+  onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
@@ -14,6 +15,7 @@ export default function TablesTab({
   tables,
   processing,
   onUpdateItemStatus,
+  onCancelItem,
   onCobrarMesa,
   calculateTableTotal,
   notifications,
@@ -50,6 +52,7 @@ export default function TablesTab({
             table={table}
             processing={processing}
             onUpdateItemStatus={onUpdateItemStatus}
+            onCancelItem={onCancelItem}
             onCobrarMesa={onCobrarMesa}
             calculateTableTotal={calculateTableTotal}
             notifications={notifications}

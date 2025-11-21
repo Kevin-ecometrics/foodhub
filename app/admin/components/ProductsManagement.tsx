@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/app/lib/supabase/client";
 import { FaPlus, FaEdit, FaSpinner, FaStar } from "react-icons/fa";
 import { Product, ProductFormData } from "../types";
@@ -35,9 +35,29 @@ export default function ProductsManagement({
     extras: [],
   });
 
+  // Referencia para el formulario
+  const formRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadProducts();
   }, []);
+
+  // Efecto para hacer scroll cuando se muestra el formulario o cambia el producto editado
+  useEffect(() => {
+    if (showProductForm && formRef.current) {
+      const scrollToForm = () => {
+        formRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      };
+
+      // Pequeño delay para asegurar que el DOM se haya actualizado
+      const timer = setTimeout(scrollToForm, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showProductForm, editingProduct?.id]); // Usar el ID del producto como dependencia
 
   const loadProducts = async () => {
     setProductsLoading(true);
@@ -201,7 +221,11 @@ export default function ProductsManagement({
       rating: product.rating.toString(),
       extras: product.extras || [], // CARGAR EXTRAS EXISTENTES
     });
-    setShowProductForm(true);
+
+    // Asegurar que el formulario se muestre (por si acaso)
+    if (!showProductForm) {
+      setShowProductForm(true);
+    }
   };
 
   const toggleProductAvailability = async (product: Product) => {
@@ -244,6 +268,38 @@ export default function ProductsManagement({
     }
   };
 
+  // En el componente ProductsManagement, agrega esta función después de las otras funciones
+  const handleDeleteProduct = async (productId: number) => {
+    if (
+      !confirm(
+        "¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productId);
+
+      if (error) throw error;
+
+      // Si estamos editando el producto que se elimina, cerrar el formulario
+      if (editingProduct?.id === productId) {
+        setShowProductForm(false);
+        setEditingProduct(null);
+      }
+
+      await loadProducts();
+      alert("✅ Producto eliminado correctamente");
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      onError("Error eliminando el producto");
+    }
+  };
+
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
@@ -281,18 +337,29 @@ export default function ProductsManagement({
         </button>
       </div>
 
-      {showProductForm && (
-        <ProductForm
-          editingProduct={editingProduct}
-          productForm={productForm}
-          onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-          onCancel={() => {
-            setShowProductForm(false);
-            setEditingProduct(null);
-          }}
-          onFormChange={setProductForm}
-        />
-      )}
+      {/* Agregar referencia al formulario */}
+      <div ref={formRef}>
+        {showProductForm && (
+          <ProductForm
+            editingProduct={editingProduct}
+            productForm={productForm}
+            onSubmit={
+              editingProduct ? handleUpdateProduct : handleCreateProduct
+            }
+            onCancel={() => {
+              setShowProductForm(false);
+              setEditingProduct(null);
+            }}
+            onFormChange={setProductForm}
+            onDelete={
+              editingProduct
+                ? (productId: string) =>
+                    handleDeleteProduct(parseInt(productId))
+                : undefined
+            }
+          />
+        )}
+      </div>
 
       {productsLoading ? (
         <div className="text-center py-12">

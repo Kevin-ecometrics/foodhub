@@ -11,6 +11,7 @@ interface ProductFormProps {
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   onFormChange: (data: ProductFormData) => void;
+  onDelete?: (productId: string) => void;
 }
 
 export default function ProductForm({
@@ -19,6 +20,7 @@ export default function ProductForm({
   onSubmit,
   onCancel,
   onFormChange,
+  onDelete,
 }: ProductFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -29,13 +31,6 @@ export default function ProductForm({
         if (value.length > 100)
           return "El nombre no puede tener más de 100 caracteres";
         return "";
-
-      // case "description":
-      //   if (!value || value.trim() === "")
-      //     return "La descripción es obligatoria";
-      //   if (value.length > 500)
-      //     return "La descripción no puede tener más de 500 caracteres";
-      //   return "";
 
       case "price":
         if (value === "" || value === null || value === undefined)
@@ -55,16 +50,6 @@ export default function ProductForm({
         if (time > 480)
           return "El tiempo no puede ser mayor a 480 minutos (8 horas)";
         return "";
-
-      // case "rating":
-      //   if (value === "" || value === null || value === undefined)
-      //     return "La calificación es obligatoria";
-      //   const rating = parseFloat(value);
-      //   if (isNaN(rating)) return "La calificación debe ser un número válido";
-      //   if (rating < 0) return "La calificación no puede ser negativa";
-      //   if (rating > 5) return "La calificación no puede ser mayor a 5";
-      //   if (rating < 1) return "La calificación debe ser al menos 1";
-      //   return "";
 
       case "category":
         if (!value || value.trim() === "") return "La categoría es obligatoria";
@@ -97,23 +82,6 @@ export default function ProductForm({
       [field]: value,
     });
   };
-
-  // const handleRatingChange = (rating: number) => {
-  //   // Validar que la calificación no sea 0
-  //   if (rating === 0) {
-  //     setErrors((prev) => ({
-  //       ...prev,
-  //       rating: "La calificación es obligatoria",
-  //     }));
-  //   } else {
-  //     setErrors((prev) => {
-  //       const newErrors = { ...prev };
-  //       delete newErrors.rating;
-  //       return newErrors;
-  //     });
-  //   }
-  //   handleChange("rating", rating.toString());
-  // };
 
   const handleRatingChange = (rating: number) => {
     handleChange("rating", rating.toString());
@@ -275,6 +243,13 @@ export default function ProductForm({
     }
   };
 
+  // Función para manejar la eliminación
+  const handleDelete = () => {
+    if (editingProduct && onDelete) {
+      onDelete(editingProduct.id.toString());
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -378,22 +353,14 @@ export default function ProductForm({
               {/* Calificación */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Calificación Inicial 
+                  Calificación Inicial
                 </label>
-                <div
-                  // className={`border rounded-lg p-3 h-full ${
-                  //   errors.rating ? "border-red-500" : "border-gray-300"
-                  // }`}
-                  className="border rounded-lg p-3 h-full border-gray-300"
-                >
+                <div className="border rounded-lg p-3 h-full border-gray-300">
                   <StarRating
                     rating={parseFloat(productForm.rating || "0")}
                     onRatingChange={handleRatingChange}
                     readonly={false}
                   />
-                  {/* {errors.rating && (
-                    <p className="text-red-500 text-xs mt-2">{errors.rating}</p>
-                  )} */}
                   <p className="text-xs text-gray-500 mt-2">
                     Calificación inicial (1-5 estrellas)
                   </p>
@@ -504,20 +471,16 @@ export default function ProductForm({
 
           <div className="md:col-span-2 mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Descripción 
+              Descripción
             </label>
             <textarea
               value={productForm.description}
               onChange={(e) => handleChange("description", e.target.value)}
               rows={3}
-              // className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              //   errors.description ? "border-red-500" : "border-gray-300"
-              // }`}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300"
               maxLength={500}
               placeholder="Máximo 500 caracteres"
             />
-
             <div className="text-xs text-gray-500 mt-1 text-right">
               {productForm.description.length}/500
             </div>
@@ -690,6 +653,19 @@ export default function ProductForm({
           >
             {editingProduct ? "Actualizar" : "Crear"} Producto
           </button>
+
+          {/* Botón de eliminar - solo se muestra cuando se está editando */}
+          {editingProduct && onDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+            >
+              <FaTrash />
+              Eliminar Producto
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onCancel}

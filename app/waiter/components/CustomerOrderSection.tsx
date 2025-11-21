@@ -15,12 +15,14 @@ interface CustomerOrderSectionProps {
   customerSummary: CustomerOrderSummary;
   processing: string | null;
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
+  onCancelItem: (itemId: string) => void;
 }
 
 export default function CustomerOrderSection({
   customerSummary,
   processing,
   onUpdateItemStatus,
+  onCancelItem,
 }: CustomerOrderSectionProps) {
   return (
     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -56,6 +58,7 @@ export default function CustomerOrderSection({
               item={item}
               processing={processing}
               onUpdateStatus={onUpdateItemStatus}
+              onCancelItem={onCancelItem}
             />
           ))
         )}

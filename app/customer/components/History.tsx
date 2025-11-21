@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,6 +23,8 @@ import {
   FaQuestion,
   FaStickyNote,
   FaPlus,
+  FaTimes,
+  FaBan,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -49,6 +52,9 @@ interface CustomerOrderSummary {
   total: number;
   itemsCount: number;
   latestOrderDate: string;
+  cancelledItemsCount: number;
+  cancelledUnitsCount: number;
+  cancelledAmount: number;
 }
 
 export default function HistoryPage() {
@@ -193,6 +199,177 @@ export default function HistoryPage() {
     );
   };
 
+  // Función para renderizar items de orden (incluyendo cancelados)
+  // Función para renderizar items de orden (incluyendo cancelados) - CORREGIDA
+  const renderOrderItem = (item: any) => {
+    const isCancelled = item.status === "cancelled";
+    const cancelledQty = item.cancelled_quantity || 0;
+    const activeQuantity = item.quantity - cancelledQty;
+    const isPartiallyCancelled = cancelledQty > 0 && activeQuantity > 0;
+    const isFullyCancelled = cancelledQty > 0 && activeQuantity === 0;
+
+    // DETERMINAR EL ESTADO REAL DEL PEDIDO
+    // Si está parcialmente cancelado, mostrar el estado actual del pedido
+    // Si está completamente cancelado, mostrar como cancelado
+    const showOrderStatus = !isFullyCancelled;
+
+    return (
+      <div
+        key={item.id}
+        className={`flex justify-between items-start py-3 border-b border-gray-100 ${
+          isFullyCancelled
+            ? "bg-red-50 border-l-4 border-l-red-400 pl-3 opacity-75"
+            : isPartiallyCancelled
+            ? "bg-orange-50 border-l-4 border-l-orange-400 pl-3"
+            : ""
+        }`}
+      >
+        <div className="flex-1">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className={`font-medium text-base ${
+                    isFullyCancelled
+                      ? "text-red-700 line-through"
+                      : "text-gray-800"
+                  }`}
+                >
+                  {item.product_name}
+                </span>
+
+                {/* BADGE DE ESTADO - MOSTRAR SIEMPRE QUE NO ESTÉ COMPLETAMENTE CANCELADO */}
+                {showOrderStatus && (
+                  <>
+                    {item.status === "ordered" && (
+                      <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                        <FaClock className="text-xs" />
+                        Ordenado
+                      </span>
+                    )}
+
+                    {item.status === "preparing" && (
+                      <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                        <FaUtensilSpoon className="text-xs" />
+                        En Preparación
+                      </span>
+                    )}
+
+                    {item.status === "served" && (
+                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                        <FaCheck className="text-xs" />
+                        Servido
+                      </span>
+                    )}
+                  </>
+                )}
+
+                {/* BADGE DE CANCELACIÓN - MOSTRAR SIEMPRE */}
+                {isFullyCancelled && (
+                  <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                    <FaBan className="text-xs" />
+                    Completamente Cancelado
+                  </span>
+                )}
+
+                {isPartiallyCancelled && (
+                  <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                    <FaBan className="text-xs" />
+                    Parcialmente Cancelado
+                  </span>
+                )}
+              </div>
+
+              {/* Información de cantidades - MEJORADA */}
+              <div className="text-sm text-gray-600 mb-2">
+                <div className="flex items-center gap-2">
+                  <span>
+                    Cantidad {showOrderStatus ? "activa" : "original"}:{" "}
+                    <strong>
+                      {isFullyCancelled ? item.quantity : activeQuantity}
+                    </strong>
+                    {cancelledQty > 0 && (
+                      <span className="text-red-500 line-through ml-1">
+                        {isFullyCancelled
+                          ? " (cancelada)"
+                          : ` (de ${item.quantity})`}
+                      </span>
+                    )}
+                  </span>
+                  <span>•</span>
+                  <span>{formatCurrency(item.price)} c/u</span>
+                </div>
+
+                {/* INFORMACIÓN ESPECÍFICA DE CANCELACIÓN */}
+                {cancelledQty > 0 && (
+                  <div className="text-xs text-red-600 mt-1">
+                    {isFullyCancelled
+                      ? `${cancelledQty} unidad(es) cancelada(s) - No se cobrará`
+                      : `${cancelledQty} unidad(es) cancelada(s) de ${item.quantity}`}
+                  </div>
+                )}
+
+                {/* INFORMACIÓN DEL ESTADO DEL PEDIDO PARA ITEMS PARCIALMENTE CANCELADOS */}
+                {isPartiallyCancelled && showOrderStatus && (
+                  <div className="text-xs text-blue-600 mt-1 font-medium">
+                    • {activeQuantity} unidad(es){" "}
+                    {getStatusTextForItem(item.status)}
+                  </div>
+                )}
+              </div>
+
+              {/* NOTAS Y EXTRAS MEJORADOS */}
+              {formatItemNotes(item.notes)}
+            </div>
+            <div className="text-right ml-4">
+              <div
+                className={`font-semibold text-lg ${
+                  isFullyCancelled
+                    ? "text-red-700 line-through"
+                    : "text-gray-800"
+                }`}
+              >
+                {formatCurrency(item.price * activeQuantity)}
+              </div>
+
+              {/* INFORMACIÓN DE MONTO CANCELADO */}
+              {cancelledQty > 0 && (
+                <div className="text-xs text-red-600 font-medium mt-1">
+                  Cancelado: {formatCurrency(item.price * cancelledQty)}
+                </div>
+              )}
+
+              {/* MENSAJE DE NO COBRO SOLO PARA COMPLETAMENTE CANCELADOS */}
+              {isFullyCancelled && (
+                <div className="text-xs text-red-600 font-medium mt-1 bg-red-100 px-2 py-1 rounded">
+                  No se cobrará
+                </div>
+              )}
+
+              {/* MENSAJE PARA PARCIALMENTE CANCELADOS */}
+              {isPartiallyCancelled && (
+                <div className="text-xs text-orange-600 font-medium mt-1 bg-orange-100 px-2 py-1 rounded">
+                  Solo se cobrarán {activeQuantity} unidad(es)
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Función auxiliar para obtener texto del estado del item
+  const getStatusTextForItem = (status: string): string => {
+    const statusMap: { [key: string]: string } = {
+      ordered: "ordenadas",
+      preparing: "en preparación",
+      served: "servidas",
+      cancelled: "canceladas",
+    };
+    return statusMap[status] || status;
+  };
+
   // Cargar usuarios de la mesa
   useEffect(() => {
     if (tableId) {
@@ -246,10 +423,11 @@ export default function HistoryPage() {
 
   // Calcular impuestos y totales
   const calculateTaxes = (items: typeof orderItems): TaxCalculation => {
-    const subtotal = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    const subtotal = items.reduce((sum, item) => {
+      const cancelledQty = item.cancelled_quantity || 0;
+      const activeQuantity = item.quantity - cancelledQty;
+      return sum + item.price * activeQuantity;
+    }, 0);
     const taxRate = 0.08;
     const taxAmount = subtotal * taxRate;
     const total = subtotal + taxAmount;
@@ -279,20 +457,54 @@ export default function HistoryPage() {
           total: 0,
           itemsCount: 0,
           latestOrderDate: order.created_at,
+          cancelledItemsCount: 0,
+          cancelledUnitsCount: 0,
+          cancelledAmount: 0,
         });
       }
 
       const customerSummary = customerMap.get(customerName)!;
       customerSummary.orders.push(order);
 
-      // Calcular subtotal de esta orden
-      const orderSubtotal = order.order_items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
+      // Calcular subtotal de esta orden (excluyendo cancelados)
+      const orderCalculations = order.order_items.reduce(
+        (acc, item) => {
+          const cancelledQty = item.cancelled_quantity || 0;
+          const activeQuantity = item.quantity - cancelledQty;
+
+          // Contar items completamente cancelados
+          if (activeQuantity === 0) {
+            acc.cancelledItemsCount++;
+          }
+
+          // Contar unidades canceladas
+          acc.cancelledUnitsCount += cancelledQty;
+
+          // Calcular montos
+          acc.activeAmount += item.price * activeQuantity;
+          acc.cancelledAmount += item.price * cancelledQty;
+
+          return acc;
+        },
+        {
+          cancelledItemsCount: 0,
+          cancelledUnitsCount: 0,
+          activeAmount: 0,
+          cancelledAmount: 0,
+        }
       );
 
-      customerSummary.subtotal += orderSubtotal;
-      customerSummary.itemsCount += order.order_items.length;
+      customerSummary.subtotal += orderCalculations.activeAmount;
+      customerSummary.cancelledItemsCount +=
+        orderCalculations.cancelledItemsCount;
+      customerSummary.cancelledUnitsCount +=
+        orderCalculations.cancelledUnitsCount;
+      customerSummary.cancelledAmount += orderCalculations.cancelledAmount;
+
+      // Contar solo items con cantidad activa
+      customerSummary.itemsCount += order.order_items.filter(
+        (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0
+      ).length;
 
       // Actualizar la fecha más reciente
       if (
@@ -359,7 +571,23 @@ export default function HistoryPage() {
       const history = await historyService.getCustomerOrderHistory(tableId);
       console.log("📊 Historial cargado:", history.length, "órdenes");
 
-      setOrderHistory(history);
+      // Procesar los datos para asegurar consistencia
+      const processedHistory = history.map((order) => ({
+        ...order,
+        order_items: order.order_items.map((item) => ({
+          ...item,
+          // Asegurar que cancelled_quantity siempre tenga un valor
+          cancelled_quantity: item.cancelled_quantity || 0,
+          // Si el item está marcado como 'cancelled' pero no tiene cancelled_quantity,
+          // asumimos que toda la cantidad está cancelada
+          ...(item.status === "cancelled" &&
+            !item.cancelled_quantity && {
+              cancelled_quantity: item.quantity,
+            }),
+        })),
+      }));
+
+      setOrderHistory(processedHistory);
     } catch (error) {
       console.error("Error loading history:", error);
       setError("Error cargando el historial");
@@ -418,12 +646,12 @@ export default function HistoryPage() {
     }
   };
 
-  // NUEVA FUNCIÓN: Manejar solicitud de ticket
+  // Manejar solicitud de ticket
   const handleBillRequest = async () => {
     setShowPaymentMethodModal(true);
   };
 
-  // NUEVA FUNCIÓN: Confirmar solicitud de ticket
+  // Confirmar solicitud de ticket
   const confirmTicketRequest = async () => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
@@ -454,7 +682,7 @@ export default function HistoryPage() {
     }
   };
 
-  // NUEVA FUNCIÓN: Cancelar solicitud
+  // Cancelar solicitud
   const handleCancelTicket = () => {
     setShowPaymentMethodModal(false);
   };
@@ -629,6 +857,20 @@ export default function HistoryPage() {
   const targetTableId = tableId || currentTableId;
   const customerSummaries = groupOrdersByCustomer();
 
+  // Calcular total general de la mesa
+  const mesaTotal = customerSummaries.reduce(
+    (total, customer) => total + customer.total,
+    0
+  );
+  const mesaCancelledAmount = customerSummaries.reduce(
+    (total, customer) => total + customer.cancelledAmount,
+    0
+  );
+  const mesaCancelledUnits = customerSummaries.reduce(
+    (total, customer) => total + customer.cancelledUnitsCount,
+    0
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-24">
       <header className="bg-white shadow-sm sticky top-0 z-30">
@@ -648,6 +890,12 @@ export default function HistoryPage() {
                 {customerSummaries.length > 1 ? "es" : ""} •{" "}
                 {orderHistory.length} orden{orderHistory.length > 1 ? "es" : ""}
               </p>
+              {mesaCancelledUnits > 0 && (
+                <p className="text-sm text-red-600 font-medium">
+                  {mesaCancelledUnits} unidad(es) cancelada(s) -{" "}
+                  {formatCurrency(mesaCancelledAmount)} excluido(s)
+                </p>
+              )}
             </div>
           </div>
 
@@ -723,7 +971,8 @@ export default function HistoryPage() {
                             <span>•</span>
                             <span>
                               {customerSummary.itemsCount} item
-                              {customerSummary.itemsCount > 1 ? "s" : ""}
+                              {customerSummary.itemsCount > 1 ? "s" : ""}{" "}
+                              activo(s)
                             </span>
                             <span>•</span>
                             <span>
@@ -756,37 +1005,9 @@ export default function HistoryPage() {
 
                         {/* Items de esta orden */}
                         <div className="space-y-3">
-                          {order.order_items.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex justify-between items-start py-2 border-b border-gray-100"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <span className="font-medium text-gray-800">
-                                      {item.product_name}
-                                    </span>
-                                    <div className="text-sm text-gray-500 mt-1">
-                                      Cantidad: {item.quantity}
-                                    </div>
-                                    {/* NOTAS Y EXTRAS MEJORADOS */}
-                                    {formatItemNotes(item.notes)}
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-medium text-gray-800">
-                                      {formatCurrency(
-                                        item.price * item.quantity
-                                      )}
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                      {formatCurrency(item.price)} c/u
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                          {order.order_items.map((item) =>
+                            renderOrderItem(item)
+                          )}
                         </div>
 
                         {/* Separador entre órdenes del mismo cliente */}
@@ -797,11 +1018,25 @@ export default function HistoryPage() {
                     ))}
 
                     {/* Resumen del Cliente */}
-                    <div className=" border-gray-200 pt-4 mt-4">
+                    <div className="border-t border-gray-200 pt-4 mt-4">
                       <div className="flex justify-between font-semibold text-gray-800 border-t border-gray-300 pt-2">
                         <span>Total de {customerSummary.customerName}:</span>
                         <span>{formatCurrency(customerSummary.subtotal)}</span>
                       </div>
+
+                      {/* Mostrar información de cancelados */}
+                      {customerSummary.cancelledUnitsCount > 0 && (
+                        <div className="text-xs text-red-600 mt-2 space-y-1">
+                          <div>
+                            • {customerSummary.cancelledUnitsCount} unidad(es)
+                            cancelada(s)
+                          </div>
+                          <div>
+                            • {formatCurrency(customerSummary.cancelledAmount)}{" "}
+                            excluido(s) del total
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

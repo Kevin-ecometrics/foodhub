@@ -8,6 +8,7 @@ interface Product {
 }
 
 export interface OrderItem {
+  cancelled_quantity: number
   id: string
   order_id: string
   product_id: number

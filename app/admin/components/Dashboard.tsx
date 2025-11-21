@@ -17,6 +17,7 @@ import {
   FaUser,
   FaCalendarDay,
   FaCalendarWeek,
+  FaBan,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -48,6 +49,8 @@ interface SalesItem {
   quantity: number;
   subtotal: number;
   notes?: string | null;
+  cancelled_quantity?: number;
+  status?: string;
 }
 
 // Interfaz para el ticket
@@ -78,7 +81,7 @@ interface CustomerFeedback {
   created_at: string;
 }
 
-// Interfaz para producto agrupado - NUEVA
+// Interfaz para producto agrupado - ACTUALIZADA CON CANCELADOS
 interface GroupedProduct {
   product_name: string;
   price: number;
@@ -88,6 +91,10 @@ interface GroupedProduct {
   isExtra?: boolean;
   basePrice?: number;
   extrasTotal?: number;
+  cancelledQuantity: number;
+  cancelledAmount: number;
+  activeQuantity: number;
+  activeSubtotal: number;
 }
 
 type FilterMode = "single" | "range";
@@ -124,8 +131,10 @@ export default function Dashboard({
   );
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] =
+    useState<CustomerFeedback | null>(null);
+
   const formatDateRange = (startDate: Date, endDate: Date): string => {
-    // Ajustar las fechas para la zona horaria local
     const adjustForTimezone = (date: Date) => {
       const localDate = new Date(date);
       localDate.setMinutes(
@@ -145,6 +154,7 @@ export default function Dashboard({
       "es-MX"
     )} - ${localEnd.toLocaleDateString("es-MX")}`;
   };
+
   const handleDateRangeChange = () => {
     if (startDateInput && endDateInput) {
       const [startYear, startMonth, startDay] = startDateInput
@@ -173,8 +183,6 @@ export default function Dashboard({
       onDateChange(today);
     }
   };
-  const [selectedFeedback, setSelectedFeedback] =
-    useState<CustomerFeedback | null>(null);
 
   // Actualizar dateInput cuando selectedDate cambie
   useEffect(() => {
@@ -195,7 +203,6 @@ export default function Dashboard({
     if (filterMode === "single") {
       loadCustomerFeedback(selectedDate);
     } else {
-      // En modo rango, cargar encuestas para el rango actual
       const startDate = new Date(startDateInput + "T00:00:00");
       const endDate = new Date(endDateInput + "T23:59:59");
       loadCustomerFeedbackForRange(startDate, endDate);
@@ -231,7 +238,7 @@ export default function Dashboard({
       setLoadingFeedback(false);
     }
   };
-  // Agrega esta función después de loadCustomerFeedback:
+
   // NUEVA FUNCIÓN: Cargar encuestas por rango de fechas
   const loadCustomerFeedbackForRange = async (
     startDate: Date,
@@ -287,18 +294,30 @@ export default function Dashboard({
     if (saleIds.length === 0) return [];
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = (await supabase
         .from("sales_items")
         .select("*")
         .in("sale_id", saleIds)
-        .order("product_name");
+        .order("product_name")) as { data: any[] | null; error: any };
 
       if (error) {
         console.error("Error fetching sales items from Supabase:", error);
         throw error;
       }
 
-      return data || [];
+      // Procesar items para asegurar consistencia en cancelled_quantity
+      const processedItems = (data || []).map((item: any) => ({
+        ...item,
+        cancelled_quantity: item.cancelled_quantity || 0,
+        // Si el item está marcado como 'cancelled' pero no tiene cancelled_quantity,
+        // asumimos que toda la cantidad está cancelada
+        ...(item.status === "cancelled" &&
+          !item.cancelled_quantity && {
+            cancelled_quantity: item.quantity,
+          }),
+      }));
+
+      return processedItems;
     } catch (error) {
       console.error("Error in fetchSalesItemsFromSupabase:", error);
       return [];
@@ -319,11 +338,9 @@ export default function Dashboard({
       };
     }
 
-    // Detectar si tiene información de extras con precios
     const hasPricedExtras = notes.includes("(+$");
 
     if (hasPricedExtras) {
-      // Separar notas principales de extras
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
         (part) => !part.includes("Extras:") && !part.includes("Total:")
@@ -334,7 +351,6 @@ export default function Dashboard({
       let extrasList: Array<{ name: string; price: number }> = [];
       let extrasTotal = 0;
 
-      // Procesar extras con precios
       if (extrasPart) {
         const extrasText = extrasPart.replace("Extras: ", "");
         extrasList = extrasText.split(", ").map((extra) => {
@@ -346,7 +362,6 @@ export default function Dashboard({
         });
       }
 
-      // Obtener precio base y final
       let basePrice = 0;
       let finalPrice = 0;
 
@@ -366,7 +381,6 @@ export default function Dashboard({
       };
     }
 
-    // Detectar extras simples (sin precios)
     if (notes.includes("Extras:")) {
       const parts = notes.split(" | ");
       const extrasPart = parts.find((part) => part.startsWith("Extras:"));
@@ -380,7 +394,7 @@ export default function Dashboard({
         return {
           hasExtras: true,
           extrasList,
-          extrasTotal: 0, // No sabemos el precio en este caso
+          extrasTotal: 0,
           basePrice: 0,
           finalPrice: 0,
         };
@@ -437,6 +451,7 @@ export default function Dashboard({
       day: "numeric",
     });
   };
+
   const formatDateTime = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleString("es-MX", {
@@ -525,11 +540,12 @@ export default function Dashboard({
     setShowDateFilter(false);
   };
 
-  // FUNCIÓN CORREGIDA: Calcular ingresos totales incluyendo extras
+  // FUNCIÓN CORREGIDA: Calcular ingresos totales incluyendo extras y excluyendo cancelados
   const calculateTotalRevenue = (): number => {
-    // Sumar todos los subtotales de los items de venta
     const totalFromItems = salesItems.reduce((total, item) => {
-      return total + item.subtotal;
+      const cancelledQty = item.cancelled_quantity || 0;
+      const activeQuantity = item.quantity - cancelledQty;
+      return total + item.price * activeQuantity;
     }, 0);
 
     return totalFromItems;
@@ -537,25 +553,28 @@ export default function Dashboard({
 
   // FUNCIÓN CORREGIDA: Calcular total cobrado
   const calculateTotalCollected = (): number => {
-    // Sumar todos los subtotales de los items de venta
-    const totalFromItems = salesItems.reduce((total, item) => {
-      return total + item.subtotal;
-    }, 0);
-
-    return totalFromItems;
+    return calculateTotalRevenue();
   };
 
   // FUNCIÓN CORREGIDA: Calcular ventas totales para reportes
   const calculateTotalSalesForReports = (): number => {
     const products = getGroupedProducts();
-    return products.reduce((total, product) => total + product.subtotal, 0);
+    return products.reduce(
+      (total, product) => total + product.activeSubtotal,
+      0
+    );
   };
 
-  // FUNCIÓN CORREGIDA: Agrupar productos para reportes
+  // FUNCIÓN CORREGIDA: Agrupar productos para reportes CON CANCELADOS
   const getGroupedProducts = (): GroupedProduct[] => {
     const productMap = new Map<string, GroupedProduct>();
 
     salesItems.forEach((item) => {
+      const cancelledQty = item.cancelled_quantity || 0;
+      const activeQuantity = item.quantity - cancelledQty;
+      const cancelledAmount = item.price * cancelledQty;
+      const activeSubtotal = item.price * activeQuantity;
+
       const processedExtras = processExtrasFromNotes(item.notes);
 
       if (processedExtras.hasExtras && processedExtras.basePrice > 0) {
@@ -569,6 +588,14 @@ export default function Dashboard({
             quantity: existing.quantity + item.quantity,
             subtotal:
               existing.subtotal + processedExtras.basePrice * item.quantity,
+            cancelledQuantity: existing.cancelledQuantity + cancelledQty,
+            cancelledAmount:
+              existing.cancelledAmount +
+              processedExtras.basePrice * cancelledQty,
+            activeQuantity: existing.activeQuantity + activeQuantity,
+            activeSubtotal:
+              existing.activeSubtotal +
+              processedExtras.basePrice * activeQuantity,
           });
         } else {
           productMap.set(baseKey, {
@@ -577,6 +604,10 @@ export default function Dashboard({
             quantity: item.quantity,
             subtotal: processedExtras.basePrice * item.quantity,
             hasExtras: true,
+            cancelledQuantity: cancelledQty,
+            cancelledAmount: processedExtras.basePrice * cancelledQty,
+            activeQuantity: activeQuantity,
+            activeSubtotal: processedExtras.basePrice * activeQuantity,
           });
         }
 
@@ -590,6 +621,12 @@ export default function Dashboard({
                 ...existing,
                 quantity: existing.quantity + item.quantity,
                 subtotal: existing.subtotal + extra.price * item.quantity,
+                cancelledQuantity: existing.cancelledQuantity + cancelledQty,
+                cancelledAmount:
+                  existing.cancelledAmount + extra.price * cancelledQty,
+                activeQuantity: existing.activeQuantity + activeQuantity,
+                activeSubtotal:
+                  existing.activeSubtotal + extra.price * activeQuantity,
               });
             } else {
               productMap.set(extraKey, {
@@ -598,6 +635,10 @@ export default function Dashboard({
                 quantity: item.quantity,
                 subtotal: extra.price * item.quantity,
                 isExtra: true,
+                cancelledQuantity: cancelledQty,
+                cancelledAmount: extra.price * cancelledQty,
+                activeQuantity: activeQuantity,
+                activeSubtotal: extra.price * activeQuantity,
               } as GroupedProduct);
             }
           }
@@ -611,6 +652,10 @@ export default function Dashboard({
             ...existing,
             quantity: existing.quantity + item.quantity,
             subtotal: existing.subtotal + item.subtotal,
+            cancelledQuantity: existing.cancelledQuantity + cancelledQty,
+            cancelledAmount: existing.cancelledAmount + cancelledAmount,
+            activeQuantity: existing.activeQuantity + activeQuantity,
+            activeSubtotal: existing.activeSubtotal + activeSubtotal,
           });
         } else {
           productMap.set(key, {
@@ -619,6 +664,10 @@ export default function Dashboard({
             quantity: item.quantity,
             subtotal: item.subtotal,
             hasExtras: false,
+            cancelledQuantity: cancelledQty,
+            cancelledAmount: cancelledAmount,
+            activeQuantity: activeQuantity,
+            activeSubtotal: activeSubtotal,
           });
         }
       }
@@ -627,7 +676,7 @@ export default function Dashboard({
     return Array.from(productMap.values());
   };
 
-  // FUNCIÓN CORREGIDA: Generar Excel de productos vendidos
+  // FUNCIÓN CORREGIDA: Generar Excel de productos vendidos CON CANCELADOS
   const generateProductsExcelReport = () => {
     const products = getGroupedProducts();
 
@@ -636,17 +685,26 @@ export default function Dashboard({
       return;
     }
 
-    // Calcular totales CORREGIDOS - Sumar los subtotales reales
+    // Calcular totales CORREGIDOS - Sumar los subtotales activos
     const totalQuantity = products.reduce(
-      (sum, product) => sum + product.quantity,
+      (sum, product) => sum + product.activeQuantity,
       0
     );
 
-    // Usar el total real de las ventas (sin dividir entre 1.08)
+    const totalCancelledQuantity = products.reduce(
+      (sum, product) => sum + product.cancelledQuantity,
+      0
+    );
+
     const totalSales = calculateTotalSalesForReports();
+    const totalCancelledAmount = products.reduce(
+      (sum, product) => sum + product.cancelledAmount,
+      0
+    );
 
     // Crear CSV con encabezados
-    let csvContent = "No.,Producto,Precio Unitario,Cantidad,Total,Tipo\n";
+    let csvContent =
+      "No.,Producto,Precio Unitario,Cantidad Activa,Cantidad Cancelada,Total Activo,Total Cancelado,Tipo\n";
 
     let rowNumber = 1;
     products.forEach((product) => {
@@ -656,19 +714,20 @@ export default function Dashboard({
         ? "Con Extras"
         : "Producto";
 
-      // MOSTRAR PRECIOS REALES (sin dividir entre 1.08)
       csvContent += `"${rowNumber}","${product.product_name}","${formatCurrency(
-        product.price // Precio REAL con IVA incluido
-      )}","${product.quantity}","${formatCurrency(
-        product.subtotal // Subtotal REAL con IVA incluido
+        product.price
+      )}","${product.activeQuantity}","${
+        product.cancelledQuantity
+      }","${formatCurrency(product.activeSubtotal)}","${formatCurrency(
+        product.cancelledAmount
       )}","${tipo}"\n`;
       rowNumber++;
     });
 
     // Agregar totales al final
-    csvContent += `\n"","TOTALES","","${totalQuantity}","${formatCurrency(
+    csvContent += `\n"","TOTALES","","${totalQuantity}","${totalCancelledQuantity}","${formatCurrency(
       totalSales
-    )}",""`;
+    )}","${formatCurrency(totalCancelledAmount)}",""`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -683,7 +742,7 @@ export default function Dashboard({
     URL.revokeObjectURL(url);
   };
 
-  // FUNCIÓN CORREGIDA: Generar PDF del reporte de productos vendidos
+  // FUNCIÓN CORREGIDA: Generar PDF del reporte de productos vendidos CON CANCELADOS
   const generateProductsPDFReport = () => {
     const products = getGroupedProducts();
 
@@ -692,14 +751,21 @@ export default function Dashboard({
       return;
     }
 
-    // Calcular totales CORREGIDOS - Usar el total real de las ventas
     const totalQuantity = products.reduce(
-      (sum, product) => sum + product.quantity,
+      (sum, product) => sum + product.activeQuantity,
       0
     );
 
-    // Usar el total real de las ventas (sin dividir entre 1.08)
+    const totalCancelledQuantity = products.reduce(
+      (sum, product) => sum + product.cancelledQuantity,
+      0
+    );
+
     const totalSales = calculateTotalSalesForReports();
+    const totalCancelledAmount = products.reduce(
+      (sum, product) => sum + product.cancelledAmount,
+      0
+    );
 
     // Crear contenido HTML para el PDF
     const content = `
@@ -763,6 +829,10 @@ export default function Dashboard({
           background: #dbeafe; 
           border-color: #bfdbfe; 
         }
+        .summary-cancelled { 
+          background: #fef2f2; 
+          border-color: #fecaca; 
+        }
         .summary-number { 
           font-size: 18px; 
           font-weight: bold; 
@@ -795,6 +865,10 @@ export default function Dashboard({
         .product-with-extras { 
           background: #f0fdf4 !important; 
           font-weight: bold;
+        }
+        .cancelled-info { 
+          color: #dc2626; 
+          font-size: 11px;
         }
         .totals-section { 
           margin-top: 20px; 
@@ -839,14 +913,24 @@ export default function Dashboard({
         <h3 style="margin: 0 0 15px 0; color: #1f2937;">RESUMEN GENERAL</h3>
         <div class="summary-grid">
           <div class="summary-card summary-total">
-            <div>VENTAS TOTALES</div>
+            <div>VENTAS ACTIVAS</div>
             <div class="summary-number">${formatCurrency(totalSales)}</div>
-            <div>${products.length} productos diferentes</div>
+            <div>${totalQuantity} unidades activas</div>
           </div>
           <div class="summary-card summary-items">
             <div>ITEMS VENDIDOS</div>
             <div class="summary-number">${totalQuantity}</div>
-            <div>unidades totales</div>
+            <div>unidades activas</div>
+          </div>
+          <div class="summary-card summary-cancelled">
+            <div>ITEMS CANCELADOS</div>
+            <div class="summary-number">${totalCancelledQuantity}</div>
+            <div>${formatCurrency(totalCancelledAmount)} excluidos</div>
+          </div>
+          <div class="summary-card" style="background: #f3f4f6; border-color: #d1d5db;">
+            <div>PRODUCTOS DIFERENTES</div>
+            <div class="summary-number">${products.length}</div>
+            <div>incluyendo extras</div>
           </div>
         </div>
       </div>
@@ -859,8 +943,9 @@ export default function Dashboard({
             <th>#</th>
             <th>Producto</th>
             <th class="text-right">Precio Unitario</th>
-            <th class="text-center">Cantidad</th>
-            <th class="text-right">Total</th>
+            <th class="text-center">Cant. Activa</th>
+            <th class="text-center">Cant. Cancelada</th>
+            <th class="text-right">Total Activo</th>
             <th>Tipo</th>
           </tr>
         </thead>
@@ -877,12 +962,13 @@ export default function Dashboard({
             }">
               <td class="text-center">${index + 1}</td>
               <td>${product.product_name}</td>
+              <td class="text-right">${formatCurrency(product.price)}</td>
+              <td class="text-center">${product.activeQuantity}</td>
+              <td class="text-center cancelled-info">${
+                product.cancelledQuantity > 0 ? product.cancelledQuantity : "-"
+              }</td>
               <td class="text-right">${formatCurrency(
-                product.price // Precio REAL con IVA
-              )}</td>
-              <td class="text-center">${product.quantity}</td>
-              <td class="text-right">${formatCurrency(
-                product.subtotal // Subtotal REAL con IVA
+                product.activeSubtotal
               )}</td>
               <td>${
                 product.isExtra
@@ -901,11 +987,17 @@ export default function Dashboard({
       <!-- Totales -->
       <div class="totals-section">
         <div class="total-row">
-          <span><strong>Total Items Vendidos:</strong></span>
+          <span><strong>Total Items Activos:</strong></span>
           <span><strong>${totalQuantity} unidades</strong></span>
         </div>
+        <div class="total-row">
+          <span><strong>Total Items Cancelados:</strong></span>
+          <span><strong>${totalCancelledQuantity} unidades (${formatCurrency(
+      totalCancelledAmount
+    )})</strong></span>
+        </div>
         <div class="total-row grand-total">
-          <span><strong>VENTA TOTAL:</strong></span>
+          <span><strong>VENTA TOTAL ACTIVA:</strong></span>
           <span><strong>${formatCurrency(totalSales)}</strong></span>
         </div>
       </div>
@@ -919,68 +1011,70 @@ export default function Dashboard({
     </html>
   `;
 
-    // Abrir ventana para imprimir
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(content);
       printWindow.document.close();
       printWindow.focus();
 
-      // Esperar a que cargue el contenido antes de imprimir
       setTimeout(() => {
         printWindow.print();
       }, 500);
     }
   };
 
-  // FUNCIÓN CORREGIDA: Generar PDF del ticket con cálculos correctos
+  // FUNCIÓN CORREGIDA: Generar PDF del ticket con cálculos correctos Y CANCELADOS
   const generateTicketPDF = (ticketData: TicketData) => {
     const { sale, items } = ticketData;
 
-    // Usar el total_amount de la venta en lugar de calcularlo
     const total = sale.total_amount;
-    const subtotal = total / 1.08; // Quitar IVA
-    const tax = (total * 0.08) / 1.08; // Calcular IVA real
+    const subtotal = total / 1.08;
+    const tax = (total * 0.08) / 1.08;
 
     const itemsWithExtras: Array<any> = [];
 
     // Procesar cada item para separar productos base de extras
     items.forEach((item) => {
-      const processedExtras = processExtrasFromNotes(item.notes);
+      const cancelledQty = item.cancelled_quantity || 0;
+      const activeQuantity = item.quantity - cancelledQty;
 
-      if (processedExtras.hasExtras && processedExtras.basePrice > 0) {
-        // Producto con extras - usar precio base
-        const baseSubtotal = processedExtras.basePrice * item.quantity;
+      // Solo mostrar items con cantidad activa
+      if (activeQuantity > 0) {
+        const processedExtras = processExtrasFromNotes(item.notes);
 
-        // Agregar producto base
-        itemsWithExtras.push({
-          ...item,
-          price: processedExtras.basePrice,
-          subtotal: baseSubtotal,
-          isBaseProduct: true,
-          extras: processedExtras.extrasList,
-        });
+        if (processedExtras.hasExtras && processedExtras.basePrice > 0) {
+          const baseSubtotal = processedExtras.basePrice * activeQuantity;
 
-        // Agregar extras como items separados
-        processedExtras.extrasList.forEach((extra) => {
-          if (extra.price > 0) {
-            const extraSubtotal = extra.price * item.quantity;
-            itemsWithExtras.push({
-              ...item,
-              product_name: `+ ${extra.name}`,
-              price: extra.price,
-              subtotal: extraSubtotal,
-              isExtra: true,
-              quantity: item.quantity,
-            });
-          }
-        });
-      } else {
-        // Producto sin extras
-        itemsWithExtras.push({
-          ...item,
-          isBaseProduct: true,
-        });
+          itemsWithExtras.push({
+            ...item,
+            price: processedExtras.basePrice,
+            subtotal: baseSubtotal,
+            quantity: activeQuantity,
+            isBaseProduct: true,
+            extras: processedExtras.extrasList,
+          });
+
+          processedExtras.extrasList.forEach((extra) => {
+            if (extra.price > 0) {
+              const extraSubtotal = extra.price * activeQuantity;
+              itemsWithExtras.push({
+                ...item,
+                product_name: `+ ${extra.name}`,
+                price: extra.price,
+                subtotal: extraSubtotal,
+                isExtra: true,
+                quantity: activeQuantity,
+              });
+            }
+          });
+        } else {
+          itemsWithExtras.push({
+            ...item,
+            isBaseProduct: true,
+            quantity: activeQuantity,
+            subtotal: item.price * activeQuantity,
+          });
+        }
       }
     });
 
@@ -1022,6 +1116,16 @@ export default function Dashboard({
         .total-row { display: flex; justify-content: space-between; margin: 2px 0; }
         .grand-total { font-weight: bold; font-size: 14px; margin-top: 5px; }
         .footer { text-align: center; margin-top: 20px; font-size: 10px; padding-top: 10px; border-top: 1px dashed #000; }
+        .cancelled-note { 
+          background: #fef2f2; 
+          border: 1px solid #fecaca; 
+          padding: 5px; 
+          margin: 5px 0; 
+          border-radius: 4px; 
+          font-size: 10px; 
+          color: #dc2626;
+          text-align: center;
+        }
       </style>
     </head>
     <body>
@@ -1042,6 +1146,14 @@ export default function Dashboard({
       <div class="payment-method">
         MÉTODO DE PAGO: ${getPaymentMethodText(sale.payment_method)}
       </div>
+
+      ${
+        items.some((item) => (item.cancelled_quantity || 0) > 0)
+          ? `<div class="cancelled-note">
+              <strong>NOTA:</strong> Se excluyen items cancelados del total
+             </div>`
+          : ""
+      }
       
       <table class="items-table">
         <thead>
@@ -1098,14 +1210,12 @@ export default function Dashboard({
     </html>
   `;
 
-    // Abrir ventana para imprimir
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(content);
       printWindow.document.close();
       printWindow.focus();
 
-      // Esperar a que cargue el contenido antes de imprimir
       setTimeout(() => {
         printWindow.print();
       }, 500);
@@ -1132,6 +1242,22 @@ export default function Dashboard({
     })),
   };
 
+  // Calcular estadísticas de cancelados
+  const cancelledStats = {
+    totalCancelledQuantity: salesItems.reduce(
+      (sum, item) => sum + (item.cancelled_quantity || 0),
+      0
+    ),
+    totalCancelledAmount: salesItems.reduce(
+      (sum, item) => sum + item.price * (item.cancelled_quantity || 0),
+      0
+    ),
+    totalActiveQuantity: salesItems.reduce(
+      (sum, item) => sum + (item.quantity - (item.cancelled_quantity || 0)),
+      0
+    ),
+  };
+
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   if (dataLoading) {
@@ -1145,11 +1271,13 @@ export default function Dashboard({
 
   // Calcular estadísticas combinadas CORREGIDAS
   const combinedStats = {
-    totalRevenue: calculateTotalRevenue(), // Usar función corregida
+    totalRevenue: calculateTotalRevenue(),
     totalItems: salesSummary?.totalItems || dailyStats?.totalItemsSold || 0,
     totalOrders: salesSummary?.totalOrders || dailyStats?.totalOrders || 0,
     activeOrders: todayOrders.length,
     activeTables: dailyStats?.activeTables || 0,
+    cancelledItems: cancelledStats.totalCancelledQuantity,
+    cancelledAmount: cancelledStats.totalCancelledAmount,
   };
 
   // Calcular estadísticas de métodos de pago
@@ -1184,6 +1312,12 @@ export default function Dashboard({
                       new Date(endDateInput)
                     )}
               </p>
+              {combinedStats.cancelledItems > 0 && (
+                <p className="text-sm text-red-600 font-medium">
+                  {combinedStats.cancelledItems} unidad(es) cancelada(s) -{" "}
+                  {formatCurrency(combinedStats.cancelledAmount)} excluido(s)
+                </p>
+              )}
             </div>
           </div>
 
@@ -1337,7 +1471,7 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Estadísticas Principales CORREGIDAS */}
+      {/* Estadísticas Principales CORREGIDAS CON CANCELADOS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <div className="flex items-center gap-4">
@@ -1352,6 +1486,11 @@ export default function Dashboard({
               <p className="text-xs text-gray-500 mt-1">
                 {salesSummary?.saleCount || 0} ventas procesadas
               </p>
+              {combinedStats.cancelledAmount > 0 && (
+                <p className="text-xs text-red-500 mt-1">
+                  {formatCurrency(combinedStats.cancelledAmount)} excluidos
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1369,6 +1508,11 @@ export default function Dashboard({
               <p className="text-xs text-gray-500 mt-1">
                 En {combinedStats.totalOrders} órdenes
               </p>
+              {combinedStats.cancelledItems > 0 && (
+                <p className="text-xs text-red-500 mt-1">
+                  {combinedStats.cancelledItems} cancelados
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1548,13 +1692,14 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Vista previa de productos vendidos CORREGIDA */}
+      {/* Vista previa de productos vendidos CORREGIDA CON CANCELADOS */}
       {salesItems.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <FaShoppingCart className="text-green-600" />
-              Productos Vendidos ({salesItems.length} items individuales)
+              Productos Vendidos ({cancelledStats.totalActiveQuantity} items
+              activos)
             </h3>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
               {loadingItems
@@ -1562,6 +1707,20 @@ export default function Dashboard({
                 : `${getGroupedProducts().length} productos diferentes`}
             </span>
           </div>
+
+          {cancelledStats.totalCancelledQuantity > 0 && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 text-red-700">
+                <FaBan className="text-red-600" />
+                <p className="text-sm font-medium">
+                  {cancelledStats.totalCancelledQuantity} unidad(es)
+                  cancelada(s) -{" "}
+                  {formatCurrency(cancelledStats.totalCancelledAmount)}{" "}
+                  excluido(s)
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1574,7 +1733,10 @@ export default function Dashboard({
                     Precio
                   </th>
                   <th className="px-4 py-2 text-right font-semibold text-gray-700">
-                    Cantidad
+                    Cant. Activa
+                  </th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-700">
+                    Cant. Cancelada
                   </th>
                   <th className="px-4 py-2 text-right font-semibold text-gray-700">
                     Subtotal
@@ -1605,10 +1767,15 @@ export default function Dashboard({
                         {formatCurrency(product.price)}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-800">
-                        {product.quantity}
+                        {product.activeQuantity}
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-600">
+                        {product.cancelledQuantity > 0
+                          ? product.cancelledQuantity
+                          : "-"}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-green-600">
-                        {formatCurrency(product.subtotal)}
+                        {formatCurrency(product.activeSubtotal)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
@@ -1892,7 +2059,13 @@ export default function Dashboard({
               <h3 className="font-semibold text-gray-800 mb-4">Productos:</h3>
               <div className="space-y-3">
                 {selectedTicket.items.map((item) => {
+                  const cancelledQty = item.cancelled_quantity || 0;
+                  const activeQuantity = item.quantity - cancelledQty;
                   const processedExtras = processExtrasFromNotes(item.notes);
+
+                  // Solo mostrar items con cantidad activa
+                  if (activeQuantity === 0) return null;
+
                   return (
                     <div key={item.id}>
                       {/* Producto principal */}
@@ -1900,6 +2073,12 @@ export default function Dashboard({
                         <div className="flex-1">
                           <p className="font-medium text-gray-800">
                             {item.product_name}
+                            {cancelledQty > 0 && (
+                              <span className="text-sm text-red-600 ml-2">
+                                (de {item.quantity}, {cancelledQty}{" "}
+                                cancelada(s))
+                              </span>
+                            )}
                           </p>
                           {item.notes && !processedExtras.hasExtras && (
                             <p className="text-sm text-gray-600 mt-1">
@@ -1909,10 +2088,10 @@ export default function Dashboard({
                         </div>
                         <div className="text-right">
                           <p className="text-gray-800">
-                            {item.quantity} × {formatCurrency(item.price)}
+                            {activeQuantity} × {formatCurrency(item.price)}
                           </p>
                           <p className="font-semibold text-green-600">
-                            {formatCurrency(item.subtotal)}
+                            {formatCurrency(item.price * activeQuantity)}
                           </p>
                         </div>
                       </div>
@@ -1934,7 +2113,7 @@ export default function Dashboard({
                               >
                                 <span>• {extra.name}</span>
                                 <span className="text-green-600">
-                                  {item.quantity} ×{" "}
+                                  {activeQuantity} ×{" "}
                                   {formatCurrency(extra.price)}
                                 </span>
                               </div>
@@ -1953,16 +2132,14 @@ export default function Dashboard({
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
                     <span>
-                      {formatCurrency(
-                        selectedTicket.sale.total_amount / 1.08 // Dividimos entre 1.08 para quitar el IVA
-                      )}
+                      {formatCurrency(selectedTicket.sale.total_amount / 1.08)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>IVA (8%):</span>
                     <span>
                       {formatCurrency(
-                        (selectedTicket.sale.total_amount * 0.08) / 1.08 // Calculamos el IVA real
+                        (selectedTicket.sale.total_amount * 0.08) / 1.08
                       )}
                     </span>
                   </div>

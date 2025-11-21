@@ -11,7 +11,7 @@ type NotificationType =
 
 type NotificationStatus = 'pending' | 'acknowledged' | 'completed'
 type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning'
-type OrderItemStatus = 'ordered' | 'preparing' | 'ready' | 'served'
+type OrderItemStatus = 'ordered' | 'preparing' | 'ready' | 'served' | 'cancelled'
 type OrderStatus = 'sent' | 'completed'
 type PaymentMethod = 'cash' | 'terminal' | null
 
@@ -23,7 +23,7 @@ export interface WaiterNotification {
   type: NotificationType
   message: string
   status: NotificationStatus
-  payment_method: PaymentMethod // NUEVO CAMPO
+  payment_method: PaymentMethod
   created_at: string
   updated_at?: string
   tables?: {
@@ -43,6 +43,7 @@ export interface OrderItem {
   price: number
   notes?: string
   order_id?: string
+  cancelled_quantity?: number
 }
 
 export interface Order {
@@ -74,12 +75,14 @@ interface OrderRow {
   created_at: string
   status: OrderStatus
   order_items?: {
+    status: string
     id: string
     product_name: string
     quantity: number
     price: number
     notes?: string | null
     order_id?: string
+    cancelled_quantity?: number
   }[]
 }
 
@@ -100,7 +103,7 @@ interface SalesHistoryRow {
   total_amount: number
   order_count: number
   item_count: number
-  payment_method: PaymentMethod // NUEVO CAMPO
+  payment_method: PaymentMethod
   closed_at: string
 }
 
@@ -114,17 +117,20 @@ interface SalesItemRow {
   notes?: string | null
 }
 
-// interface WaiterNotificationRow {
-//   id: string
-//   table_id: number
-//   order_id: string | null
-//   type: NotificationType
-//   message: string
-//   status: NotificationStatus
-//   payment_method: PaymentMethod // NUEVO CAMPO
-//   created_at: string
-//   updated_at?: string
-// }
+// NUEVO: Interface para order_items con cancelled_quantity
+interface OrderItemRow {
+  id: string
+  order_id: string
+  product_id: number
+  product_name: string
+  price: number
+  quantity: number
+  notes?: string | null
+  status: OrderItemStatus
+  created_at: string
+  updated_at: string
+  cancelled_quantity?: number
+}
 
 // Helpers tipados -> permitimos cualquier tipo (objeto o array)
 function assertUpdate<T>(data: T): T {
@@ -140,7 +146,6 @@ export const waiterService = {
   async getPendingNotifications(): Promise<WaiterNotification[]> {
     const { data, error } = await supabase
       .from('waiter_notifications')
-      // Tipamos el SELECT con returns para que TS conozca la forma
       .select(
         `
         *,
@@ -174,7 +179,8 @@ export const waiterService = {
             quantity,
             status,
             price,
-            notes
+            notes,
+            cancelled_quantity
           )
         )
       `
@@ -196,6 +202,7 @@ export const waiterService = {
                 status: OrderItemStatus
                 price: number
                 notes?: string | null
+                cancelled_quantity?: number
               }[]
             }[]
           }
@@ -230,122 +237,154 @@ export const waiterService = {
                 status: it.status,
                 price: it.price,
                 notes: it.notes ?? undefined,
+                cancelled_quantity: it.cancelled_quantity || 0,
                 order_id: undefined,
               })) || [],
           })) || [],
     }))
   },
 
-  async saveSalesHistory(
-    tableId: number,
-    tableNumber: number,
-    paymentMethod: PaymentMethod = null // NUEVO PARÁMETRO
-  ): Promise<string> {
-    try {
-      console.log(`💰 Guardando historial de venta para mesa ${tableNumber}, método: ${paymentMethod}`)
+async saveSalesHistory(
+  tableId: number,
+  tableNumber: number,
+  paymentMethod: PaymentMethod = null
+): Promise<string> {
+  try {
+    console.log(`💰 Guardando historial de venta para mesa ${tableNumber}, método: ${paymentMethod}`)
 
-      // Usamos el tipo OrderRow en la consulta (returns es seguro)
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select(
-          `
-          id,
-          total_amount,
-          customer_name,
-          created_at,
-          order_items (
-            id,
-            product_name,
-            quantity,
-            price,
-            notes
-          )
+    // Obtener órdenes con sus items INCLUYENDO cancelled_quantity
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select(
         `
+        id,
+        total_amount,
+        customer_name,
+        created_at,
+        order_items (
+          id,
+          product_name,
+          quantity,
+          price,
+          notes,
+          status,
+          cancelled_quantity
         )
-        .eq('table_id', tableId)
-        .in('status', ['sent', 'completed'])
-        .returns<OrderRow[]>()
-
-      if (ordersError) throw ordersError
-      if (!orders || orders.length === 0) {
-        throw new Error('No hay órdenes para guardar en el historial')
-      }
-
-      const totalAmount = orders.reduce((sum, order) => sum + (order.total_amount ?? 0), 0)
-
-      const orderCount = orders.length
-
-      const itemCount = orders.reduce(
-        (sum, order) =>
-          sum +
-          (order.order_items?.reduce((acc, item) => acc + (item.quantity ?? 0), 0) ?? 0),
-        0
+      `
       )
+      .eq('table_id', tableId)
+      .in('status', ['sent', 'completed'])
+      .returns<OrderRow[]>()
 
-      const customerName = orders[0]?.customer_name ?? null
-
-      // Insertamos el historial CON el método de pago
-      const { data: saleData, error: saleError } = await supabase
-        .from('sales_history')
-        .insert(
-          assertInsert({
-            table_id: tableId,
-            table_number: tableNumber,
-            customer_name: customerName,
-            total_amount: totalAmount,
-            order_count: orderCount,
-            item_count: itemCount,
-            payment_method: paymentMethod, // NUEVO CAMPO
-            closed_at: new Date().toISOString(),
-          } as never)
-        )
-        .select()
-        .single()
-
-      if (saleError) throw saleError
-      if (!saleData) throw new Error('No se pudo crear el registro de venta')
-
-      // casteamos a SalesHistoryRow para que TS conozca sale.id
-      const sale = saleData as SalesHistoryRow
-
-      const salesItems: SalesItemRow[] = orders.flatMap((order) =>
-        (order.order_items || []).map((item) => ({
-          sale_id: sale.id,
-          product_name: item.product_name,
-          price: item.price,
-          quantity: item.quantity,
-          subtotal: (item.price ?? 0) * (item.quantity ?? 0),
-          notes: item.notes ?? null,
-        }))
-      )
-
-      if (salesItems.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('sales_items')
-          // insert expects array or object; assertInsert accepts arrays now
-          .insert(assertInsert(salesItems) as never)
-        if (itemsError) throw itemsError
-      }
-
-      console.log(
-        `✅ Historial guardado: $${totalAmount.toFixed(2)}, ${orderCount} órdenes, ${itemCount} items, método: ${paymentMethod}`
-      )
-      return sale.id
-    } catch (err) {
-      console.error('Error guardando historial de venta:', err)
-      throw err
+    if (ordersError) throw ordersError
+    if (!orders || orders.length === 0) {
+      throw new Error('No hay órdenes para guardar en el historial')
     }
-  },
+
+    // Calcular totales CONSIDERANDO cancelled_quantity
+    let totalAmount = 0;
+    let itemCount = 0;
+    let cancelledItemsCount = 0;
+
+    orders.forEach((order) => {
+      if (order.order_items) {
+        order.order_items.forEach((item) => {
+          // Calcular cantidad REAL (excluyendo cancelados)
+          const cancelledQty = item.cancelled_quantity || 0;
+          const actualQuantity = item.quantity - cancelledQty;
+          
+          // Solo contar items con cantidad activa > 0
+          if (actualQuantity > 0) {
+            totalAmount += (item.price ?? 0) * actualQuantity;
+            itemCount += actualQuantity;
+          }
+          
+          // Contar cancelados para el log
+          if (cancelledQty > 0) {
+            cancelledItemsCount += cancelledQty;
+          }
+        });
+      }
+    });
+
+    const orderCount = orders.length
+    const customerName = orders[0]?.customer_name ?? null
+
+    console.log(`📊 Resumen venta: $${totalAmount.toFixed(2)}, ${orderCount} órdenes, ${itemCount} items activos, ${cancelledItemsCount} unidades canceladas excluidas`)
+
+    // Insertamos el historial CON el método de pago
+    const { data: saleData, error: saleError } = await supabase
+      .from('sales_history')
+      .insert(
+        assertInsert({
+          table_id: tableId,
+          table_number: tableNumber,
+          customer_name: customerName,
+          total_amount: totalAmount,
+          order_count: orderCount,
+          item_count: itemCount,
+          payment_method: paymentMethod,
+          closed_at: new Date().toISOString(),
+        } as never)
+      )
+      .select()
+      .single()
+
+    if (saleError) throw saleError
+    if (!saleData) throw new Error('No se pudo crear el registro de venta')
+
+    const sale = saleData as SalesHistoryRow
+
+    // Crear sales_items CONSIDERANDO cancelled_quantity
+    const salesItems: SalesItemRow[] = orders.flatMap((order) =>
+      (order.order_items || [])
+        .filter(item => {
+          // Filtrar items que tengan cantidad activa > 0
+          const cancelledQty = item.cancelled_quantity || 0;
+          const actualQuantity = item.quantity - cancelledQty;
+          return actualQuantity > 0;
+        })
+        .map((item) => {
+          const cancelledQty = item.cancelled_quantity || 0;
+          const actualQuantity = item.quantity - cancelledQty;
+          
+          return {
+            sale_id: sale.id,
+            product_name: item.product_name,
+            price: item.price,
+            quantity: actualQuantity, // ← Usar cantidad REAL
+            subtotal: (item.price ?? 0) * actualQuantity, // ← Calcular con cantidad REAL
+            notes: item.notes ?? null,
+          }
+        })
+    )
+
+    if (salesItems.length > 0) {
+      const { error: itemsError } = await supabase
+        .from('sales_items')
+        .insert(assertInsert(salesItems) as never)
+      if (itemsError) throw itemsError
+    }
+
+    console.log(
+      `✅ Historial guardado: $${totalAmount.toFixed(2)}, ${orderCount} órdenes, ${salesItems.length} items activos, ${cancelledItemsCount} unidades canceladas excluidas, método: ${paymentMethod}`
+    )
+    return sale.id
+  } catch (err) {
+    console.error('Error guardando historial de venta:', err)
+    throw err
+  }
+},
 
   async freeTableAndClean(
     tableId: number,
     tableNumber: number,
-    paymentMethod: PaymentMethod = null // NUEVO PARÁMETRO
+    paymentMethod: PaymentMethod = null
   ): Promise<void> {
     try {
       console.log(`🔄 Iniciando proceso completo para mesa ${tableNumber}, método: ${paymentMethod}`)
 
-      await this.saveSalesHistory(tableId, tableNumber, paymentMethod) // PASA EL MÉTODO DE PAGO
+      await this.saveSalesHistory(tableId, tableNumber, paymentMethod)
 
       console.log(`🗑️ Eliminando notificaciones para mesa ${tableId}`)
       const { error: notificationsError } = await supabase
@@ -355,7 +394,6 @@ export const waiterService = {
 
       if (notificationsError) throw notificationsError
 
-      // Seleccionamos solo id tipado
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('id')
@@ -385,7 +423,6 @@ export const waiterService = {
       }
 
       console.log(`🔄 Liberando mesa ${tableId}`)
-      // Quité el genérico en .update() para evitar constraint 'never'
       const { error: tableError } = await supabase
         .from('tables')
         .update(
@@ -446,4 +483,56 @@ export const waiterService = {
 
     if (error) throw error
   },
+
+async cancelOrderItem(itemId: string, cancelQuantity: number = 1) {
+  try {
+    console.log(`🔄 Cancelando ${cancelQuantity} unidad(es) del item ${itemId}`);
+
+    // Obtener item actual
+    const { data, error: fetchError } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('id', itemId)
+      .maybeSingle(); // <--- evita errores de tipos y funciona igual
+
+    if (fetchError) throw fetchError;
+    if (!data) throw new Error('Item no encontrado');
+
+    // Aseguramos el tipo
+    const item = data as OrderItemRow;
+
+    const currentCancelled = item.cancelled_quantity ?? 0;
+    const newCancelledQuantity = currentCancelled + cancelQuantity;
+    const remainingQuantity = item.quantity - newCancelledQuantity;
+
+    console.log(
+      `📊 Estado actual: ${item.quantity} total, ${currentCancelled} cancelados, ${remainingQuantity} restantes`
+    );
+
+    // Determinar el nuevo estado
+    const newStatus =
+      remainingQuantity <= 0 ? 'cancelled' : item.status;
+
+    const updateData: Partial<OrderItemRow> = {
+      status: newStatus,
+      cancelled_quantity: newCancelledQuantity,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('order_items')
+      .update(updateData as never)
+      .eq('id', itemId);
+
+    if (error) throw error;
+
+    console.log(
+      `✅ Canceladas ${cancelQuantity} unidad(es). Nuevo estado: ${newStatus}`
+    );
+  } catch (error) {
+    console.error('Error cancelando item:', error);
+    throw error;
+  }
+}
+
 }

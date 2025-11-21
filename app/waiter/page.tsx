@@ -72,14 +72,49 @@ export default function WaiterDashboard() {
         waiterService.getTablesWithOrders(),
       ]);
 
+      // PROCESAR LOS DATOS PARA ASEGURAR QUE CANCELLED_QUANTITY ESTÉ CORRECTO
+      const processedTables = tablesData.map((table) => ({
+        ...table,
+        orders: table.orders.map((order) => ({
+          ...order,
+          order_items: order.order_items.map((item) => {
+            // Asegurar que cancelled_quantity siempre tenga un valor
+            const cancelledQty = item.cancelled_quantity || 0;
+
+            // Si el item está marcado como 'cancelled' pero no tiene cancelled_quantity,
+            // asumimos que toda la cantidad está cancelada
+            const finalCancelledQty =
+              item.status === "cancelled" && cancelledQty === 0
+                ? item.quantity
+                : cancelledQty;
+
+            return {
+              ...item,
+              cancelled_quantity: finalCancelledQty,
+            };
+          }),
+        })),
+      }));
+
       // Actualizar estados solo si los datos realmente cambiaron
       setNotifications((prev) =>
         JSON.stringify(prev) === JSON.stringify(notifsData) ? prev : notifsData
       );
 
       setTables((prev) =>
-        JSON.stringify(prev) === JSON.stringify(tablesData) ? prev : tablesData
+        JSON.stringify(prev) === JSON.stringify(processedTables)
+          ? prev
+          : processedTables
       );
+
+      console.log("🔄 Datos actualizados - Items procesados:", {
+        totalMesas: processedTables.length,
+        itemsConCancelados: processedTables.flatMap((t) =>
+          t.orders.flatMap((o) =>
+            o.order_items.filter((i) => i.cancelled_quantity > 0)
+          )
+        ).length,
+      });
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -228,6 +263,52 @@ export default function WaiterDashboard() {
     }
   };
 
+  const handleCancelItem = async (
+    itemId: string,
+    cancelQuantity: number = 1
+  ) => {
+    setProcessing(itemId);
+    try {
+      // Cancelar la cantidad específica
+      await waiterService.cancelOrderItem(itemId, cancelQuantity);
+
+      // Actualizar el estado local
+      setTables((prevTables) =>
+        prevTables.map((table) => ({
+          ...table,
+          orders: table.orders.map((order) => ({
+            ...order,
+            order_items: order.order_items.map((item) => {
+              if (item.id === itemId) {
+                const newCancelledQty =
+                  (item.cancelled_quantity || 0) + cancelQuantity;
+                const newStatus =
+                  item.quantity - newCancelledQty === 0
+                    ? "cancelled"
+                    : item.status;
+
+                return {
+                  ...item,
+                  cancelled_quantity: newCancelledQty,
+                  status: newStatus,
+                };
+              }
+              return item;
+            }),
+          })),
+        }))
+      );
+
+      console.log(`✅ ${cancelQuantity} producto(s) cancelado(s) exitosamente`);
+    } catch (error: any) {
+      console.error("Error cancelando producto:", error);
+      alert(`❌ Error al cancelar el producto:\n${error.message}`);
+      await loadData();
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const handleUpdateItemStatus = async (itemId: string, newStatus: string) => {
     setProcessing(itemId);
     try {
@@ -262,6 +343,17 @@ export default function WaiterDashboard() {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
+    // Calcular cantidad de items cancelados
+    const cancelledItemsCount = table
+      ? table.orders.reduce((count, order) => {
+          return (
+            count +
+            order.order_items.filter((item: any) => item.status === "cancelled")
+              .length
+          );
+        }, 0)
+      : 0;
+
     // Buscar notificación de cuenta para esta mesa
     const billNotification = notifications.find(
       (notification) =>
@@ -281,13 +373,18 @@ export default function WaiterDashboard() {
       paymentMethodText = "❓ Método de pago no especificado";
     }
 
-    if (
-      !confirm(
-        `¿Estás seguro de que quieres COBRAR la Mesa ${tableNumber}?\n\n${paymentMethodText}\n💰 Total: $${tableTotal.toFixed(
-          2
-        )}\n\n📊 Se guardará el historial de venta y se liberará la mesa.`
-      )
-    ) {
+    let confirmationMessage = `¿Estás seguro de que quieres COBRAR la Mesa ${tableNumber}?\n\n${paymentMethodText}\n💰 Total: $${tableTotal.toFixed(
+      2
+    )}`;
+
+    // Agregar información sobre cancelados si existen
+    if (cancelledItemsCount > 0) {
+      confirmationMessage += `\n\n📝 Nota: ${cancelledItemsCount} producto(s) cancelado(s) no se incluirán en la cuenta.`;
+    }
+
+    confirmationMessage += `\n\n📊 Se guardará el historial de venta y se liberará la mesa.`;
+
+    if (!confirm(confirmationMessage)) {
       return;
     }
 
@@ -297,7 +394,6 @@ export default function WaiterDashboard() {
         `💵 Iniciando cobro para mesa ${tableNumber}, método: ${paymentMethod}`
       );
 
-      // PASA EL MÉTODO DE PAGO A LA FUNCIÓN
       await waiterService.freeTableAndClean(
         tableId,
         tableNumber,
@@ -310,9 +406,14 @@ export default function WaiterDashboard() {
       } else if (paymentMethod === "terminal") {
         successMessage += `💳 Pago con TERMINAL\n`;
       }
-      successMessage += `💵 Total: $${tableTotal.toFixed(
-        2
-      )}\n📈 Historial guardado correctamente`;
+      successMessage += `💵 Total: $${tableTotal.toFixed(2)}\n`;
+
+      // Agregar info sobre cancelados en el mensaje de éxito
+      if (cancelledItemsCount > 0) {
+        successMessage += `📝 ${cancelledItemsCount} producto(s) cancelado(s) excluidos\n`;
+      }
+
+      successMessage += `📈 Historial guardado correctamente`;
 
       alert(successMessage);
 
@@ -324,7 +425,6 @@ export default function WaiterDashboard() {
       setProcessing(null);
     }
   };
-
   const handleGoToTables = () => {
     setActiveTab("tables");
   };
@@ -333,21 +433,26 @@ export default function WaiterDashboard() {
     alert(error);
   };
 
-  // FUNCIÓN CORREGIDA: Calcular el total REAL incluyendo extras
+  // FUNCIÓN CORREGIDA: Calcular el total REAL excluyendo cancelados
   const calculateTableTotal = (table: TableWithOrder) => {
-    // Calcular el total REAL sumando todos los items con sus precios actualizados
     return table.orders.reduce((total, order) => {
-      // Si la orden tiene items, sumar item.price * item.quantity (que ya incluye extras)
       if (order.order_items && Array.isArray(order.order_items)) {
         const orderTotal = order.order_items.reduce(
           (orderSum: number, item: any) => {
-            return orderSum + item.price * item.quantity;
+            // Calcular cantidad activa (excluyendo cancelados)
+            const cancelledQty = item.cancelled_quantity || 0;
+            const activeQuantity = item.quantity - cancelledQty;
+
+            // Solo sumar si hay cantidad activa
+            if (activeQuantity > 0) {
+              return orderSum + item.price * activeQuantity;
+            }
+            return orderSum;
           },
           0
         );
         return total + orderTotal;
       }
-      // Si no hay items, usar total_amount como fallback
       return total + order.total_amount;
     }, 0);
   };
@@ -389,6 +494,7 @@ export default function WaiterDashboard() {
             onCobrarMesa={handleCobrarMesa}
             calculateTableTotal={calculateTableTotal}
             notifications={notifications}
+            onCancelItem={handleCancelItem}
           />
         )}
 

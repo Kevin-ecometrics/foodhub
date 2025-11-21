@@ -7,6 +7,7 @@ interface TableCardProps {
   table: TableWithOrder;
   processing: string | null;
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
+  onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
@@ -16,6 +17,7 @@ export default function TableCard({
   table,
   processing,
   onUpdateItemStatus,
+  onCancelItem,
   onCobrarMesa,
   calculateTableTotal,
   notifications,
@@ -89,6 +91,7 @@ export default function TableCard({
           customerSummary={customerSummary}
           processing={processing}
           onUpdateItemStatus={onUpdateItemStatus}
+          onCancelItem={onCancelItem}
         />
       ))}
 

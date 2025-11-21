@@ -187,7 +187,7 @@ export default function TableHeader({
                 💡 El cliente pagará en efectivo - Prepárate para dar cambio
               </p>
             ) : (
-              <p>💡 El cliente pagará con tarjeta - Lleva la terminal</p>
+              <p>💡 El cliente solicito la cuenta</p>
             )}
           </div>
         )}

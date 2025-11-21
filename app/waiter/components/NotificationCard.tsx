@@ -48,11 +48,11 @@ export default function NotificationCard({
               <h3 className="font-semibold text-gray-800">
                 Mesa {notification.tables?.number}
               </h3>
-              {notification.tables?.number && (
+              {/* {notification.tables?.number && (
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                   {notification.tables.number}
                 </span>
-              )}
+              )} */}
               {isAttended && (
                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                   Atendida
@@ -68,11 +68,11 @@ export default function NotificationCard({
             <p className="text-sm text-gray-500 mt-1">
               {new Date(notification.created_at).toLocaleString()}
             </p>
-            {notification.orders?.total_amount && (
+            {/* {notification.orders?.total_amount && (
               <p className="text-sm font-semibold text-green-600 mt-1">
                 Total: ${notification.orders.total_amount.toFixed(2)}
               </p>
-            )}
+            )} */}
           </div>
         </div>
 
