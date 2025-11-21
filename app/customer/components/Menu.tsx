@@ -44,18 +44,18 @@ const CATEGORIES = [
   },
   {
     id: "Wayna Drinks",
-    name: "Wayna Drinks", 
+    name: "Wayna Drinks",
     icon: "🍹",
     description: "Bebidas especiales Wayna",
   },
   {
     id: "Clasikitos",
     name: "Clasikitos",
-    icon: "🎉", 
+    icon: "🎉",
     description: "Los clásicos favoritos",
   },
   {
-    id: "Strong Drinks", 
+    id: "Strong Drinks",
     name: "Strong Drinks",
     icon: "🥃",
     description: "Bebidas fuertes",
@@ -64,7 +64,7 @@ const CATEGORIES = [
     id: "Botanas",
     name: "Botanas",
     icon: "🍿",
-    description: "Snacks y botanas", 
+    description: "Snacks y botanas",
   },
   {
     id: "Cervezas",
@@ -74,7 +74,7 @@ const CATEGORIES = [
   },
   {
     id: "Botellas",
-    name: "Botellas", 
+    name: "Botellas",
     icon: "🍾",
     description: "Botellas para compartir",
   },
@@ -268,61 +268,61 @@ export default function MenuPage() {
     }
   }, [tableId]);
 
-useEffect(() => {
-  if (products.length === 0) return;
+  useEffect(() => {
+    if (products.length === 0) return;
 
-  const handleScroll = () => {
-    const scrollPosition = window.scrollY + 100; // Offset para cuando la categoría está cerca del top
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 100; // Offset para cuando la categoría está cerca del top
 
-    // Encontrar todas las categorías que tienen productos
-    const availableCategories = CATEGORIES.filter(
-      category => getProductsByCategory(category.id).length > 0
-    );
+      // Encontrar todas las categorías que tienen productos
+      const availableCategories = CATEGORIES.filter(
+        (category) => getProductsByCategory(category.id).length > 0
+      );
 
-    let currentActiveCategory = "favorites";
+      let currentActiveCategory = "favorites";
 
-    // Buscar la categoría que está actualmente en vista
-    for (const category of availableCategories) {
-      const element = categoryRefs.current[category.id];
-      if (element) {
-        const elementTop = element.offsetTop;
-        const elementBottom = elementTop + element.offsetHeight;
+      // Buscar la categoría que está actualmente en vista
+      for (const category of availableCategories) {
+        const element = categoryRefs.current[category.id];
+        if (element) {
+          const elementTop = element.offsetTop;
+          const elementBottom = elementTop + element.offsetHeight;
 
-        // Si el scroll position está dentro de los límites de esta categoría
-        if (scrollPosition >= elementTop && scrollPosition < elementBottom) {
-          currentActiveCategory = category.id;
-          break;
+          // Si el scroll position está dentro de los límites de esta categoría
+          if (scrollPosition >= elementTop && scrollPosition < elementBottom) {
+            currentActiveCategory = category.id;
+            break;
+          }
         }
       }
-    }
 
-    // Solo actualizar si cambió la categoría
-    if (currentActiveCategory !== selectedCategory) {
-      setSelectedCategory(currentActiveCategory);
-    }
-  };
+      // Solo actualizar si cambió la categoría
+      if (currentActiveCategory !== selectedCategory) {
+        setSelectedCategory(currentActiveCategory);
+      }
+    };
 
-  // Agregar event listener con throttling para mejor performance
-  let ticking = false;
-  const throttledScroll = () => {
-    if (!ticking) {
-      requestAnimationFrame(() => {
-        handleScroll();
-        ticking = false;
-      });
-      ticking = true;
-    }
-  };
+    // Agregar event listener con throttling para mejor performance
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
 
-  window.addEventListener('scroll', throttledScroll, { passive: true });
-  
-  // Ejecutar una vez al cargar para establecer la categoría inicial correcta
-  handleScroll();
+    window.addEventListener("scroll", throttledScroll, { passive: true });
 
-  return () => {
-    window.removeEventListener('scroll', throttledScroll);
-  };
-}, [products, selectedCategory]); // Dependencias necesarias
+    // Ejecutar una vez al cargar para establecer la categoría inicial correcta
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", throttledScroll);
+    };
+  }, [products, selectedCategory]); // Dependencias necesarias
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -803,9 +803,7 @@ useEffect(() => {
       case "popular":
         return getPopularItems();
       default:
-        return products.filter(
-          (product) => product.category === categoryId
-        );
+        return products.filter((product) => product.category === categoryId);
     }
   };
 
@@ -945,21 +943,21 @@ useEffect(() => {
   };
 
   // Función para hacer scroll a una categoría específica
-const scrollToCategory = (categoryId: string) => {
-  const element = categoryRefs.current[categoryId];
-  if (element) {
-    const offset = 140; // Un poco más de offset para mejor visualización
-    const elementPosition = element.offsetTop - offset;
-    
-    // Actualizar inmediatamente la categoría seleccionada
-    setSelectedCategory(categoryId);
-    
-    window.scrollTo({
-      top: elementPosition,
-      behavior: 'smooth'
-    });
-  }
-};
+  const scrollToCategory = (categoryId: string) => {
+    const element = categoryRefs.current[categoryId];
+    if (element) {
+      const offset = 140; // Un poco más de offset para mejor visualización
+      const elementPosition = element.offsetTop - offset;
+
+      // Actualizar inmediatamente la categoría seleccionada
+      setSelectedCategory(categoryId);
+
+      window.scrollTo({
+        top: elementPosition,
+        behavior: "smooth",
+      });
+    }
+  };
 
   if (tableId === null || isLoading) {
     return (
@@ -981,7 +979,7 @@ const scrollToCategory = (categoryId: string) => {
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
-                FoodHub Restaurant
+                Wayna Drink House
               </h1>
               <p className="text-sm text-gray-500">
                 Mesa {targetTableId} •{" "}
@@ -1064,198 +1062,213 @@ const scrollToCategory = (categoryId: string) => {
       </div>
 
       {/* Contenedor principal con todas las categorías */}
-      <main className="max-w-7xl mx-auto px-4 py-6"   ref={containerRef}
->
+      <main className="max-w-7xl mx-auto px-4 py-6" ref={containerRef}>
         {/* Renderizar todas las categorías con productos */}
-        {CATEGORIES.filter(category => getProductsByCategory(category.id).length > 0)
-          .map((category) => {
-            const categoryProducts = getProductsByCategory(category.id);
-            
-            return (
-              <div
-                key={category.id}
-                ref={(el) => {
-                  categoryRefs.current[category.id] = el;
-                }}
-                data-category={category.id}
-                className="mb-12 scroll-mt-4"
-              >
-                <div className="mb-6 flex justify-between items-center">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-800">
-                      {category.name}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      {getCategoryDescription(category.id)}
-                    </p>
-                  </div>
-                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                    {categoryProducts.length} items
-                  </span>
+        {CATEGORIES.filter(
+          (category) => getProductsByCategory(category.id).length > 0
+        ).map((category) => {
+          const categoryProducts = getProductsByCategory(category.id);
+
+          return (
+            <div
+              key={category.id}
+              ref={(el) => {
+                categoryRefs.current[category.id] = el;
+              }}
+              data-category={category.id}
+              className="mb-12 scroll-mt-4"
+            >
+              <div className="mb-6 flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {category.name}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {getCategoryDescription(category.id)}
+                  </p>
                 </div>
+                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  {categoryProducts.length} items
+                </span>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {categoryProducts.map((product) => {
-                    const isInCart = isProductInCart(product.id);
-                    const currentQuantity = getProductQuantityInCart(product.id);
-                    const currentNotes = getProductNotesInCart(product.id);
-                    const totalRecentQuantity = getProductTotalQuantityInRecentOrders(
-                      product.id
-                    );
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categoryProducts.map((product) => {
+                  const isInCart = isProductInCart(product.id);
+                  const currentQuantity = getProductQuantityInCart(product.id);
+                  const currentNotes = getProductNotesInCart(product.id);
+                  const totalRecentQuantity =
+                    getProductTotalQuantityInRecentOrders(product.id);
 
-                    return (
-                      <div
-                        key={product.id}
-                        className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
-                      >
-                        {/* Badge de popularidad */}
-                        {product.rating !== null && product.rating !== undefined && product.rating >= 4.5 && (
+                  return (
+                    <div
+                      key={product.id}
+                      className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
+                    >
+                      {/* Badge de popularidad */}
+                      {product.rating !== null &&
+                        product.rating !== undefined &&
+                        product.rating >= 4.5 && (
                           <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
                             <FaFire className="text-xs" />
                             Popular
                           </div>
                         )}
 
-                        {product.image_url ? (
-                          <div className="relative overflow-hidden h-48">
-                            <img
-                              src={
-                                product.image_url ||
-                                "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
-                              }
-                              alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                            <div className="absolute top-2 right-2 bg-white px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
-                              {renderStarRating(product.rating || 0)}
-                            </div>
-
-                            {/* Badge de favorito */}
-                            {product.is_favorite && (
-                              <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
-                                <FaHeart className="text-xs" />
-                                Favorito
-                              </div>
-                            )}
-
-                            {/* Badge de cantidad en órdenes recientes */}
-                            {category.id === "repite-item" &&
-                              totalRecentQuantity > 0 && (
-                                <div className="absolute bottom-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                                  {totalRecentQuantity}x en pedidos anteriores
-                                </div>
-                              )}
-
-                            {/* Badge de en carrito actual */}
-                            {isInCart && (
-                              <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                                {currentQuantity} en carrito
-                              </div>
-                            )}
+                      {product.image_url ? (
+                        <div className="relative overflow-hidden h-48">
+                          <img
+                            src={
+                              product.image_url ||
+                              "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
+                            }
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute top-2 right-2 bg-white px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-md">
+                            {renderStarRating(product.rating || 0)}
                           </div>
-                        ) : null}
 
-                        <div className="p-4">
-                          <h3 className="text-lg font-bold text-gray-800 mb-1">
-                            {product.name}
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-3">
-                            {product.description}
-                          </p>
-
-                          {/* Mostrar extras disponibles */}
-                          {product.extras && product.extras.length > 0 && (
-                            <div className="mb-3">
-                              <p className="text-xs text-green-600 font-medium">
-                                +{product.extras.filter((e) => e.is_available).length}{" "}
-                                extras disponibles
-                              </p>
+                          {/* Badge de favorito */}
+                          {product.is_favorite && (
+                            <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                              <FaHeart className="text-xs" />
+                              Favorito
                             </div>
                           )}
 
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="text-2xl font-bold text-blue-600">
-                                ${product.price.toFixed(2)}
-                              </span>
-                              {product.preparation_time && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  ⏱️ {product.preparation_time} min
-                                </p>
-                              )}
+                          {/* Badge de cantidad en órdenes recientes */}
+                          {category.id === "repite-item" &&
+                            totalRecentQuantity > 0 && (
+                              <div className="absolute bottom-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                                {totalRecentQuantity}x en pedidos anteriores
+                              </div>
+                            )}
+
+                          {/* Badge de en carrito actual */}
+                          {isInCart && (
+                            <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                              {currentQuantity} en carrito
                             </div>
-
-                            <div className="flex items-center gap-2">
-                              {isInCart ? (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      const item = orderItems.find(
-                                        (item) => item.product_id === product.id
-                                      );
-                                      if (item) {
-                                        if (currentQuantity > 1) {
-                                          updateCartItem(item.id, currentQuantity - 1);
-                                        } else {
-                                          removeFromCart(item.id);
-                                        }
-                                      }
-                                    }}
-                                    className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-                                  >
-                                    <FaMinus className="text-sm" />
-                                  </button>
-
-                                  <span className="font-bold text-lg w-8 text-center bg-blue-100 text-blue-600 rounded py-1">
-                                    {currentQuantity}
-                                  </span>
-
-                                  <button
-                                    onClick={() => {
-                                      const item = orderItems.find(
-                                        (item) => item.product_id === product.id
-                                      );
-                                      if (item) {
-                                        updateCartItem(item.id, currentQuantity + 1);
-                                      }
-                                    }}
-                                    className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition"
-                                  >
-                                    <FaPlus className="text-sm" />
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  id={`product-${product.id}`}
-                                  onClick={() => handleAddToCartWithNotes(product)}
-                                  disabled={addingProduct === product.id}
-                                  className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 hover:scale-105"
-                                >
-                                  {addingProduct === product.id ? (
-                                    <FaSpinner className="animate-spin" />
-                                  ) : (
-                                    <>
-                                      <FaPlus />
-                                      Agregar
-                                    </>
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Mostrar notas si existen - MEJORADO */}
-                          {isInCart && currentNotes && (
-                            <div className="mt-2">{formatItemNotes(currentNotes)}</div>
                           )}
                         </div>
+                      ) : null}
+
+                      <div className="p-4">
+                        <h3 className="text-lg font-bold text-gray-800 mb-1">
+                          {product.name}
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-3">
+                          {product.description}
+                        </p>
+
+                        {/* Mostrar extras disponibles */}
+                        {product.extras && product.extras.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs text-green-600 font-medium">
+                              +
+                              {
+                                product.extras.filter((e) => e.is_available)
+                                  .length
+                              }{" "}
+                              extras disponibles
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="text-2xl font-bold text-blue-600">
+                              ${product.price.toFixed(2)}
+                            </span>
+                            {product.preparation_time && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                ⏱️ {product.preparation_time} min
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {isInCart ? (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    const item = orderItems.find(
+                                      (item) => item.product_id === product.id
+                                    );
+                                    if (item) {
+                                      if (currentQuantity > 1) {
+                                        updateCartItem(
+                                          item.id,
+                                          currentQuantity - 1
+                                        );
+                                      } else {
+                                        removeFromCart(item.id);
+                                      }
+                                    }
+                                  }}
+                                  className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                                >
+                                  <FaMinus className="text-sm" />
+                                </button>
+
+                                <span className="font-bold text-lg w-8 text-center bg-blue-100 text-blue-600 rounded py-1">
+                                  {currentQuantity}
+                                </span>
+
+                                <button
+                                  onClick={() => {
+                                    const item = orderItems.find(
+                                      (item) => item.product_id === product.id
+                                    );
+                                    if (item) {
+                                      updateCartItem(
+                                        item.id,
+                                        currentQuantity + 1
+                                      );
+                                    }
+                                  }}
+                                  className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition"
+                                >
+                                  <FaPlus className="text-sm" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                id={`product-${product.id}`}
+                                onClick={() =>
+                                  handleAddToCartWithNotes(product)
+                                }
+                                disabled={addingProduct === product.id}
+                                className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-300 shadow-md font-medium flex items-center gap-2 disabled:opacity-50 hover:scale-105"
+                              >
+                                {addingProduct === product.id ? (
+                                  <FaSpinner className="animate-spin" />
+                                ) : (
+                                  <>
+                                    <FaPlus />
+                                    Agregar
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Mostrar notas si existen - MEJORADO */}
+                        {isInCart && currentNotes && (
+                          <div className="mt-2">
+                            {formatItemNotes(currentNotes)}
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
       </main>
 
       {/* MODAL DE NOTAS MEJORADO CON EXTRAS */}

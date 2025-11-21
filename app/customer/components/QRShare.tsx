@@ -51,8 +51,8 @@ export default function QRSharePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Únete a mi mesa - FoodHub",
-          text: "Únete a mi mesa en FoodHub Restaurant",
+          title: "Únete a mi mesa - Wayna Drink House",
+          text: "Únete a mi mesa en Wayna Drink House",
           url: currentUrl,
         });
       } catch (err) {
