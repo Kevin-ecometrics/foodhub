@@ -292,12 +292,11 @@ export default function ProductForm({
               }`}
             >
               <option value="">Seleccionar categoría</option>
-              <option value="Wayna Drinks">Wayna Drinks</option>
-              <option value="Clasikitos">Clasikitos</option>
-              <option value="Strong Drinks">Strong Drinks</option>
-              <option value="Botanas">Botanas</option>
-              <option value="Cervezas">Cervezas</option>
-              <option value="Botellas">Botellas</option>
+              <option value="Breakfast">Breakfast</option>
+              <option value="Lunch">Lunch</option>
+              <option value="Dinner">Dinner</option>
+              <option value="Combos">Combos</option>
+              <option value="Drinks">Drinks</option>
             </select>
             {errors.category && (
               <p className="text-red-500 text-xs mt-1">{errors.category}</p>

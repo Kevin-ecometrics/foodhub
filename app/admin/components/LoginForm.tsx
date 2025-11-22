@@ -97,12 +97,12 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
           </button>
         </form>
 
-        {/* <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-600 text-center">
             <strong>Demo:</strong> usuario: <code>admin</code> / contraseña:{" "}
             <code>restaurant</code>
           </p>
-        </div> */}
+        </div>
       </div>
     </div>
   );

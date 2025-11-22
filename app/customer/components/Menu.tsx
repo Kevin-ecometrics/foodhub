@@ -43,41 +43,20 @@ const CATEGORIES = [
     description: "Tus items recientes de esta orden",
   },
   {
-    id: "Wayna Drinks",
-    name: "Wayna Drinks",
-    icon: "🍹",
-    description: "Bebidas especiales Wayna",
+    id: "drinks",
+    name: "Drinks",
+    icon: "🥤",
+    description: "Refill de bebidas",
   },
   {
-    id: "Clasikitos",
-    name: "Clasikitos",
-    icon: "🎉",
-    description: "Los clásicos favoritos",
+    id: "combos",
+    name: "Combos",
+    icon: "🍔",
+    description: "Combos especiales",
   },
-  {
-    id: "Strong Drinks",
-    name: "Strong Drinks",
-    icon: "🥃",
-    description: "Bebidas fuertes",
-  },
-  {
-    id: "Botanas",
-    name: "Botanas",
-    icon: "🍿",
-    description: "Snacks y botanas",
-  },
-  {
-    id: "Cervezas",
-    name: "Cervezas",
-    icon: "🍺",
-    description: "Selección de cervezas",
-  },
-  {
-    id: "Botellas",
-    name: "Botellas",
-    icon: "🍾",
-    description: "Botellas para compartir",
-  },
+  { id: "breakfast", name: "Breakfast", icon: "🍳", description: "Desayunos" },
+  { id: "lunch", name: "Lunch", icon: "🍱", description: "Almuerzos" },
+  { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
 ];
 
 interface TableUser {
@@ -803,7 +782,16 @@ export default function MenuPage() {
       case "popular":
         return getPopularItems();
       default:
-        return products.filter((product) => product.category === categoryId);
+        const categoryMap: { [key: string]: string } = {
+          drinks: "Drinks",
+          combos: "Combos",
+          breakfast: "Breakfast",
+          lunch: "Lunch",
+          dinner: "Dinner",
+        };
+        return products.filter(
+          (product) => product.category === categoryMap[categoryId]
+        );
     }
   };
 
@@ -944,19 +932,22 @@ export default function MenuPage() {
 
   // Función para hacer scroll a una categoría específica
   const scrollToCategory = (categoryId: string) => {
-    const element = categoryRefs.current[categoryId];
-    if (element) {
-      const offset = 140; // Un poco más de offset para mejor visualización
-      const elementPosition = element.offsetTop - offset;
+    // Actualizar inmediatamente la categoría seleccionada
+    setSelectedCategory(categoryId);
 
-      // Actualizar inmediatamente la categoría seleccionada
-      setSelectedCategory(categoryId);
+    // Pequeño delay para asegurar que el estado se actualice antes del scroll
+    setTimeout(() => {
+      const element = categoryRefs.current[categoryId];
+      if (element) {
+        const offset = 180; // Aumenté el offset
+        const elementPosition = element.offsetTop - offset;
 
-      window.scrollTo({
-        top: elementPosition,
-        behavior: "smooth",
-      });
-    }
+        window.scrollTo({
+          top: elementPosition,
+          behavior: "smooth",
+        });
+      }
+    }, 10);
   };
 
   if (tableId === null || isLoading) {
@@ -978,9 +969,7 @@ export default function MenuPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                Wayna Drink House
-              </h1>
+              <h1 className="text-2xl font-bold text-gray-800">FoodHub</h1>
               <p className="text-sm text-gray-500">
                 Mesa {targetTableId} •{" "}
                 {currentOrder?.customer_name || "Invitado"}

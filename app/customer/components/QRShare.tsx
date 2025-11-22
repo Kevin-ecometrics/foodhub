@@ -17,7 +17,7 @@ export default function QRSharePage() {
 
   useEffect(() => {
     if (tableNumber) {
-      const baseUrl = "https://wayna.e-commetrics.com";
+      const baseUrl = "https://mvp-foodhub.e-commetrics.com";
       // Incluir todos los parámetros en el QR
       const url = `${baseUrl}/customer?table=${tableNumber}`;
       setCurrentUrl(url);
@@ -51,8 +51,8 @@ export default function QRSharePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Únete a mi mesa - Wayna Drink House",
-          text: "Únete a mi mesa en Wayna Drink House",
+          title: "Únete a mi mesa - FoodHub",
+          text: "Únete a mi mesa en FoodHub",
           url: currentUrl,
         });
       } catch (err) {
