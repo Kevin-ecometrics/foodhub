@@ -15,6 +15,87 @@ import TablesTab from "./components/TablesTab";
 import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
 
+// Modal de confirmación con contraseña
+function PasswordModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+}) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleConfirm = () => {
+    if (password === "waynadh2025") {
+      setError("");
+      setPassword("");
+      onConfirm();
+      onClose();
+    } else {
+      setError("Contraseña incorrecta");
+    }
+  };
+
+  const handleClose = () => {
+    setPassword("");
+    setError("");
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="text-gray-600 mb-4">{message}</p>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Contraseña de confirmación:
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ingresa la contraseña"
+            onKeyPress={(e) => {
+              if (e.key === "Enter") {
+                handleConfirm();
+              }
+            }}
+          />
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        </div>
+
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+            disabled={!password}
+          >
+            Confirmar Cancelación
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WaiterDashboard() {
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
@@ -26,6 +107,13 @@ export default function WaiterDashboard() {
   const [attendedNotifications, setAttendedNotifications] = useState<
     Set<string>
   >(new Set());
+
+  // Estados para el modal de contraseña
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pendingCancelAction, setPendingCancelAction] = useState<{
+    itemId: string;
+    cancelQuantity: number;
+  } | null>(null);
 
   // Referencia para guardar la posición del scroll
   const scrollPositionRef = useRef(0);
@@ -267,7 +355,18 @@ export default function WaiterDashboard() {
     itemId: string,
     cancelQuantity: number = 1
   ) => {
+    // Mostrar modal de confirmación con contraseña
+    setPendingCancelAction({ itemId, cancelQuantity });
+    setShowPasswordModal(true);
+  };
+
+  // Función que se ejecuta después de confirmar la contraseña
+  const executeCancelItem = async () => {
+    if (!pendingCancelAction) return;
+
+    const { itemId, cancelQuantity } = pendingCancelAction;
     setProcessing(itemId);
+
     try {
       // Cancelar la cantidad específica
       await waiterService.cancelOrderItem(itemId, cancelQuantity);
@@ -306,6 +405,7 @@ export default function WaiterDashboard() {
       await loadData();
     } finally {
       setProcessing(null);
+      setPendingCancelAction(null);
     }
   };
 
@@ -425,6 +525,7 @@ export default function WaiterDashboard() {
       setProcessing(null);
     }
   };
+
   const handleGoToTables = () => {
     setActiveTab("tables");
   };
@@ -502,6 +603,15 @@ export default function WaiterDashboard() {
           <ProductsManagement onError={handleError} />
         )}
       </main>
+
+      {/* Modal de confirmación con contraseña */}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onConfirm={executeCancelItem}
+        title="Confirmar Cancelación de Producto"
+        message="Para cancelar este producto, ingresa la contraseña de autorización:"
+      />
     </div>
   );
 }
