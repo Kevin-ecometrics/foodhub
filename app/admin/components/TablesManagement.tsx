@@ -1,8 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/admin/components/TablesManagement.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
-import { FaPlus, FaEdit, FaQrcode, FaCog, FaSpinner } from "react-icons/fa";
+import {
+  FaPlus,
+  FaEdit,
+  FaQrcode,
+  FaCog,
+  FaSpinner,
+  FaTrash,
+} from "react-icons/fa";
 import { RestaurantTable } from "../types";
 import TableForm from "./TableForm";
 import QRCode from "qrcode";
@@ -17,6 +25,10 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   const [showTableForm, setShowTableForm] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [showLogoPreview, setShowLogoPreview] = useState(false);
+  const [deletingTable, setDeletingTable] = useState<string | null>(null);
+  const [tableHasOrders, setTableHasOrders] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   const [editingTable, setEditingTable] = useState<RestaurantTable | null>(
     null
@@ -61,6 +73,42 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     }
   };
 
+  const checkTableHasOrderItems = async (tableId: number): Promise<boolean> => {
+    try {
+      // Buscar órdenes activas para esta mesa
+      const { data: orders, error: ordersError } = (await supabase
+        .from("orders")
+        .select("id")
+        .eq("table_id", tableId)
+        .in("status", ["active", "pending", "confirmed"])) as {
+        data: { id: number }[] | null;
+        error: any;
+      }; // Solo órdenes activas
+
+      if (ordersError) throw ordersError;
+
+      if (!orders || orders.length === 0) {
+        return false;
+      }
+
+      // Verificar si alguna de estas órdenes tiene items
+      const orderIds = orders.map((order) => order.id);
+
+      const { data: orderItems, error: itemsError } = await supabase
+        .from("order_items")
+        .select("id")
+        .in("order_id", orderIds)
+        .limit(1);
+
+      if (itemsError) throw itemsError;
+
+      return !!orderItems && orderItems.length > 0;
+    } catch (error) {
+      console.error("Error checking table order items:", error);
+      return false;
+    }
+  };
+
   const loadTables = async () => {
     setTablesLoading(true);
     try {
@@ -70,7 +118,17 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setTables(data || []);
+      setTables((data as RestaurantTable[]) || []);
+
+      // Verificar para cada mesa si tiene órdenes con items
+      const tableOrdersMap: { [key: string]: boolean } = {};
+      if (data) {
+        for (const table of data as RestaurantTable[]) {
+          const hasOrders = await checkTableHasOrderItems(table.id);
+          tableOrdersMap[table.id] = hasOrders;
+        }
+      }
+      setTableHasOrders(tableOrdersMap);
 
       await loadLatestLogo();
     } catch (error) {
@@ -78,6 +136,164 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       onError("Error cargando las mesas");
     } finally {
       setTablesLoading(false);
+    }
+  };
+
+  const shouldShowDeleteOrderButton = (table: RestaurantTable): boolean => {
+    // Mostrar si la mesa está ocupada O si tiene items en order_items
+    return table.status === "occupied" || tableHasOrders[table.id] === true;
+  };
+
+  const handleDeleteTableOrder = async (tableId: string) => {
+    if (
+      !confirm(
+        "¿Estás seguro de que quieres eliminar la orden de esta mesa? Esta acción no se puede deshacer y eliminará todos los pedidos y notificaciones asociadas, y la mesa volverá a estar disponible."
+      )
+    )
+      return;
+
+    setDeletingTable(tableId);
+    try {
+      const tableIdNum = parseInt(tableId);
+      console.log("🔍 Verificando datos para mesa:", tableIdNum);
+
+      // Buscar CUALQUIER orden de esta mesa (sin filtrar por status)
+      const { data: allOrders, error: ordersError } = (await supabase
+        .from("orders")
+        .select("id, status, created_at")
+        .eq("table_id", tableIdNum)
+        .order("created_at", { ascending: false })) as {
+        data: { id: number; status: string; created_at: string }[] | null;
+        error: any;
+      };
+
+      if (ordersError) {
+        console.error("Error buscando órdenes:", ordersError);
+        throw ordersError;
+      }
+
+      console.log("📋 Todas las órdenes encontradas:", allOrders);
+
+      if (allOrders && allOrders.length > 0) {
+        // Eliminar todas las órdenes de esta mesa
+        for (const order of allOrders) {
+          const orderId = order.id;
+          console.log(
+            `🗑️ Eliminando orden ${orderId} (status: ${order.status})`
+          );
+
+          // 1. Eliminar notificaciones de esta orden
+          const { error: notifError } = await supabase
+            .from("waiter_notifications")
+            .delete()
+            .eq("order_id", orderId);
+
+          if (notifError) {
+            console.error("Error eliminando notificaciones:", notifError);
+            throw notifError;
+          }
+
+          // 2. Eliminar items de la orden
+          const { error: itemsError } = await supabase
+            .from("order_items")
+            .delete()
+            .eq("order_id", orderId);
+
+          if (itemsError) {
+            console.error("Error eliminando items:", itemsError);
+            throw itemsError;
+          }
+
+          // 3. Eliminar la orden
+          const { error: orderError } = await supabase
+            .from("orders")
+            .delete()
+            .eq("id", orderId);
+
+          if (orderError) {
+            console.error("Error eliminando orden:", orderError);
+            throw orderError;
+          }
+
+          console.log(`✅ Orden ${orderId} eliminada`);
+        }
+      } else {
+        console.log("ℹ️ No se encontraron órdenes para esta mesa");
+      }
+
+      // Eliminar notificaciones directas de la mesa (por si acaso)
+      const { data: tableNotifications, error: tableNotifError } =
+        await supabase
+          .from("waiter_notifications")
+          .select("id, type")
+          .eq("table_id", tableIdNum);
+
+      if (tableNotifError) {
+        console.error(
+          "Error buscando notificaciones de mesa:",
+          tableNotifError
+        );
+        throw tableNotifError;
+      }
+
+      console.log("📋 Notificaciones directas de mesa:", tableNotifications);
+
+      if (tableNotifications && tableNotifications.length > 0) {
+        const { error: deleteTableNotifError } = await supabase
+          .from("waiter_notifications")
+          .delete()
+          .eq("table_id", tableIdNum);
+
+        if (deleteTableNotifError) {
+          console.error(
+            "Error eliminando notificaciones de mesa:",
+            deleteTableNotifError
+          );
+          throw deleteTableNotifError;
+        }
+        console.log(
+          `✅ ${tableNotifications.length} notificaciones de mesa eliminadas`
+        );
+      }
+
+      // 4. Cambiar el status de la mesa a "available"
+      console.log("🔄 Cambiando status de la mesa a 'available'");
+      const { error: tableUpdateError } = await supabase
+        .from("tables")
+        .update({ status: "available" } as never)
+        .eq("id", tableIdNum);
+
+      if (tableUpdateError) {
+        console.error(
+          "Error actualizando estado de la mesa:",
+          tableUpdateError
+        );
+        throw tableUpdateError;
+      }
+
+      console.log("✅ Status de la mesa actualizado a 'available'");
+      console.log("🎉 Proceso de limpieza completado para mesa:", tableIdNum);
+
+      // Mostrar mensaje de éxito
+      let successMessage = "✅ Mesa limpiada y puesta como disponible";
+      if (allOrders && allOrders.length > 0) {
+        successMessage += ` y ordenes eliminadas`;
+      } else {
+        successMessage += " (no había órdenes activas)";
+      }
+
+      onError(successMessage);
+      await loadTables();
+
+      // Limpiar el mensaje después de 3 segundos
+      setTimeout(() => onError(""), 3000);
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      onError(
+        "Error eliminando la orden: " + (error.message || "Error desconocido")
+      );
+    } finally {
+      setDeletingTable(null);
     }
   };
 
@@ -396,13 +612,6 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
                       <p className="text-sm text-gray-600">
                         <strong>Capacidad:</strong> {table.capacity} personas
                       </p>
-                      {/* <p className="text-sm text-gray-600">
-                      <strong>ID:</strong> {table.id}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong>Creada:</strong>{" "}
-                      {new Date(table.created_at).toLocaleDateString()}
-                    </p> */}
                     </div>
 
                     <div className="flex gap-2 flex-wrap">
@@ -435,6 +644,24 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
                         <FaCog />
                         {table.status === "available" ? "Deshab." : "Habilitar"}
                       </button>
+
+                      {/* Botón de Eliminar Orden Completa - Solo visible cuando la mesa está ocupada o tiene órdenes */}
+                      {shouldShowDeleteOrderButton(table) && (
+                        <button
+                          onClick={() =>
+                            handleDeleteTableOrder(table.id.toString())
+                          }
+                          disabled={deletingTable === table.id.toString()}
+                          className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deletingTable === table.id.toString() ? (
+                            <FaSpinner className="animate-spin" />
+                          ) : (
+                            <FaTrash />
+                          )}
+                          Eliminar Orden Completa
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
