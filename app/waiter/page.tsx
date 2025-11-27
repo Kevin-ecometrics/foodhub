@@ -33,7 +33,7 @@ function PasswordModal({
   const [error, setError] = useState("");
 
   const handleConfirm = () => {
-    if (password === "restautant") {
+    if (password === "restaurant") {
       setError("");
       setPassword("");
       onConfirm();

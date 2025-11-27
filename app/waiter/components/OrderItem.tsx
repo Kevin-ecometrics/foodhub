@@ -6,7 +6,7 @@ interface OrderItemProps {
   item: any;
   processing: string | null;
   onUpdateStatus: (itemId: string, newStatus: string) => void;
-  onCancelItem: (itemId: string, cancelQuantity: number) => void; // ACTUALIZADO: ahora acepta cantidad
+  onCancelItem: (itemId: string, cancelQuantity: number) => void;
 }
 
 export default function OrderItem({
@@ -61,11 +61,12 @@ export default function OrderItem({
     );
   };
 
-  // Función para obtener el siguiente estado
+  // Función para obtener el siguiente estado (FLUJO COMPLETO CON READY)
   const getNextStatus = (currentStatus: string): string => {
     const statusFlow = {
       ordered: "preparing",
-      preparing: "served",
+      preparing: "ready",
+      ready: "served",
       served: "served",
       cancelled: "cancelled",
     };
@@ -79,6 +80,7 @@ export default function OrderItem({
     const statusText = {
       ordered: "Ordenado",
       preparing: "En Preparación",
+      ready: "Listo",
       served: "Servido",
       cancelled: "Cancelado",
     };
@@ -93,6 +95,7 @@ export default function OrderItem({
     const statusStyles = {
       ordered: "bg-red-500 text-white hover:bg-red-600",
       preparing: "bg-yellow-500 text-white hover:bg-yellow-600",
+      ready: "bg-blue-500 text-white hover:bg-blue-600",
       served: "bg-green-500 text-white cursor-default",
       cancelled: "bg-gray-400 text-white cursor-default",
     };
@@ -101,6 +104,16 @@ export default function OrderItem({
       statusStyles[status as keyof typeof statusStyles] ||
       "bg-gray-500 text-white"
     }`;
+  };
+
+  // Función para verificar si se puede cancelar (NO PERMITE READY O SERVED)
+  const canCancel = (): boolean => {
+    return (
+      !isCancelled &&
+      remainingQuantity > 0 &&
+      item.status !== "ready" &&
+      item.status !== "served"
+    );
   };
 
   // Función para manejar el click en el botón de estado
@@ -119,8 +132,12 @@ export default function OrderItem({
     e.preventDefault();
     e.stopPropagation();
 
-    if (item.status === "cancelled") {
-      alert("Este producto ya está cancelado");
+    if (!canCancel()) {
+      if (item.status === "ready" || item.status === "served") {
+        alert("No se puede cancelar un producto que ya está listo o servido");
+      } else if (item.status === "cancelled") {
+        alert("Este producto ya está cancelado");
+      }
       return;
     }
 
@@ -217,6 +234,7 @@ export default function OrderItem({
             </div>
 
             <div className="flex gap-2 flex-col">
+              {/* Botón de estado */}
               <button
                 onClick={handleStatusClick}
                 disabled={
@@ -234,11 +252,12 @@ export default function OrderItem({
                 )}
               </button>
 
-              {!isCancelled && remainingQuantity > 0 && (
+              {/* Botón de cancelar - SOLO SE MUESTRA SI SE PUEDE CANCELAR */}
+              {canCancel() && (
                 <button
                   onClick={handleCancelClick}
-                  disabled={processing === item.id || item.status === "served"}
-                  className="text-xs px-3 py-2 rounded font-medium transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  disabled={processing === item.id}
+                  className="text-xs px-3 py-2 rounded font-medium transition-all duration-200 bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                 >
                   {processing === item.id ? (
                     <FaSpinner className="animate-spin" />
@@ -320,7 +339,7 @@ export default function OrderItem({
                 onClick={() => setShowCancelModal(false)}
                 className="flex-1 bg-gray-500 text-white py-2 rounded hover:bg-gray-600 transition"
               >
-                Cancelar
+                Volver
               </button>
               <button
                 onClick={handleConfirmCancel}
