@@ -715,7 +715,7 @@ export default function AdminPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                 {checkingLogo ? (
                   <div className="animate-pulse bg-gray-300 w-full h-full"></div>
                 ) : logoUrl ? (
@@ -723,39 +723,47 @@ export default function AdminPage() {
                     src={logoUrl}
                     alt="Logo del negocio"
                     className="w-full h-full object-cover"
-                    onError={() => setLogoUrl(null)} // Si falla la carga, mostrar icono
+                    onError={() => setLogoUrl(null)}
                   />
                 ) : (
-                  <FaChartBar className="text-blue-600" />
+                  <FaChartBar className="text-blue-600 text-sm sm:text-base" />
                 )}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">
-                  Dashboard Administrativo
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800">
+                  <span className="hidden sm:inline">
+                    Dashboard Administrativo
+                  </span>
+                  <span className="sm:hidden">Dashboard</span>
                 </h1>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <button
                 onClick={handleWaiter}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                className="flex items-center gap-1 sm:gap-2 p-2 sm:px-4 sm:py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                title="Waiter"
               >
-                <FaUser />
-                Waiter
+                <FaUser className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Waiter</span>
               </button>
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                className="flex items-center gap-1 sm:gap-2 p-2 sm:px-4 sm:py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                title={logoUrl ? "Actualizar Logo" : "Subir Logo"}
               >
-                <FaUpload />
-                {logoUrl ? "Actualizar Logo" : "Subir Logo"}
+                <FaUpload className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">
+                  {logoUrl ? "Actualizar Logo" : "Subir Logo"}
+                </span>
               </button>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                className="flex items-center gap-1 sm:gap-2 p-2 sm:px-4 sm:py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                title="Cerrar Sesión"
               >
-                <FaSignOutAlt />
-                Cerrar Sesión
+                <FaSignOutAlt className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Cerrar Sesión</span>
               </button>
             </div>
           </div>
