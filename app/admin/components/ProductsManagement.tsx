@@ -367,140 +367,249 @@ export default function ProductsManagement({
           <p className="text-gray-600">Cargando productos...</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Producto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoría
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Precio
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Calificación
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Favorito
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tiempo
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr
-                    key={product.id}
-                    className={`hover:bg-gray-50 ${
-                      product.is_favorite
-                        ? "bg-yellow-50 hover:bg-yellow-100"
-                        : ""
-                    }`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {product.image_url && (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="h-10 w-10 rounded-lg object-cover mr-3"
-                          />
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                            {product.name}
-                            {product.is_favorite && (
-                              <FaStar className="text-yellow-500 text-xs" />
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {product.description}
-                          </div>
-                          {/* MOSTRAR EXTRAS SI EXISTEN */}
-                          {product.extras && product.extras.length > 0 && (
-                            <div className="text-xs text-green-600 mt-1">
-                              +{product.extras.length} extras disponibles
-                            </div>
+        <>
+          {/* Vista Grid para Mobile */}
+          <div className="sm:hidden grid grid-cols-1 gap-4">
+            {products.map((product) => (
+              <div
+                key={product.id}
+                className={`bg-white rounded-2xl shadow-sm border p-4 ${
+                  product.is_favorite
+                    ? "border-yellow-200 bg-yellow-50"
+                    : "border-gray-200"
+                }`}
+              >
+                <div className="flex gap-3">
+                  {product.image_url && (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate flex items-center gap-1">
+                          {product.name}
+                          {product.is_favorite && (
+                            <FaStar className="text-yellow-500 text-xs flex-shrink-0" />
                           )}
-                        </div>
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                          {product.description}
+                        </p>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        className={` ml-2 flex-shrink-0 ${
+                          product.is_favorite
+                            ? "text-gray-600 hover:text-gray-900"
+                            : "text-yellow-600 hover:text-yellow-900"
+                        }`}
+                      >
+                        <FaEdit />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatCurrency(product.price)}
+                      </span>
+
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                         {product.category}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(product.price)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+
+                      {product.preparation_time && (
+                        <span className="text-xs text-gray-500">
+                          {product.preparation_time}min
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3">
                       <StarRating
                         rating={product.rating}
                         readonly={true}
-                        size={14}
+                        size={12}
                       />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleProductFavorite(product)}
-                        className={`p-1 rounded-full transition-colors ${
-                          product.is_favorite
-                            ? "text-yellow-500 hover:text-yellow-600 bg-yellow-100"
-                            : "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50"
-                        }`}
-                        title={
-                          product.is_favorite
-                            ? "Quitar de favoritos"
-                            : "Marcar como favorito"
-                        }
-                      >
-                        <FaStar size={16} />
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.preparation_time
-                        ? `${product.preparation_time} min`
-                        : "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleProductAvailability(product)}
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${
-                          product.is_available
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {product.is_available ? "Disponible" : "No Disponible"}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2">
+
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleEditProduct(product)}
-                          className="text-yellow-600 hover:text-yellow-900"
+                          onClick={() => toggleProductFavorite(product)}
+                          className={`p-1 rounded-full transition-colors ${
+                            product.is_favorite
+                              ? "text-yellow-500 hover:text-yellow-600 bg-yellow-100"
+                              : "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50"
+                          }`}
                         >
-                          <FaEdit />
+                          <FaStar size={14} />
+                        </button>
+
+                        <button
+                          onClick={() => toggleProductAvailability(product)}
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            product.is_available
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {product.is_available ? "Disponible" : "No Disp."}
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+
+                    {product.extras && product.extras.length > 0 && (
+                      <div className="text-xs text-green-600 mt-2">
+                        +{product.extras.length} extras disponibles
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+
+          {/* Vista Tabla para Desktop */}
+          <div className="hidden sm:block bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Producto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Categoría
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Precio
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Calificación
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Favorito
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tiempo
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {products.map((product) => (
+                    <tr
+                      key={product.id}
+                      className={`hover:bg-gray-50 ${
+                        product.is_favorite
+                          ? "bg-yellow-50 hover:bg-yellow-100"
+                          : ""
+                      }`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {product.image_url && (
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="h-10 w-10 rounded-lg object-cover mr-3"
+                            />
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                              {product.name}
+                              {product.is_favorite && (
+                                <FaStar className="text-yellow-500 text-xs" />
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-500 truncate max-w-xs">
+                              {product.description}
+                            </div>
+                            {/* MOSTRAR EXTRAS SI EXISTEN */}
+                            {product.extras && product.extras.length > 0 && (
+                              <div className="text-xs text-green-600 mt-1">
+                                +{product.extras.length} extras disponibles
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {product.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(product.price)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StarRating
+                          rating={product.rating}
+                          readonly={true}
+                          size={14}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => toggleProductFavorite(product)}
+                          className={`p-1 rounded-full transition-colors ${
+                            product.is_favorite
+                              ? "text-yellow-500 hover:text-yellow-600 bg-yellow-100"
+                              : "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50"
+                          }`}
+                          title={
+                            product.is_favorite
+                              ? "Quitar de favoritos"
+                              : "Marcar como favorito"
+                          }
+                        >
+                          <FaStar size={16} />
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {product.preparation_time
+                          ? `${product.preparation_time} min`
+                          : "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => toggleProductAvailability(product)}
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${
+                            product.is_available
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {product.is_available
+                            ? "Disponible"
+                            : "No Disponible"}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditProduct(product)}
+                            className="text-yellow-600 hover:text-yellow-900"
+                          >
+                            <FaEdit />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
