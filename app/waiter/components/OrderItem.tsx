@@ -254,10 +254,13 @@ export default function OrderItem({
 
               {/* Botón de cancelar - SOLO SE MUESTRA SI SE PUEDE CANCELAR */}
               {canCancel() && (
-                <button
+                <span
                   onClick={handleCancelClick}
-                  disabled={processing === item.id}
-                  className="text-xs px-3 py-2 rounded font-medium transition-all duration-200 bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  className={`text-xs px-3 py-2 font-medium transition-all duration-200 flex items-center gap-1 cursor-pointer ${
+                    processing === item.id
+                      ? "text-gray-400 cursor-not-allowed"
+                      : "text-gray-600 hover:text-gray-800 hover:underline"
+                  }`}
                 >
                   {processing === item.id ? (
                     <FaSpinner className="animate-spin" />
@@ -267,7 +270,7 @@ export default function OrderItem({
                       Cancelar
                     </>
                   )}
-                </button>
+                </span>
               )}
             </div>
           </div>
