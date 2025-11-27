@@ -676,283 +676,581 @@ export default function Dashboard({
     return Array.from(productMap.values());
   };
 
-  // FUNCIÓN CORREGIDA: Generar Excel de productos vendidos CON CANCELADOS
+  // FUNCIÓN MEJORADA: Obtener productos ordenados por fecha Y tipo
+  const getProductsWithOrderDatesCorrected = () => {
+    const groupedProducts = getGroupedProducts();
+    const activeProducts = groupedProducts.filter(
+      (product) => product.activeQuantity > 0
+    );
+    const productsWithDates = [];
+
+    // Mapa para guardar relaciones producto -> extra por venta específica
+    const productExtraRelations = new Map();
+
+    // Primero: construir relaciones entre productos y extras POR VENTA
+    for (const sale of salesHistory) {
+      const saleItems = salesItems.filter((item) => item.sale_id === sale.id);
+
+      for (const item of saleItems) {
+        if (item.notes) {
+          const processedExtras = processExtrasFromNotes(item.notes);
+          if (processedExtras.hasExtras) {
+            // Guardar relación: producto principal -> extras en esta venta
+            processedExtras.extrasList.forEach((extra) => {
+              const extraKey = `+ ${extra.name}`;
+              if (!productExtraRelations.has(extraKey)) {
+                productExtraRelations.set(extraKey, new Map());
+              }
+              // Relacionar este extra con el producto principal EN ESTA VENTA
+              productExtraRelations
+                .get(extraKey)
+                .set(item.product_name, sale.closed_at);
+            });
+          }
+        }
+      }
+    }
+
+    // Procesar productos principales
+    for (const product of activeProducts) {
+      if (!product.isExtra) {
+        let orderDate = "N/A";
+        let saleTimestamp = Infinity;
+
+        for (const sale of salesHistory) {
+          const hasProduct = salesItems.some(
+            (item) =>
+              item.sale_id === sale.id &&
+              item.product_name === product.product_name &&
+              Math.abs(item.price - product.price) < 0.01 &&
+              item.quantity - (item.cancelled_quantity || 0) > 0
+          );
+
+          if (hasProduct) {
+            const saleDate = new Date(sale.closed_at);
+            if (saleDate.getTime() < saleTimestamp) {
+              saleTimestamp = saleDate.getTime();
+              orderDate = sale.closed_at;
+            }
+          }
+        }
+
+        productsWithDates.push({
+          product,
+          orderDate,
+          saleTimestamp,
+          // Agregar tipo para ordenamiento
+          typeOrder: getTypeOrder(product),
+        });
+      }
+    }
+
+    // Procesar extras con fechas CORRECTAS por venta
+    for (const product of activeProducts) {
+      if (product.isExtra) {
+        let orderDate = "N/A";
+        let saleTimestamp = Infinity;
+
+        // Buscar todas las ventas donde aparece este extra
+        const extraRelations = productExtraRelations.get(product.product_name);
+
+        if (extraRelations) {
+          // Encontrar la fecha más temprana para ESTE extra específico
+          for (const [mainProduct, date] of extraRelations.entries()) {
+            const dateObj = new Date(date);
+            if (dateObj.getTime() < saleTimestamp) {
+              saleTimestamp = dateObj.getTime();
+              orderDate = date;
+            }
+          }
+        }
+
+        // Si no encontramos relaciones, buscar directamente
+        if (orderDate === "N/A") {
+          for (const sale of salesHistory) {
+            const hasExtra = salesItems.some(
+              (item) =>
+                item.sale_id === sale.id &&
+                item.product_name === product.product_name &&
+                item.quantity - (item.cancelled_quantity || 0) > 0
+            );
+
+            if (hasExtra) {
+              const saleDate = new Date(sale.closed_at);
+              if (saleDate.getTime() < saleTimestamp) {
+                saleTimestamp = saleDate.getTime();
+                orderDate = sale.closed_at;
+              }
+            }
+          }
+        }
+
+        productsWithDates.push({
+          product,
+          orderDate,
+          saleTimestamp,
+          // Agregar tipo para ordenamiento
+          typeOrder: getTypeOrder(product),
+        });
+      }
+    }
+
+    // ORDENAMIENTO MEJORADO: Primero por fecha, luego por tipo
+    return productsWithDates.sort((a, b) => {
+      // Primero ordenar por fecha (más antiguo primero)
+      if (a.saleTimestamp !== b.saleTimestamp) {
+        return a.saleTimestamp - b.saleTimestamp;
+      }
+
+      // Si misma fecha, ordenar por tipo
+      if (a.typeOrder !== b.typeOrder) {
+        return a.typeOrder - b.typeOrder;
+      }
+
+      // Si mismo tipo, ordenar alfabéticamente por nombre
+      return a.product.product_name.localeCompare(b.product.product_name);
+    });
+  };
+
+  // FUNCIÓN AUXILIAR: Obtener orden numérico para tipos
+  const getTypeOrder = (product: GroupedProduct): number => {
+    if (product.isExtra) {
+      return 2; // Extras van después
+    } else if (product.hasExtras) {
+      return 1; // Productos con extras van en medio
+    } else {
+      return 0; // Productos simples van primero
+    }
+  };
+
   const generateProductsExcelReport = () => {
     const products = getGroupedProducts();
 
-    if (products.length === 0) {
+    // Filtrar solo productos activos (sin cancelados)
+    const activeProducts = products.filter(
+      (product) => product.activeQuantity > 0
+    );
+
+    if (activeProducts.length === 0) {
       alert("No hay datos de productos vendidos para exportar");
       return;
     }
 
-    // Calcular totales CORREGIDOS - Sumar los subtotales activos
-    const totalQuantity = products.reduce(
+    // Calcular totales solo de productos activos
+    const totalQuantity = activeProducts.reduce(
       (sum, product) => sum + product.activeQuantity,
       0
     );
 
-    const totalCancelledQuantity = products.reduce(
-      (sum, product) => sum + product.cancelledQuantity,
+    const totalSales = activeProducts.reduce(
+      (sum, product) => sum + product.activeSubtotal,
       0
     );
 
-    const totalSales = calculateTotalSalesForReports();
-    const totalCancelledAmount = products.reduce(
-      (sum, product) => sum + product.cancelledAmount,
-      0
-    );
+    // Obtener fecha para el reporte
+    const reportDate =
+      filterMode === "single"
+        ? formatLongDate(selectedDate)
+        : formatDateRange(new Date(startDateInput), new Date(endDateInput));
 
-    // Crear CSV con encabezados
-    let csvContent =
-      "No.,Producto,Precio Unitario,Cantidad Activa,Cantidad Cancelada,Total Activo,Total Cancelado,Tipo\n";
+    // Crear CSV con encabezados - SIN COLUMNAS DE CANCELADOS
+    let csvContent = "Fecha del Reporte:," + reportDate + "\n";
+    csvContent += "Generado:," + new Date().toLocaleString("es-MX") + "\n\n";
+    csvContent +=
+      "No.,Fecha del Pedido,Producto,Precio Unitario,Cantidad,Total,Tipo\n";
 
     let rowNumber = 1;
-    products.forEach((product) => {
+
+    // Obtener productos con fechas y ordenar por fecha (más reciente primero)
+    const productsWithDates = getProductsWithOrderDatesCorrected();
+
+    productsWithDates.forEach((productWithDate) => {
+      const { product, orderDate } = productWithDate;
       const tipo = product.isExtra
         ? "Extra"
         : product.hasExtras
         ? "Con Extras"
         : "Producto";
 
-      csvContent += `"${rowNumber}","${product.product_name}","${formatCurrency(
-        product.price
-      )}","${product.activeQuantity}","${
-        product.cancelledQuantity
-      }","${formatCurrency(product.activeSubtotal)}","${formatCurrency(
-        product.cancelledAmount
-      )}","${tipo}"\n`;
+      const formattedDate = orderDate ? formatDateTime(orderDate) : "N/A";
+
+      csvContent += `"${rowNumber}","${formattedDate}","${
+        product.product_name
+      }","${formatCurrency(product.price)}","${
+        product.activeQuantity
+      }","${formatCurrency(product.activeSubtotal)}","${tipo}"\n`;
       rowNumber++;
     });
 
-    // Agregar totales al final
-    csvContent += `\n"","TOTALES","","${totalQuantity}","${totalCancelledQuantity}","${formatCurrency(
+    // Agregar totales al final - SIN CANCELADOS
+    csvContent += `\n"","","TOTALES","","${totalQuantity}","${formatCurrency(
       totalSales
-    )}","${formatCurrency(totalCancelledAmount)}",""`;
+    )}",""`;
 
+    // Generar nombre de archivo
+    const fileName =
+      filterMode === "single"
+        ? `productos-vendidos-${selectedDate.toISOString().split("T")[0]}.csv`
+        : `productos-vendidos-${startDateInput}-a-${endDateInput}.csv`;
+
+    // Crear y descargar el archivo
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `productos-vendidos-${
-      selectedDate.toISOString().split("T")[0]
-    }.csv`;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  // FUNCIÓN CORREGIDA: Generar PDF del reporte de productos vendidos CON CANCELADOS
+  // FUNCIÓN MEJORADA: Obtener productos con fechas ordenadas y extras corregidos
+  const getProductsWithOrderDatesSorted = () => {
+    const groupedProducts = getGroupedProducts();
+
+    // Filtrar solo productos activos
+    const activeProducts = groupedProducts.filter(
+      (product) => product.activeQuantity > 0
+    );
+    const productsWithDates = [];
+
+    // Crear mapa para relacionar productos principales con extras
+    const mainProductsMap = new Map();
+
+    // Primera pasada: procesar productos principales y guardar sus fechas
+    for (const product of activeProducts) {
+      if (!product.isExtra) {
+        let orderDate = "N/A";
+        let saleTimestamp = Infinity; // Para ordenar por fecha
+
+        // Buscar en el historial de ventas la primera ocurrencia de este producto
+        for (const sale of salesHistory) {
+          const hasProduct = salesItems.some(
+            (item) =>
+              item.sale_id === sale.id &&
+              item.product_name === product.product_name &&
+              Math.abs(item.price - product.price) < 0.01 &&
+              item.quantity - (item.cancelled_quantity || 0) > 0 // Solo items activos
+          );
+
+          if (hasProduct) {
+            const saleDate = new Date(sale.closed_at);
+            if (saleDate.getTime() < saleTimestamp) {
+              saleTimestamp = saleDate.getTime();
+              orderDate = sale.closed_at;
+            }
+          }
+        }
+
+        // Guardar en el mapa para los extras
+        mainProductsMap.set(product.product_name, { orderDate, saleTimestamp });
+
+        productsWithDates.push({
+          product,
+          orderDate,
+          saleTimestamp,
+        });
+      }
+    }
+
+    // Segunda pasada: procesar extras y asignarles la fecha de su producto principal
+    for (const product of activeProducts) {
+      if (product.isExtra) {
+        let orderDate = "N/A";
+        let saleTimestamp = Infinity;
+
+        // Buscar el producto principal para este extra
+        const mainProductName = findMainProductForExtra(product.product_name);
+
+        if (mainProductName && mainProductsMap.has(mainProductName)) {
+          const mainProductData = mainProductsMap.get(mainProductName);
+          orderDate = mainProductData.orderDate;
+          saleTimestamp = mainProductData.saleTimestamp;
+        } else {
+          // Si no encontramos el producto principal, buscar directamente
+          for (const sale of salesHistory) {
+            const hasExtra = salesItems.some(
+              (item) =>
+                item.sale_id === sale.id &&
+                item.product_name.includes(
+                  product.product_name.replace("+ ", "")
+                ) &&
+                item.quantity - (item.cancelled_quantity || 0) > 0
+            );
+
+            if (hasExtra) {
+              const saleDate = new Date(sale.closed_at);
+              if (saleDate.getTime() < saleTimestamp) {
+                saleTimestamp = saleDate.getTime();
+                orderDate = sale.closed_at;
+              }
+            }
+          }
+        }
+
+        productsWithDates.push({
+          product,
+          orderDate,
+          saleTimestamp,
+        });
+      }
+    }
+
+    // Ordenar por fecha (más reciente primero)
+    return productsWithDates.sort((a, b) => a.saleTimestamp - b.saleTimestamp);
+  };
+
+  // FUNCIÓN AUXILIAR: Encontrar el producto principal para un extra
+  const findMainProductForExtra = (extraName: string): string | null => {
+    const cleanExtraName = extraName.replace("+ ", "");
+
+    // Buscar en los items de venta para encontrar qué producto principal tiene este extra
+    for (const item of salesItems) {
+      if (
+        item.notes &&
+        item.notes.includes(cleanExtraName) &&
+        item.quantity - (item.cancelled_quantity || 0) > 0
+      ) {
+        return item.product_name;
+      }
+    }
+
+    return null;
+  };
+
   const generateProductsPDFReport = () => {
     const products = getGroupedProducts();
 
-    if (products.length === 0) {
+    // Filtrar solo productos activos
+    const activeProducts = products.filter(
+      (product) => product.activeQuantity > 0
+    );
+
+    if (activeProducts.length === 0) {
       alert("No hay datos de productos vendidos para generar el reporte");
       return;
     }
 
-    const totalQuantity = products.reduce(
+    // Calcular totales solo de productos activos
+    const totalQuantity = activeProducts.reduce(
       (sum, product) => sum + product.activeQuantity,
       0
     );
 
-    const totalCancelledQuantity = products.reduce(
-      (sum, product) => sum + product.cancelledQuantity,
+    const totalSales = activeProducts.reduce(
+      (sum, product) => sum + product.activeSubtotal,
       0
     );
 
-    const totalSales = calculateTotalSalesForReports();
-    const totalCancelledAmount = products.reduce(
-      (sum, product) => sum + product.cancelledAmount,
-      0
-    );
+    // Obtener fecha para el reporte
+    const reportDate =
+      filterMode === "single"
+        ? formatLongDate(selectedDate)
+        : `${formatLongDate(new Date(startDateInput))} a ${formatLongDate(
+            new Date(endDateInput)
+          )}`;
 
-    // Crear contenido HTML para el PDF
+    // Obtener productos ordenados por fecha
+    const productsWithDates = getProductsWithOrderDatesCorrected();
+
+    // Crear contenido HTML para el PDF - SIN COLUMNAS DE CANCELADOS
     const content = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Reporte de Productos Vendidos - ${
-        selectedDate.toISOString().split("T")[0]
-      }</title>
-      <style>
-        body { 
-          font-family: 'Arial', sans-serif; 
-          font-size: 12px; 
-          max-width: 800px; 
-          margin: 0 auto; 
-          padding: 20px;
-          color: #333;
-        }
-        .header { 
-          text-align: center; 
-          margin-bottom: 20px; 
-          border-bottom: 3px double #000; 
-          padding-bottom: 15px; 
-        }
-        .restaurant-name { 
-          font-size: 24px; 
-          font-weight: bold; 
-          margin-bottom: 5px; 
-          color: #1f2937;
-        }
-        .report-title { 
-          font-size: 18px; 
-          margin-bottom: 10px; 
-          color: #374151;
-        }
-        .summary-section { 
-          margin: 20px 0; 
-          padding: 15px; 
-          background: #f8fafc; 
-          border-radius: 8px; 
-          border: 1px solid #e2e8f0;
-        }
-        .summary-grid { 
-          display: grid; 
-          grid-template-columns: repeat(2, 1fr); 
-          gap: 15px; 
-          margin: 15px 0; 
-        }
-        .summary-card { 
-          padding: 12px; 
-          border-radius: 6px; 
-          text-align: center;
-          border: 1px solid;
-        }
-        .summary-total { 
-          background: #dcfce7; 
-          border-color: #bbf7d0; 
-        }
-        .summary-items { 
-          background: #dbeafe; 
-          border-color: #bfdbfe; 
-        }
-        .summary-cancelled { 
-          background: #fef2f2; 
-          border-color: #fecaca; 
-        }
-        .summary-number { 
-          font-size: 18px; 
-          font-weight: bold; 
-          margin: 5px 0; 
-        }
-        .products-table { 
-          width: 100%; 
-          border-collapse: collapse; 
-          margin: 20px 0; 
-        }
-        .products-table th { 
-          background: #374151; 
-          color: white; 
-          padding: 10px; 
-          text-align: left; 
-          border: 1px solid #4b5563;
-        }
-        .products-table td { 
-          padding: 8px 10px; 
-          border: 1px solid #d1d5db; 
-        }
-        .products-table tr:nth-child(even) { 
-          background: #f9fafb; 
-        }
-        .extra-row { 
-          background: #f0f9ff !important; 
-          font-style: italic;
-          color: #1e40af;
-        }
-        .product-with-extras { 
-          background: #f0fdf4 !important; 
-          font-weight: bold;
-        }
-        .cancelled-info { 
-          color: #dc2626; 
-          font-size: 11px;
-        }
-        .totals-section { 
-          margin-top: 20px; 
-          padding-top: 15px; 
-          border-top: 2px solid #000; 
-        }
-        .total-row { 
-          display: flex; 
-          justify-content: space-between; 
-          margin: 5px 0; 
-          padding: 0 10px; 
-        }
-        .grand-total { 
-          font-weight: bold; 
-          font-size: 16px; 
-          margin-top: 10px; 
-          padding-top: 10px; 
-          border-top: 1px solid #d1d5db; 
-        }
-        .footer { 
-          text-align: center; 
-          margin-top: 30px; 
-          padding-top: 15px; 
-          border-top: 1px solid #d1d5db; 
-          font-size: 10px; 
-          color: #6b7280;
-        }
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="restaurant-name">FOODHUB RESTAURANT</div>
-        <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS</div>
-        <div>Fecha: ${formatLongDate(selectedDate)}</div>
-        <div>Generado: ${new Date().toLocaleString("es-MX")}</div>
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Reporte de Productos Vendidos</title>
+    <style>
+      body { 
+        font-family: 'Arial', sans-serif; 
+        font-size: 11px; 
+        max-width: 1000px; 
+        margin: 0 auto; 
+        padding: 20px;
+        color: #333;
+      }
+      .header { 
+        text-align: center; 
+        margin-bottom: 20px; 
+        border-bottom: 3px double #000; 
+        padding-bottom: 15px; 
+      }
+      .restaurant-name { 
+        font-size: 24px; 
+        font-weight: bold; 
+        margin-bottom: 5px; 
+        color: #1f2937;
+      }
+      .report-title { 
+        font-size: 18px; 
+        margin-bottom: 10px; 
+        color: #374151;
+      }
+      .date-info {
+        background: #f8fafc;
+        padding: 10px;
+        border-radius: 6px;
+        margin: 10px 0;
+        border-left: 4px solid #3b82f6;
+      }
+      .summary-section { 
+        margin: 20px 0; 
+        padding: 15px; 
+        background: #f8fafc; 
+        border-radius: 8px; 
+        border: 1px solid #e2e8f0;
+      }
+      .summary-grid { 
+        display: grid; 
+        grid-template-columns: repeat(2, 1fr); 
+        gap: 15px; 
+        margin: 15px 0; 
+      }
+      .summary-card { 
+        padding: 12px; 
+        border-radius: 6px; 
+        text-align: center;
+        border: 1px solid;
+      }
+      .summary-total { 
+        background: #dcfce7; 
+        border-color: #bbf7d0; 
+      }
+      .summary-items { 
+        background: #dbeafe; 
+        border-color: #bfdbfe; 
+      }
+      .summary-number { 
+        font-size: 18px; 
+        font-weight: bold; 
+        margin: 5px 0; 
+      }
+      .products-table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin: 20px 0; 
+        font-size: 10px;
+      }
+      .products-table th { 
+        background: #374151; 
+        color: white; 
+        padding: 8px; 
+        text-align: left; 
+        border: 1px solid #4b5563;
+        font-size: 10px;
+      }
+      .products-table td { 
+        padding: 6px 8px; 
+        border: 1px solid #d1d5db; 
+        font-size: 9px;
+      }
+      .products-table tr:nth-child(even) { 
+        background: #f9fafb; 
+      }
+      .extra-row { 
+        background: #f0f9ff !important; 
+        font-style: italic;
+        color: #1e40af;
+      }
+      .product-with-extras { 
+        background: #f0fdf4 !important; 
+        font-weight: bold;
+      }
+      .date-column {
+        font-size: 9px;
+        white-space: nowrap;
+      }
+      .totals-section { 
+        margin-top: 20px; 
+        padding-top: 15px; 
+        border-top: 2px solid #000; 
+      }
+      .total-row { 
+        display: flex; 
+        justify-content: space-between; 
+        margin: 5px 0; 
+        padding: 0 10px; 
+      }
+      .grand-total { 
+        font-weight: bold; 
+        font-size: 16px; 
+        margin-top: 10px; 
+        padding-top: 10px; 
+        border-top: 1px solid #d1d5db; 
+      }
+      .footer { 
+        text-align: center; 
+        margin-top: 30px; 
+        padding-top: 15px; 
+        border-top: 1px solid #d1d5db; 
+        font-size: 10px; 
+        color: #6b7280;
+      }
+      .text-right { text-align: right; }
+      .text-center { text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="restaurant-name">FOODHUB RESTAURANT</div>
+      <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS - ACTIVOS</div>
+      <div class="date-info">
+        <div><strong>Fecha del Reporte:</strong> ${reportDate}</div>
+        <div><strong>Generado:</strong> ${new Date().toLocaleString(
+          "es-MX"
+        )}</div>
       </div>
-      
-      <!-- Resumen General -->
-      <div class="summary-section">
-        <h3 style="margin: 0 0 15px 0; color: #1f2937;">RESUMEN GENERAL</h3>
-        <div class="summary-grid">
-          <div class="summary-card summary-total">
-            <div>VENTAS ACTIVAS</div>
-            <div class="summary-number">${formatCurrency(totalSales)}</div>
-            <div>${totalQuantity} unidades activas</div>
-          </div>
-          <div class="summary-card summary-items">
-            <div>ITEMS VENDIDOS</div>
-            <div class="summary-number">${totalQuantity}</div>
-            <div>unidades activas</div>
-          </div>
-          <div class="summary-card summary-cancelled">
-            <div>ITEMS CANCELADOS</div>
-            <div class="summary-number">${totalCancelledQuantity}</div>
-            <div>${formatCurrency(totalCancelledAmount)} excluidos</div>
-          </div>
-          <div class="summary-card" style="background: #f3f4f6; border-color: #d1d5db;">
-            <div>PRODUCTOS DIFERENTES</div>
-            <div class="summary-number">${products.length}</div>
-            <div>incluyendo extras</div>
-          </div>
+    </div>
+    
+    <!-- Resumen General -->
+    <div class="summary-section">
+      <h3 style="margin: 0 0 15px 0; color: #1f2937;">RESUMEN GENERAL</h3>
+      <div class="summary-grid">
+        <div class="summary-card summary-total">
+          <div>VENTAS ACTIVAS</div>
+          <div class="summary-number">${formatCurrency(totalSales)}</div>
+          <div>${totalQuantity} unidades</div>
+        </div>
+        <div class="summary-card summary-items">
+          <div>ITEMS VENDIDOS</div>
+          <div class="summary-number">${totalQuantity}</div>
+          <div>unidades activas</div>
+        </div>
+        <div class="summary-card" style="background: #dbeafe; border-color: #bfdbfe;">
+          <div>PRODUCTOS DIFERENTES</div>
+          <div class="summary-number">${activeProducts.length}</div>
+          <div>incluyendo extras</div>
+        </div>
+        <div class="summary-card" style="background: #f0fdf4; border-color: #bbf7d0;">
+          <div>ÓRDENES PROCESADAS</div>
+          <div class="summary-number">${salesHistory.length}</div>
+          <div>ventas realizadas</div>
         </div>
       </div>
+    </div>
 
-      <!-- Tabla de Productos Vendidos -->
-      <h3 style="margin: 25px 0 15px 0; color: #1f2937;">DETALLE DE PRODUCTOS VENDIDOS</h3>
-      <table class="products-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Producto</th>
-            <th class="text-right">Precio Unitario</th>
-            <th class="text-center">Cant. Activa</th>
-            <th class="text-center">Cant. Cancelada</th>
-            <th class="text-right">Total Activo</th>
-            <th>Tipo</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${products
-            .map(
-              (product, index) => `
+    <!-- Tabla de Productos Vendidos SIN CANCELADOS Y ORDENADO POR FECHA -->
+    <h3 style="margin: 25px 0 15px 0; color: #1f2937;">DETALLE DE PRODUCTOS VENDIDOS (Ordenado por Fecha)</h3>
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Fecha del Pedido</th>
+          <th>Producto</th>
+          <th class="text-right">Precio Unitario</th>
+          <th class="text-center">Cantidad</th>
+          <th class="text-right">Total</th>
+          <th>Tipo</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${productsWithDates
+          .map((productWithDate, index) => {
+            const { product, orderDate } = productWithDate;
+            const formattedDate = orderDate ? formatDateTime(orderDate) : "N/A";
+
+            return `
             <tr class="${
               product.isExtra
                 ? "extra-row"
@@ -961,12 +1259,10 @@ export default function Dashboard({
                 : ""
             }">
               <td class="text-center">${index + 1}</td>
+              <td class="date-column">${formattedDate}</td>
               <td>${product.product_name}</td>
               <td class="text-right">${formatCurrency(product.price)}</td>
               <td class="text-center">${product.activeQuantity}</td>
-              <td class="text-center cancelled-info">${
-                product.cancelledQuantity > 0 ? product.cancelledQuantity : "-"
-              }</td>
               <td class="text-right">${formatCurrency(
                 product.activeSubtotal
               )}</td>
@@ -978,38 +1274,32 @@ export default function Dashboard({
                   : "Producto"
               }</td>
             </tr>
-          `
-            )
-            .join("")}
-        </tbody>
-      </table>
+          `;
+          })
+          .join("")}
+      </tbody>
+    </table>
 
-      <!-- Totales -->
-      <div class="totals-section">
-        <div class="total-row">
-          <span><strong>Total Items Activos:</strong></span>
-          <span><strong>${totalQuantity} unidades</strong></span>
-        </div>
-        <div class="total-row">
-          <span><strong>Total Items Cancelados:</strong></span>
-          <span><strong>${totalCancelledQuantity} unidades (${formatCurrency(
-      totalCancelledAmount
-    )})</strong></span>
-        </div>
-        <div class="total-row grand-total">
-          <span><strong>VENTA TOTAL ACTIVA:</strong></span>
-          <span><strong>${formatCurrency(totalSales)}</strong></span>
-        </div>
+    <!-- Totales -->
+    <div class="totals-section">
+      <div class="total-row">
+        <span><strong>Total Items Vendidos:</strong></span>
+        <span><strong>${totalQuantity} unidades</strong></span>
       </div>
+      <div class="total-row grand-total">
+        <span><strong>VENTA TOTAL:</strong></span>
+        <span><strong>${formatCurrency(totalSales)}</strong></span>
+      </div>
+    </div>
 
-      <div class="footer">
-        <div>*** REPORTE DE PRODUCTOS GENERADO AUTOMÁTICAMENTE ***</div>
-        <div>FoodHub Restaurant - Sistema de Gestión</div>
-        <div>${window.location.hostname}</div>
-      </div>
-    </body>
-    </html>
-  `;
+    <div class="footer">
+      <div>*** REPORTE DE PRODUCTOS ACTIVOS - GENERADO AUTOMÁTICAMENTE ***</div>
+      <div>FoodHub Restaurant - Sistema de Gestión</div>
+      <div>${window.location.hostname}</div>
+    </div>
+  </body>
+  </html>
+`;
 
     const printWindow = window.open("", "_blank");
     if (printWindow) {

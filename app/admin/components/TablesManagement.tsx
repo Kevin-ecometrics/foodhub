@@ -417,7 +417,6 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       canvas.height = 300;
 
       if (logoUrl) {
-        // Método 1: Usar toCanvas con logo integrado
         await QRCode.toCanvas(canvas, url, {
           width: 300,
           margin: 1,
@@ -426,11 +425,8 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
             light: "#FFFFFF",
           },
         });
-
-        // Integrar el logo directamente en el QR
         await integrateLogoIntoQR(canvas, logoUrl);
       } else {
-        // QR simple sin logo
         await QRCode.toCanvas(canvas, url, {
           width: 300,
           margin: 1,
@@ -441,20 +437,217 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         });
       }
 
-      // Abrir en nueva pestaña como antes
+      // CONVERTIR A DATA URL
       const qrDataUrl = canvas.toDataURL("image/png");
-      const qrImageUrl = URL.createObjectURL(
-        await (await fetch(qrDataUrl)).blob()
-      );
-      window.open(qrImageUrl, "_blank");
+
+      // MÉTODO CORREGIDO - SOLO MOSTRAR, NO DESCARGAR
+      await openQRInNewTabSafari(qrDataUrl, tableNumber);
     } catch (error) {
       console.error("Error generando QR:", error);
-      // Fallback
+      // Fallback - usar URL directa del servicio externo
       const fallbackUrl = `https://quickchart.io/qr?text=${encodeURIComponent(
         url
       )}&size=300&margin=1`;
-      window.open(fallbackUrl, "_blank");
+      await openQRInNewTabSafari(fallbackUrl, tableNumber);
     }
+  };
+
+  // FUNCIÓN ESPECÍFICA PARA SAFARI COMPATIBLE
+  const openQRInNewTabSafari = async (
+    imageUrl: string,
+    tableNumber?: number
+  ): Promise<boolean> => {
+    // Usar siempre el método de página HTML para máxima compatibilidad
+    return openQRWithHTMLPage(imageUrl, tableNumber);
+  };
+
+  // MÉTODO PRINCIPAL MEJORADO - SIEMPRE USAR PÁGINA HTML
+  const openQRWithHTMLPage = (
+    imageUrl: string,
+    tableNumber?: number
+  ): boolean => {
+    try {
+      const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>QR Code - Mesa ${tableNumber || ""}</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center; 
+            align-items: center; 
+            padding: 20px;
+          }
+          .qr-container {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+          }
+          .header {
+            margin-bottom: 20px;
+          }
+          .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 5px;
+          }
+          .header p {
+            color: #666;
+            font-size: 16px;
+          }
+          .qr-image {
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            border: 2px solid #f0f0f0;
+            border-radius: 10px;
+            margin: 0 auto;
+          }
+          .instruction {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+          }
+          .table-number {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 15px;
+          }
+          .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+          }
+          .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+          }
+          .btn-download {
+            background: #2196F3;
+            color: white;
+          }
+          .btn-download:hover {
+            background: #1976D2;
+          }
+          .btn-close {
+            background: #f5f5f5;
+            color: #333;
+          }
+          .btn-close:hover {
+            background: #e0e0e0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="qr-container">
+          <div class="header">
+            ${
+              tableNumber
+                ? `<div class="table-number">Mesa ${tableNumber}</div>`
+                : ""
+            }
+            <h1>Código QR</h1>
+            <p>Para pedir desde tu mesa</p>
+          </div>
+          
+          <img src="${imageUrl}" alt="QR Code" class="qr-image" />
+          
+          <div class="instruction">
+            <strong>¿Cómo usar?</strong><br>
+            1. Abre la cámara de tu teléfono<br>
+            2. Escanea el código QR<br>
+            3. Realiza tu pedido directamente
+          </div>
+          
+          <div class="actions">
+            <button class="btn btn-download" onclick="downloadQR()">Descargar QR</button>
+            <button class="btn btn-close" onclick="window.close()">Cerrar</button>
+          </div>
+        </div>
+
+        <script>
+          function downloadQR() {
+            const link = document.createElement('a');
+            link.href = '${imageUrl}';
+            link.download = 'qr-mesa-${tableNumber || "menu"}-${
+        new Date().toISOString().split("T")[0]
+      }.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+      const newWindow = window.open(
+        "",
+        "_blank",
+        "width=500,height=700,scrollbars=no,resizable=no"
+      );
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        return true;
+      } else {
+        // Si falla window.open, mostrar en la misma ventana
+        showQRInCurrentWindow(imageUrl, tableNumber);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error abriendo QR:", error);
+      showQRInCurrentWindow(imageUrl, tableNumber);
+      return false;
+    }
+  };
+
+  // FALLBACK: Mostrar en la misma ventana si no se puede abrir nueva
+  const showQRInCurrentWindow = (imageUrl: string, tableNumber?: number) => {
+    const htmlContent = `
+    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:10000;">
+      <div style="background:white;padding:30px;border-radius:15px;text-align:center;max-width:400px;margin:20px;">
+        <h2 style="color:#333;margin-bottom:15px;">QR Code - Mesa ${
+          tableNumber || ""
+        }</h2>
+        <img src="${imageUrl}" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:10px;" />
+        <p style="color:#666;margin:15px 0;">Escanea el código QR con tu cámara</p>
+        <button onclick="this.parentElement.parentElement.remove()" style="background:#2196F3;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  `;
+
+    const overlay = document.createElement("div");
+    overlay.innerHTML = htmlContent;
+    document.body.appendChild(overlay);
   };
 
   // Función para integrar el logo en el QR
