@@ -75,7 +75,7 @@ const SatisfactionSurvey = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 max-w-md w-full mx-4">
+    <div className="bg-white rounded-2xl shadow-lg p-6 max-w-xl mx-auto w-full mx-4">
       <div className="text-center mb-6">
         <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <FaStar className="text-yellow-500 text-2xl" />
@@ -563,8 +563,18 @@ export default function PaymentPage() {
   const userId = searchParams.get("user");
   const orderId = searchParams.get("order");
 
-  const { currentTableId, notificationState, createBillNotification } =
-    useOrder();
+  const {
+    currentTableId,
+    notificationState,
+    createBillNotification,
+    refreshOrder,
+  } = useOrder();
+
+  useEffect(() => {
+    if (tableId && !currentTableId) {
+      refreshOrder(parseInt(tableId));
+    }
+  }, [tableId, currentTableId, refreshOrder]);
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
@@ -576,6 +586,48 @@ export default function PaymentPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState({ status: "pending" });
+
+  const loadOrders = async () => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const orders = await historyService.getCustomerOrderHistory(
+        parseInt(targetTableId.toString())
+      );
+
+      const pendingOrders = orders.filter(
+        (order) => order.status === "active" || order.status === "sent"
+      );
+
+      const processedOrders = pendingOrders.map((order) => ({
+        ...order,
+        order_items: order.order_items.map((item) => ({
+          ...item,
+          cancelled_quantity: item.cancelled_quantity || 0,
+          ...(item.status === "cancelled" &&
+            !item.cancelled_quantity && {
+              cancelled_quantity: item.quantity,
+            }),
+        })),
+      }));
+
+      setAllOrders(processedOrders);
+
+      if (processedOrders.length === 0) {
+        setError("No hay órdenes pendientes de pago");
+      }
+    } catch (error) {
+      console.error("Error loading orders for payment:", error);
+      setError("Error cargando las órdenes para pago");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const saveSurveyToDatabase = async (rating: number, comment: string) => {
     try {
@@ -760,6 +812,154 @@ export default function PaymentPage() {
     (total, customer) => total + customer.cancelledUnitsCount,
     0
   );
+
+  // Agrega después de los otros useEffects, antes de las funciones
+
+  // 1. SUSCRIPCIÓN EN TIEMPO REAL PARA ÓRDENES
+  useEffect(() => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    console.log("🔄 Iniciando suscripción en tiempo real para órdenes");
+
+    // Suscribirse a cambios en la tabla de órdenes
+    const ordersSubscription = supabase
+      .channel(`table-${targetTableId}-orders`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // INSERT, UPDATE, DELETE
+          schema: "public",
+          table: "orders",
+          filter: `table_id=eq.${targetTableId}`,
+        },
+        (payload) => {
+          console.log("📦 Cambio en órdenes recibido:", payload);
+
+          // Recargar las órdenes cuando haya cualquier cambio
+          loadOrders();
+        }
+      )
+      .subscribe((status) => {
+        console.log("Estado de suscripción a órdenes:", status);
+      });
+
+    return () => {
+      console.log("🔕 Limpiando suscripción a órdenes");
+      ordersSubscription.unsubscribe();
+    };
+  }, [tableId, currentTableId]);
+
+  // 2. SUSCRIPCIÓN EN TIEMPO REAL PARA NOTIFICACIONES DE PAGO
+  useEffect(() => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    console.log("💰 Iniciando suscripción en tiempo real para pagos");
+
+    // Suscribirse a cambios en waiter_notifications
+    const paymentsSubscription = supabase
+      .channel(`table-${targetTableId}-payments`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "waiter_notifications",
+          filter: `table_id=eq.${targetTableId}`,
+        },
+        (payload) => {
+          console.log("💳 Cambio en notificaciones de pago:", payload);
+
+          // Si es una actualización de estado de pago
+          if (payload.eventType === "UPDATE") {
+            const newStatus = payload.new.status;
+            const notificationType = payload.new.type;
+
+            // Solo procesar notificaciones de tipo bill_request
+            if (notificationType === "bill_request") {
+              if (newStatus === "completed") {
+                console.log("✅ Pago completado en tiempo real");
+                setPaymentStatus({ status: "verified" });
+                setPaymentConfirmed(true);
+                setShowSurvey(true);
+              } else if (newStatus === "cancelled") {
+                console.log("❌ Pago cancelado en tiempo real");
+                setPaymentStatus({ status: "pending" });
+              }
+            }
+          }
+
+          // Si es una nueva notificación de pago
+          if (payload.eventType === "INSERT") {
+            const newNotification = payload.new;
+            if (
+              newNotification.type === "bill_request" &&
+              newNotification.status === "pending"
+            ) {
+              console.log("🔄 Nueva solicitud de pago recibida");
+              // Tu contexto useOrder ya debería manejar esto automáticamente
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("Estado de suscripción a pagos:", status);
+      });
+
+    return () => {
+      console.log("🔕 Limpiando suscripción a pagos");
+      paymentsSubscription.unsubscribe();
+    };
+  }, [tableId, currentTableId]);
+
+  // 3. POLLING COMO FALLBACK (por si fallan los WebSockets)
+  useEffect(() => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        // Verificar estado de pago
+        if (notificationState.hasPendingBill) {
+          const { data: notifications, error } = await supabase
+            .from("waiter_notifications")
+            .select("*")
+            .eq("table_id", targetTableId)
+            .eq("type", "bill_request")
+            .in("status", ["completed", "cancelled"])
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (!error && notifications && notifications.length > 0) {
+            const latestNotification = notifications[0] as any;
+
+            if (
+              latestNotification.status === "completed" &&
+              !paymentConfirmed
+            ) {
+              console.log("✅ Pago completado vía polling");
+              setPaymentStatus({ status: "verified" });
+              setPaymentConfirmed(true);
+              setShowSurvey(true);
+            } else if (latestNotification.status === "cancelled") {
+              console.log("❌ Pago cancelado vía polling");
+              setPaymentStatus({ status: "pending" });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error en polling:", error);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [
+    tableId,
+    currentTableId,
+    notificationState.hasPendingBill,
+    paymentConfirmed,
+  ]);
 
   useEffect(() => {
     if (paymentConfirmed && countdown > 0 && surveyCompleted) {
@@ -1426,12 +1626,6 @@ export default function PaymentPage() {
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button
-                  onClick={() => router.back()}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
-                >
-                  <FaArrowLeft className="text-gray-600" />
-                </button>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-800">
                     Ticket de Pago
@@ -1452,12 +1646,35 @@ export default function PaymentPage() {
                   )}
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(paymentSummary.total)}
-                </p>
-                <p className="text-sm text-gray-500">Total a pagar</p>
-              </div>
+
+              {/* Botón de recargar */}
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  loadOrders();
+                }}
+                disabled={loading}
+                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                )}
+                {loading ? "Actualizando..." : "Actualizar"}
+              </button>
             </div>
           </div>
         </header>
@@ -1583,8 +1800,10 @@ export default function PaymentPage() {
             </div>
 
             <div className="bg-gray-50 p-6 text-center text-sm text-gray-500 border-t">
-              <p className="font-medium mb-2">¡Gracias por su preferencia!</p>
-              <p>Presione Ya Pagué cuando haya completado el pago</p>
+              <div className="bg-gray-50 p-6 text-center text-sm text-gray-500 border-t">
+                <p className="font-medium mb-2">¡Gracias por su preferencia!</p>
+                <p>Presione Ya Pagué cuando haya completado el pago</p>
+              </div>
             </div>
           </div>
 
@@ -1647,4 +1866,7 @@ export default function PaymentPage() {
       />
     </>
   );
+}
+function setPaymentStatus(arg0: { status: string }) {
+  throw new Error("Function not implemented.");
 }
