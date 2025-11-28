@@ -144,7 +144,7 @@ export default function WaiterDashboard() {
           isUpdatingRef.current = false;
         }, 100);
       });
-    }, 30000);
+    }, 120000);
 
     return () => {
       unsubscribe();
