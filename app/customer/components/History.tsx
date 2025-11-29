@@ -57,6 +57,15 @@ interface CustomerOrderSummary {
   cancelledAmount: number;
 }
 
+// Interfaces para localStorage
+interface StoredUserData {
+  userId: string;
+  orderId: string;
+  tableId: number;
+  userName: string;
+  timestamp: number;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,6 +81,7 @@ export default function HistoryPage() {
     refreshOrder,
     getTableUsers,
     switchUserOrder,
+    setCurrentUserOrder,
   } = useOrder();
 
   const [orderHistory, setOrderHistory] = useState<OrderWithItems[]>([]);
@@ -83,9 +93,57 @@ export default function HistoryPage() {
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
 
+  // Estado local para datos persistidos
+  const [storedUserData, setStoredUserData] = useState<StoredUserData | null>(null);
+
   // Refs para prevenir loops infinitos
   const isSubscribedRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
+
+  // Funciones para localStorage
+  const saveUserToLocalStorage = (userData: StoredUserData) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('historyUserData', JSON.stringify(userData));
+        setStoredUserData(userData);
+        console.log("💾 Datos guardados en localStorage:", userData);
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
+    }
+  };
+
+  const loadUserFromLocalStorage = (): StoredUserData | null => {
+    if (typeof window !== 'undefined') {
+      try {
+        const item = localStorage.getItem('historyUserData');
+        if (item) {
+          const data = JSON.parse(item);
+          // Verificar que los datos no sean muy viejos (menos de 24 horas)
+          const isExpired = Date.now() - data.timestamp > 24 * 60 * 60 * 1000;
+          if (!isExpired) {
+            console.log("📂 Datos cargados desde localStorage:", data);
+            setStoredUserData(data);
+            return data;
+          } else {
+            console.log("🧹 Datos localStorage expirados");
+            localStorage.removeItem('historyUserData');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading from localStorage:', error);
+      }
+    }
+    return null;
+  };
+
+  const clearUserFromLocalStorage = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('historyUserData');
+      setStoredUserData(null);
+      console.log("🧹 Datos eliminados de localStorage");
+    }
+  };
 
   // Función para formatear notas y extras
   const formatItemNotes = (notes: string | null) => {
@@ -200,7 +258,6 @@ export default function HistoryPage() {
   };
 
   // Función para renderizar items de orden (incluyendo cancelados)
-  // Función para renderizar items de orden (incluyendo cancelados) - CORREGIDA
   const renderOrderItem = (item: any) => {
     const isCancelled = item.status === "cancelled";
     const cancelledQty = item.cancelled_quantity || 0;
@@ -209,8 +266,6 @@ export default function HistoryPage() {
     const isFullyCancelled = cancelledQty > 0 && activeQuantity === 0;
 
     // DETERMINAR EL ESTADO REAL DEL PEDIDO
-    // Si está parcialmente cancelado, mostrar el estado actual del pedido
-    // Si está completamente cancelado, mostrar como cancelado
     const showOrderStatus = !isFullyCancelled;
 
     return (
@@ -372,10 +427,11 @@ export default function HistoryPage() {
 
   // Cargar usuarios de la mesa
   useEffect(() => {
-    if (tableId) {
-      loadTableUsers(parseInt(tableId));
+    const targetTableId = tableId || storedUserData?.tableId;
+    if (targetTableId) {
+      loadTableUsers(parseInt(targetTableId.toString()));
     }
-  }, [tableId]);
+  }, [tableId, storedUserData]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -386,16 +442,60 @@ export default function HistoryPage() {
     }
   };
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales - MODIFICADO con persistencia
   useEffect(() => {
-    if (tableId && orderId && userId) {
-      loadInitialData(parseInt(tableId), orderId, userId);
-    } else if (tableId) {
-      // Si solo tenemos la mesa, redirigir a select-user
-      router.push(`/customer/select-user?table=${tableId}`);
-    } else {
-      router.push("/customer");
-    }
+    const initializeData = async () => {
+      try {
+        setLoading(true);
+        
+        // PRIMERO: Intentar cargar desde localStorage
+        const storedData = loadUserFromLocalStorage();
+        
+        // SEGUNDO: Si hay datos en localStorage y no tenemos parámetros URL, usarlos
+        if (storedData && (!userId || !orderId)) {
+          console.log("🔄 Usando datos persistidos de localStorage");
+          await setCurrentUserOrder(storedData.orderId, storedData.userId);
+          await loadHistory(storedData.tableId);
+          setLoading(false);
+          return;
+        }
+
+        // TERCERO: Si tenemos parámetros URL, usarlos y guardar en localStorage
+        if (tableId && orderId && userId) {
+          console.log("📥 Cargando desde parámetros URL");
+          
+          // Guardar en localStorage para futuros refreshes
+          const userData: StoredUserData = {
+            userId,
+            orderId,
+            tableId: parseInt(tableId),
+            userName: currentOrder?.customer_name || "Usuario",
+            timestamp: Date.now()
+          };
+          saveUserToLocalStorage(userData);
+          
+          await loadInitialData(parseInt(tableId), orderId, userId);
+          return;
+        }
+
+        // CUARTO: Si solo tenemos mesa, redirigir a select-user
+        if (tableId) {
+          router.push(`/customer/select-user?table=${tableId}`);
+          return;
+        }
+
+        // QUINTO: Si no hay nada, redirigir al inicio
+        router.push("/customer");
+
+      } catch (error) {
+        console.error("Error initializing data:", error);
+        setError("Error al cargar los datos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeData();
   }, [tableId, orderId, userId, router]);
 
   const loadInitialData = async (
@@ -406,6 +506,9 @@ export default function HistoryPage() {
     try {
       setLoading(true);
 
+      // Usar setCurrentUserOrder para cargar la orden
+      await setCurrentUserOrder(orderId, userId);
+      
       // También refrescar la orden actual para obtener los últimos items
       if (currentTableId) {
         await refreshOrder(currentTableId);
@@ -596,13 +699,23 @@ export default function HistoryPage() {
     }
   };
 
-  // Cambiar de usuario
+  // Cambiar de usuario - MODIFICADO para guardar en localStorage
   const handleSwitchUser = async (user: TableUser) => {
     try {
       await switchUserOrder(user.orderId, user.id);
       setShowUserSwitch(false);
 
-      // Actualizar URL
+      // Guardar en localStorage
+      const userData: StoredUserData = {
+        userId: user.id,
+        orderId: user.orderId,
+        tableId: parseInt(tableId || currentTableId?.toString() || "0"),
+        userName: user.name,
+        timestamp: Date.now()
+      };
+      saveUserToLocalStorage(userData);
+
+      // Actualizar URL (opcional, para compatibilidad)
       router.push(
         `/customer/history?table=${tableId}&user=${user.id}&order=${user.orderId}`
       );
@@ -612,12 +725,13 @@ export default function HistoryPage() {
     }
   };
 
-  // Agregar nuevo usuario
+  // Agregar nuevo usuario - MODIFICADO para guardar en localStorage
   const handleAddNewUser = async () => {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
 
-    if (!tableId) {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId) {
       alert("No se encontró la mesa");
       return;
     }
@@ -625,12 +739,22 @@ export default function HistoryPage() {
     try {
       // Crear nueva orden para el nuevo usuario
       const newOrder = await historyService.createOrder(
-        parseInt(tableId),
+        parseInt(targetTableId.toString()),
         userName.trim()
       );
 
       // Actualizar lista de usuarios
-      await loadTableUsers(parseInt(tableId));
+      await loadTableUsers(parseInt(targetTableId.toString()));
+
+      // Guardar en localStorage inmediatamente
+      const userData: StoredUserData = {
+        userId: newOrder.id,
+        orderId: newOrder.id,
+        tableId: parseInt(targetTableId.toString()),
+        userName: userName.trim(),
+        timestamp: Date.now()
+      };
+      saveUserToLocalStorage(userData);
 
       // Cambiar al nuevo usuario
       await handleSwitchUser({
@@ -689,7 +813,7 @@ export default function HistoryPage() {
 
   // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
   useEffect(() => {
-    const targetTableId = tableId || currentTableId;
+    const targetTableId = tableId || currentTableId || storedUserData?.tableId;
     if (!targetTableId || isSubscribedRef.current) return;
 
     console.log("🔔 History: Iniciando suscripción para cambios en órdenes");
@@ -764,6 +888,8 @@ export default function HistoryPage() {
 
           if (payload.new.type === "table_freed") {
             console.log("🚨 History: Mesa liberada - Redirigiendo...");
+            // Limpiar localStorage cuando se libere la mesa
+            clearUserFromLocalStorage();
             alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
             window.location.href = "/customer";
           }
@@ -780,7 +906,7 @@ export default function HistoryPage() {
       notificationSubscription.unsubscribe();
       isSubscribedRef.current = false;
     };
-  }, [tableId, currentTableId]);
+  }, [tableId, currentTableId, storedUserData]);
 
   const handleAssistanceRequest = async () => {
     const targetTableId = tableId || currentTableId;
@@ -817,8 +943,19 @@ export default function HistoryPage() {
     }).format(amount);
   };
 
+  // Obtener datos del usuario actual (del contexto o localStorage)
+  const getCurrentUserDisplay = () => {
+    if (currentOrder?.customer_name) {
+      return currentOrder.customer_name;
+    }
+    if (storedUserData?.userName) {
+      return storedUserData.userName;
+    }
+    return "Invitado";
+  };
+
   // Mostrar loading mientras se obtiene tableId
-  if (tableId === null) {
+  if (tableId === null && !storedUserData) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -854,7 +991,7 @@ export default function HistoryPage() {
     );
   }
 
-  const targetTableId = tableId || currentTableId;
+  const targetTableId = tableId || currentTableId || storedUserData?.tableId;
   const customerSummaries = groupOrdersByCustomer();
 
   // Calcular total general de la mesa
@@ -882,8 +1019,8 @@ export default function HistoryPage() {
                 Historial de Pedidos
               </h1>
               <p className="text-sm text-gray-500">
-                Mesa {targetTableId} •{" "}
-                {currentOrder?.customer_name || "Invitado"}
+                Mesa {targetTableId} • {getCurrentUserDisplay()}
+                {storedUserData && ""}
               </p>
               <p className="text-sm text-blue-600 font-medium">
                 {customerSummaries.length} comensal
@@ -1056,11 +1193,12 @@ export default function HistoryPage() {
               Aún no has realizado ningún pedido en esta mesa
             </p>
             <button
-              onClick={() =>
-                router.push(
-                  `/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`
-                )
-              }
+              onClick={() => {
+                const targetTableId = tableId || currentTableId;
+                if (targetTableId) {
+                  router.push(`/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`);
+                }
+              }}
               className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
             >
               Hacer mi primer pedido
@@ -1198,11 +1336,12 @@ export default function HistoryPage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
         <div className="max-w-7xl mx-auto flex justify-around py-3">
           <button
-            onClick={() =>
-              router.push(
-                `/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`
-              )
-            }
+            onClick={() => {
+              const targetTableId = tableId || currentTableId;
+              if (targetTableId) {
+                router.push(`/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`);
+              }
+            }}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaUtensils className="text-2xl mb-1" />
@@ -1213,11 +1352,12 @@ export default function HistoryPage() {
             <span className="text-xs font-medium">Cuenta</span>
           </button>
           <button
-            onClick={() =>
-              router.push(
-                `/customer/qr?table=${targetTableId}&user=${userId}&order=${orderId}`
-              )
-            }
+            onClick={() => {
+              const targetTableId = tableId || currentTableId;
+              if (targetTableId) {
+                router.push(`/customer/qr?table=${targetTableId}&user=${userId}&order=${orderId}`);
+              }
+            }}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaQrcode className="text-2xl mb-1" />
