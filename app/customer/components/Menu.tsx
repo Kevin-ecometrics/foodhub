@@ -779,7 +779,7 @@ export default function MenuPage() {
     if (uniqueProducts > 4) estimatedTime += 8;
     else if (uniqueProducts > 2) estimatedTime += 5;
 
-    return Math.min(Math.max(estimatedTime, 10), 45);
+    return Math.min(Math.max(estimatedTime, 5), 45);
   };
 
   const getPopularItems = () => {
