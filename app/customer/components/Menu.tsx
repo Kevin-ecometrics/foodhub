@@ -1,6 +1,8 @@
+// app/customer/menu/page.tsx
 "use client";
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { ordersService } from "@/app/lib/supabase/orders";
@@ -20,10 +22,10 @@ import {
   FaFire,
   FaClock,
   FaUser,
-  FaUsers,
   FaEdit,
   FaQuestion,
   FaStickyNote,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
@@ -57,6 +59,12 @@ const CATEGORIES = [
   { id: "breakfast", name: "Breakfast", icon: "🍳", description: "Desayunos" },
   { id: "lunch", name: "Lunch", icon: "🍱", description: "Almuerzos" },
   { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
+  {
+    id: "refill",
+    name: "Refill",
+    icon: "🥤",
+    description: "Refill de bebidas",
+  },
 ];
 
 interface TableUser {
@@ -67,10 +75,18 @@ interface TableUser {
 
 export default function MenuPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
-  const userId = searchParams.get("user");
-  const orderId = searchParams.get("order");
+  const { session, clearSession, updateSession } = useSession();
+
+  // Estados para controlar la carga y verificación
+  const [hasCheckedSession, setHasCheckedSession] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Obtener datos de la sesión en lugar de searchParams
+  const tableId = session?.tableId;
+  const userId = session?.userId;
+  const orderId = session?.orderId;
+  const customerName = session?.customerName;
+  const tableNumber = session?.tableNumber;
 
   const {
     currentOrder,
@@ -119,15 +135,13 @@ export default function MenuPage() {
     [key: string]: boolean;
   }>({});
 
-  // Función para formatear notas y extras (MEJORADA)
+  // Función para formatear notas y extras
   const formatItemNotes = (notes: string | null) => {
     if (!notes) return null;
 
-    // Detectar si tiene información de extras con precios
     const hasPricedExtras = notes.includes("(+$");
 
     if (hasPricedExtras) {
-      // Separar notas principales de extras
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
         (part) => !part.includes("Extras:") && !part.includes("Total:")
@@ -137,7 +151,6 @@ export default function MenuPage() {
 
       return (
         <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          {/* Notas principales */}
           {mainNotes && (
             <div className="flex items-start gap-2">
               <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
@@ -147,7 +160,6 @@ export default function MenuPage() {
             </div>
           )}
 
-          {/* Extras con precios */}
           {extrasPart && (
             <div className="flex items-start gap-2">
               <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
@@ -177,7 +189,6 @@ export default function MenuPage() {
             </div>
           )}
 
-          {/* Total si está presente */}
           {totalPart && (
             <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
               <FaStickyNote className="text-blue-500 mt-0.5 flex-shrink-0" />
@@ -190,7 +201,6 @@ export default function MenuPage() {
       );
     }
 
-    // Detectar extras simples (sin precios)
     if (notes.includes("Extras:")) {
       const parts = notes.split(" | ");
       let mainNotes = "";
@@ -220,7 +230,6 @@ export default function MenuPage() {
       );
     }
 
-    // Notas normales
     return (
       <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
         <p className="text-sm text-yellow-800 flex items-center gap-1">
@@ -231,43 +240,101 @@ export default function MenuPage() {
     );
   };
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales - MEJORADO PARA MANEJAR REFRESH
   useEffect(() => {
-    if (tableId && orderId && userId) {
-      loadInitialData(parseInt(tableId), orderId, userId);
-    } else {
-      router.push("/customer");
-    }
-  }, [tableId, orderId, userId, router]);
+    // Primer efecto: verificar y cargar sesión
+    const checkAndLoadSession = async () => {
+      // Si ya verificamos, no hacer nada
+      if (hasCheckedSession) return;
+
+      // Intentar recuperar sesión del localStorage como fallback
+      if (!session && !tableId && !orderId && !userId) {
+        try {
+          const storedSession = localStorage.getItem("customerSession");
+          if (storedSession) {
+            const parsedSession = JSON.parse(storedSession);
+            console.log("Recuperando sesión de localStorage:", parsedSession);
+            updateSession(parsedSession);
+
+            // Dar tiempo para que la sesión se actualice
+            setTimeout(() => {
+              setHasCheckedSession(true);
+              setIsInitialLoad(false);
+            }, 100);
+            return;
+          }
+        } catch (error) {
+          console.error("Error parsing stored session:", error);
+        }
+      }
+
+      // Si tenemos datos de sesión, marcar como verificados
+      if (tableId && orderId && userId) {
+        console.log("Sesión válida encontrada:", { tableId, orderId, userId });
+        setHasCheckedSession(true);
+        setIsInitialLoad(false);
+      } else if (session) {
+        // Si hay sesión pero faltan datos, intentar recuperar
+        console.log("Sesión parcial, intentando recuperar datos...");
+        setHasCheckedSession(true);
+        setIsInitialLoad(false);
+      }
+    };
+
+    checkAndLoadSession();
+  }, [session, tableId, orderId, userId, hasCheckedSession, updateSession]);
+
+  // Segundo efecto: cargar datos una vez verificada la sesión
+  useEffect(() => {
+    if (!hasCheckedSession || isInitialLoad) return;
+
+    const loadData = async () => {
+      // Si no tenemos los datos mínimos, redirigir
+      if (!tableId || !orderId || !userId) {
+        console.log("Faltan datos esenciales, redirigiendo...");
+        router.push("/customer");
+        return;
+      }
+
+      try {
+        await loadInitialData(parseInt(tableId), orderId, userId);
+      } catch (error) {
+        console.error("Error fatal al cargar datos:", error);
+        router.push("/customer");
+      }
+    };
+
+    loadData();
+  }, [hasCheckedSession, isInitialLoad, tableId, orderId, userId, router]);
 
   // Cargar usuarios de la mesa
   useEffect(() => {
-    if (tableId) {
+    if (tableId && hasCheckedSession) {
       loadTableUsers(parseInt(tableId));
     }
-  }, [tableId]);
+  }, [tableId, hasCheckedSession]);
 
+  // Scroll handling (mantener igual)
   useEffect(() => {
-    if (products.length === 0) return;
+    if (products.length === 0 || !hasCheckedSession) return;
 
     const handleScroll = () => {
-      const scrollPosition = window.scrollY + 100; // Offset para cuando la categoría está cerca del top
+      // Calcular la altura real del navbar (incluyendo todos los elementos fijos)
+      const navbarHeight = 220; // Ajusta este valor según la altura real de tu navbar
 
-      // Encontrar todas las categorías que tienen productos
+      const scrollPosition = window.scrollY + navbarHeight;
       const availableCategories = CATEGORIES.filter(
         (category) => getProductsByCategory(category.id).length > 0
       );
 
-      let currentActiveCategory = "favorites";
+      let currentActiveCategory = availableCategories[0]?.id || "favorites";
 
-      // Buscar la categoría que está actualmente en vista
       for (const category of availableCategories) {
         const element = categoryRefs.current[category.id];
         if (element) {
           const elementTop = element.offsetTop;
           const elementBottom = elementTop + element.offsetHeight;
 
-          // Si el scroll position está dentro de los límites de esta categoría
           if (scrollPosition >= elementTop && scrollPosition < elementBottom) {
             currentActiveCategory = category.id;
             break;
@@ -275,13 +342,11 @@ export default function MenuPage() {
         }
       }
 
-      // Solo actualizar si cambió la categoría
       if (currentActiveCategory !== selectedCategory) {
         setSelectedCategory(currentActiveCategory);
       }
     };
 
-    // Agregar event listener con throttling para mejor performance
     let ticking = false;
     const throttledScroll = () => {
       if (!ticking) {
@@ -294,14 +359,12 @@ export default function MenuPage() {
     };
 
     window.addEventListener("scroll", throttledScroll, { passive: true });
-
-    // Ejecutar una vez al cargar para establecer la categoría inicial correcta
     handleScroll();
 
     return () => {
       window.removeEventListener("scroll", throttledScroll);
     };
-  }, [products, selectedCategory]); // Dependencias necesarias
+  }, [products, selectedCategory, hasCheckedSession]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -320,42 +383,68 @@ export default function MenuPage() {
     try {
       setIsLoading(true);
 
-      // Establecer la orden del usuario actual
-      await setCurrentUserOrder(orderId, userId);
+      // Verificar que la orden exista
+      try {
+        const orderExists = await ordersService.getOrder(orderId);
+        if (!orderExists) {
+          console.log("La orden no existe, creando nueva...");
+          // Crear nueva orden
+          const newOrderId = await createNewOrder(customerName || "Cliente");
+          // Actualizar sesión con la nueva orden
+          updateSession({
+            userId: newOrderId,
+            orderId: newOrderId,
+          });
+          await setCurrentUserOrder(newOrderId, newOrderId);
+        } else {
+          await setCurrentUserOrder(orderId, userId);
+        }
+      } catch (orderError) {
+        console.error("Error verificando orden:", orderError);
+        // Continuar intentando cargar productos
+      }
 
-      // Cargar productos
       const productsData = await productsService.getProducts();
       setProducts(productsData);
-
-      // Cargar items recientes
       await updateRecentItems();
     } catch (error) {
       console.error("Error loading data:", error);
-      alert("Error al cargar el menú. Redirigiendo...");
-      router.push("/customer");
+      // NO redirigir inmediatamente, intentar recuperar
+      try {
+        // Cargar productos como mínimo
+        const productsData = await productsService.getProducts();
+        setProducts(productsData);
+
+        // Mostrar mensaje al usuario
+        alert(
+          "⚠️ Hubo un problema al cargar tu orden anterior, pero puedes hacer un nuevo pedido."
+        );
+      } catch (recoveryError) {
+        console.error("Error en recuperación:", recoveryError);
+        // Solo redirigir si falla todo
+        router.push("/customer");
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Resetear lastOrderSent cuando se agregan nuevos items al carrito
   useEffect(() => {
     if (lastOrderSent && orderItems.length > 0) {
       setLastOrderSent(false);
     }
   }, [orderItems.length, lastOrderSent]);
 
-  // Actualizar items recientes y favoritos
   useEffect(() => {
     updateFavoriteItems();
   }, [orderItems, products]);
 
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
-    if (targetTableId && products.length > 0) {
+    if (targetTableId && products.length > 0 && hasCheckedSession) {
       updateRecentItems();
     }
-  }, [tableId, currentTableId, products]);
+  }, [tableId, currentTableId, products, hasCheckedSession]);
 
   useEffect(() => {
     if (lastOrderSent) {
@@ -392,7 +481,7 @@ export default function MenuPage() {
     setFavoriteItems(favorites);
   };
 
-  // FUNCIONES PARA MANEJAR EXTRAS
+  // FUNCIONES PARA MANEJAR EXTRAS (mantener igual)
   const handleExtraToggle = (extraName: string) => {
     setSelectedExtras((prev) => ({
       ...prev,
@@ -402,7 +491,6 @@ export default function MenuPage() {
 
   const calculateTotalWithExtras = () => {
     if (!selectedProduct) return 0;
-
     const basePrice = selectedProduct.price;
     const extrasTotal = Object.entries(selectedExtras)
       .filter(([_, isSelected]) => isSelected)
@@ -410,7 +498,6 @@ export default function MenuPage() {
         const extra = selectedProduct.extras?.find((e) => e.name === extraName);
         return total + (extra?.price || 0);
       }, 0);
-
     return basePrice + extrasTotal;
   };
 
@@ -421,7 +508,6 @@ export default function MenuPage() {
     setEditingItem(null);
   };
 
-  // FUNCIONES PARA EL MODAL DE NOTAS Y EXTRAS
   const handleAddToCartWithNotes = (product: Product) => {
     setSelectedProduct(product);
     setNotes("");
@@ -444,14 +530,10 @@ export default function MenuPage() {
   const handleConfirmAddWithNotes = async () => {
     if (!selectedProduct) return;
 
-    // ✅ VALIDACIÓN MEJORADA: Detectar si solo hay espacios vacíos
     const trimmedNotes = notes.trim();
-
-    // Verificar si hay texto que no sean solo espacios
     const hasValidNotes = trimmedNotes.length > 0;
     const hasOnlySpaces = notes.length > 0 && trimmedNotes.length === 0;
 
-    // Si el usuario escribió algo pero solo son espacios, mostrar error
     if (hasOnlySpaces) {
       alert(
         "❌ Las instrucciones especiales no pueden contener solo espacios en blanco."
@@ -459,7 +541,6 @@ export default function MenuPage() {
       return;
     }
 
-    // ✅ VALIDACIÓN EXISTENTE: Si hay texto válido, debe tener al menos 2 caracteres
     if (hasValidNotes && trimmedNotes.length < 2) {
       alert(
         "❌ Las instrucciones especiales deben tener al menos 2 caracteres válidos."
@@ -467,10 +548,8 @@ export default function MenuPage() {
       return;
     }
 
-    // ✅ VALIDACIÓN: Si no hay extras seleccionados y no hay notas válidas, usar el método simple
     const hasExtras = Object.values(selectedExtras).some((value) => value);
     if (!hasExtras && !hasValidNotes) {
-      // Usar el método simple de agregar al carrito sin notas
       setAddingProduct(selectedProduct.id);
       try {
         await addToCart(selectedProduct);
@@ -486,7 +565,6 @@ export default function MenuPage() {
 
     setAddingProduct(selectedProduct.id);
     try {
-      // Calcular el precio total con extras
       const basePrice = selectedProduct.price;
       const extrasTotal = Object.entries(selectedExtras)
         .filter(([_, isSelected]) => isSelected)
@@ -499,7 +577,6 @@ export default function MenuPage() {
 
       const totalPrice = basePrice + extrasTotal;
 
-      // Preparar notas incluyendo los extras seleccionados
       const selectedExtrasList = Object.entries(selectedExtras)
         .filter(([_, isSelected]) => isSelected)
         .map(([extraName]) => {
@@ -512,7 +589,7 @@ export default function MenuPage() {
           };
         });
 
-      let finalNotes = hasValidNotes ? trimmedNotes : ""; // Usar el texto validado o vacío
+      let finalNotes = hasValidNotes ? trimmedNotes : "";
       if (selectedExtrasList.length > 0) {
         const extrasDetails = selectedExtrasList
           .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
@@ -523,13 +600,11 @@ export default function MenuPage() {
           ? `${trimmedNotes} | ${extrasText}`
           : extrasText;
 
-        // Agregar información del total si hay extras
         if (extrasTotal > 0) {
           finalNotes += ` | Total: $${totalPrice.toFixed(2)}`;
         }
       }
 
-      // ✅ NUEVA LÓGICA: Verificar si ya existe un item IDÉNTICO en el carrito
       const existingItem = orderItems.find(
         (item) =>
           item.product_id === selectedProduct.id &&
@@ -538,10 +613,8 @@ export default function MenuPage() {
       );
 
       if (existingItem) {
-        // ✅ Si existe un item idéntico, incrementar la cantidad
         await updateCartItem(existingItem.id, existingItem.quantity + 1);
       } else if (editingItem) {
-        // Editar item existente CON PRECIO ACTUALIZADO
         await updateCartItem(
           editingItem.id,
           editingItem.quantity,
@@ -549,7 +622,6 @@ export default function MenuPage() {
           totalPrice
         );
       } else {
-        // Agregar nuevo producto con notas, extras y PRECIO CORRECTO
         await addToCart(selectedProduct, 1, finalNotes, totalPrice);
       }
 
@@ -565,7 +637,7 @@ export default function MenuPage() {
   // Suscripción para detectar liberación de mesa
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!targetTableId || !hasCheckedSession) return;
 
     const subscription = supabase
       .channel(`customer-menu-table-${targetTableId}`)
@@ -580,6 +652,7 @@ export default function MenuPage() {
         (payload) => {
           if (payload.new.type === "table_freed") {
             alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
+            clearSession();
             window.location.href = "/customer";
           }
         }
@@ -589,15 +662,12 @@ export default function MenuPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [tableId, currentTableId]);
+  }, [tableId, currentTableId, clearSession, hasCheckedSession]);
 
-  // FUNCIÓN ORIGINAL: Agregar producto sin notas (mantenida para compatibilidad)
   const handleAddToCart = async (product: Product) => {
     setAddingProduct(product.id);
     try {
       await addToCart(product);
-
-      // Animación de confirmación
       const button = document.getElementById(`product-${product.id}`);
       if (button) {
         button.classList.add("bg-green-500");
@@ -612,7 +682,7 @@ export default function MenuPage() {
     }
   };
 
-  // FUNCIÓN CORREGIDA: Enviar orden a cocina
+  // FUNCIÓN MODIFICADA: Enviar orden a cocina
   const handleSendOrder = async () => {
     if (!currentOrder || orderItems.length === 0) return;
 
@@ -624,10 +694,8 @@ export default function MenuPage() {
         tableId: currentOrder.table_id,
       });
 
-      // 1. Actualizar el estado de la orden a 'sent' en la base de datos
       await ordersService.updateOrderStatus(currentOrder.id, "sent");
 
-      // 2. Enviar notificación a cocina
       await notificationsService.createNotification(
         currentOrder.table_id,
         "new_order",
@@ -635,24 +703,21 @@ export default function MenuPage() {
         currentOrder.id
       );
 
-      // 3. IMPORTANTE: Crear NUEVA orden para el MISMO usuario (no crear nuevo comensal)
+      // Crear NUEVA orden para el MISMO usuario
       const newOrderId = await createNewOrder(currentOrder.customer_name);
 
-      // 4. ACTUALIZAR URL con la nueva orden del mismo usuario
-      router.push(
-        `/customer/menu?table=${tableId}&user=${newOrderId}&order=${newOrderId}`
-      );
+      // ACTUALIZAR SESIÓN con la nueva orden
+      updateSession({
+        userId: newOrderId,
+        orderId: newOrderId,
+      });
 
-      // 5. Actualizar lista de usuarios
+      // Actualizar lista de usuarios
       await loadTableUsers(currentOrder.table_id);
 
-      // 6. Marcar que se acaba de enviar una orden
       setLastOrderSent(true);
-
-      // 7. Cerrar el modal del carrito
       setShowCart(false);
 
-      // 8. Mostrar confirmación
       alert(
         `✅ ¡Orden enviada a cocina, ${currentOrder.customer_name}! Tu carrito está listo para nuevos pedidos.`
       );
@@ -664,23 +729,24 @@ export default function MenuPage() {
     }
   };
 
-  // Cambiar de usuario
+  // MODIFICADA: Cambiar de usuario
   const handleSwitchUser = async (user: TableUser) => {
     try {
       await switchUserOrder(user.orderId, user.id);
       setShowUserSwitch(false);
 
-      // Actualizar URL
-      router.push(
-        `/customer/menu?table=${tableId}&user=${user.id}&order=${user.orderId}`
-      );
+      // ACTUALIZAR SESIÓN
+      updateSession({
+        userId: user.id,
+        orderId: user.orderId,
+      });
     } catch (error) {
       console.error("Error switching user:", error);
       alert("Error al cambiar de usuario");
     }
   };
 
-  // Agregar nuevo usuario
+  // MODIFICADA: Agregar nuevo usuario
   const handleAddNewUser = async () => {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
@@ -691,20 +757,18 @@ export default function MenuPage() {
     }
 
     try {
-      // Crear nueva orden para el nuevo usuario
       const newOrder = await ordersService.createOrder(
         parseInt(tableId),
         userName.trim()
       );
 
-      // Actualizar lista de usuarios
       await loadTableUsers(parseInt(tableId));
 
-      // Cambiar al nuevo usuario
-      await handleSwitchUser({
-        id: newOrder.id,
-        name: userName.trim(),
+      // ACTUALIZAR SESIÓN para el nuevo usuario
+      updateSession({
+        userId: newOrder.id,
         orderId: newOrder.id,
+        customerName: userName.trim(),
       });
 
       alert(`✅ Bienvenido/a, ${userName.trim()}!`);
@@ -716,43 +780,32 @@ export default function MenuPage() {
 
   const getEstimatedTime = () => {
     if (orderItems.length === 0) return 0;
-
-    // Cache de productos para evitar búsquedas repetidas
     const productCache = new Map();
-
-    // Encontrar máximo tiempo y cantidad en una sola pasada
     let maxPreparationTime = 0;
     let maxQuantity = 0;
     let uniqueProducts = 0;
     const seenProducts = new Set();
 
     orderItems.forEach((item) => {
-      // Cache de productos
       let product = productCache.get(item.product_id);
       if (!product) {
         product = products.find((p) => p.id === item.product_id);
         productCache.set(item.product_id, product);
       }
 
-      // Máximo tiempo
       const prepTime = product?.preparation_time || 10;
       maxPreparationTime = Math.max(maxPreparationTime, prepTime);
-
-      // Máxima cantidad
       maxQuantity = Math.max(maxQuantity, item.quantity);
 
-      // Productos únicos
       if (!seenProducts.has(item.product_id)) {
         seenProducts.add(item.product_id);
         uniqueProducts++;
       }
     });
 
-    // Calcular multiplicador de cantidad
     const quantityMultiplier =
       maxQuantity > 5 ? 1.8 : maxQuantity > 3 ? 1.5 : maxQuantity > 1 ? 1.2 : 1;
 
-    // Tiempo base + complejidad
     let estimatedTime = maxPreparationTime * quantityMultiplier;
 
     if (uniqueProducts > 4) estimatedTime += 8;
@@ -788,6 +841,7 @@ export default function MenuPage() {
           breakfast: "Breakfast",
           lunch: "Lunch",
           dinner: "Dinner",
+          refill: "Refill",
         };
         return products.filter(
           (product) => product.category === categoryMap[categoryId]
@@ -816,7 +870,6 @@ export default function MenuPage() {
     }
   };
 
-  // Función para solicitar asistencia - VERSIÓN CORREGIDA
   const handleAssistanceRequest = async () => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
@@ -869,7 +922,6 @@ export default function MenuPage() {
     );
   };
 
-  // Componente para el badge del carrito mejorado
   const CartBadge = () => {
     const formatBadgeCount = (count: number): string => {
       if (count <= 99) {
@@ -930,18 +982,13 @@ export default function MenuPage() {
     }).format(amount);
   };
 
-  // Función para hacer scroll a una categoría específica
   const scrollToCategory = (categoryId: string) => {
-    // Actualizar inmediatamente la categoría seleccionada
     setSelectedCategory(categoryId);
-
-    // Pequeño delay para asegurar que el estado se actualice antes del scroll
     setTimeout(() => {
       const element = categoryRefs.current[categoryId];
       if (element) {
-        const offset = 180; // Aumenté el offset
+        const offset = 200;
         const elementPosition = element.offsetTop - offset;
-
         window.scrollTo({
           top: elementPosition,
           behavior: "smooth",
@@ -950,7 +997,55 @@ export default function MenuPage() {
     }, 10);
   };
 
-  if (tableId === null || isLoading) {
+  // Loading mientras verifica sesión
+  if (!hasCheckedSession || isInitialLoad) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Recuperando sesión...</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Si el problema persiste, regresa a la página principal
+          </p>
+          <button
+            onClick={() => router.push("/customer")}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Si ya verificamos pero no hay sesión válida
+  if (hasCheckedSession && (!tableId || !orderId || !userId)) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
+          <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Sesión no válida
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Tu sesión ha expirado o no es válida. Por favor, escanea el código
+            QR nuevamente.
+          </p>
+          <button
+            onClick={() => {
+              clearSession();
+              router.push("/customer");
+            }}
+            className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+          >
+            Volver al escáner QR
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -971,8 +1066,7 @@ export default function MenuPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-800">FoodHub</h1>
               <p className="text-sm text-gray-500">
-                Mesa {targetTableId} •{" "}
-                {currentOrder?.customer_name || "Invitado"}
+                Mesa {tableNumber} • {customerName}
                 {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
               </p>
             </div>
@@ -1015,8 +1109,7 @@ export default function MenuPage() {
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1 text-green-600 font-semibold">
                   <FaShoppingCart className="text-xs" />
-                  {orderItems.length} items en carrito de{" "}
-                  {currentOrder?.customer_name}
+                  {orderItems.length} items en carrito de {customerName}
                 </span>
               </div>
               <span className="text-gray-600">
@@ -1065,7 +1158,7 @@ export default function MenuPage() {
                 categoryRefs.current[category.id] = el;
               }}
               data-category={category.id}
-              className="mb-12 scroll-mt-4"
+              className="mb-12 scroll-mt-48"
             >
               <div className="mb-6 flex justify-between items-center">
                 <div>
@@ -1244,7 +1337,7 @@ export default function MenuPage() {
                           </div>
                         </div>
 
-                        {/* Mostrar notas si existen - MEJORADO */}
+                        {/* Mostrar notas si existen */}
                         {isInCart && currentNotes && (
                           <div className="mt-2">
                             {formatItemNotes(currentNotes)}
@@ -1410,7 +1503,6 @@ export default function MenuPage() {
                   <p className="text-xs text-gray-500">
                     {notes.length}/200 caracteres
                   </p>
-                  {/* ✅ Mensajes de validación MEJORADOS */}
                   {notes.length > 0 && notes.trim().length === 0 && (
                     <p className="text-xs text-red-500 font-medium">
                       No se permiten solo espacios
@@ -1499,7 +1591,7 @@ export default function MenuPage() {
                   ✕
                 </button>
               </div>
-              <p className="text-gray-600">Mesa {targetTableId}</p>
+              <p className="text-gray-600">Mesa {tableNumber}</p>
             </div>
 
             <div className="p-6">
@@ -1572,7 +1664,7 @@ export default function MenuPage() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800">
-                    Orden de {currentOrder?.customer_name}
+                    Orden de {customerName}
                   </h2>
                   {currentOrder?.id && (
                     <p className="text-sm text-gray-500">
@@ -1609,11 +1701,7 @@ export default function MenuPage() {
 
                 {lastOrderSent && (
                   <button
-                    onClick={() =>
-                      router.push(
-                        `/customer/history?table=${targetTableId}&user=${userId}&order=${orderId}`
-                      )
-                    }
+                    onClick={() => router.push("/customer/history")}
                     className="block w-full mt-4 bg-gray-100 text-gray-700 px-6 py-3 rounded-full hover:bg-gray-200 transition"
                   >
                     Ver Estado de mi Orden
@@ -1724,7 +1812,7 @@ export default function MenuPage() {
 
                   <p className="text-xs text-gray-500 text-center mt-3">
                     💡 Los nuevos items se agregarán a una nueva orden para{" "}
-                    {currentOrder?.customer_name}
+                    {customerName}
                   </p>
                 </div>
               </>
@@ -1740,22 +1828,14 @@ export default function MenuPage() {
             <span className="text-xs font-medium">Menu</span>
           </button>
           <button
-            onClick={() =>
-              router.push(
-                `/customer/history?table=${targetTableId}&user=${userId}&order=${orderId}`
-              )
-            }
+            onClick={() => router.push("/customer/history")}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaHistory className="text-2xl mb-1" />
             <span className="text-xs font-medium">Cuenta</span>
           </button>
           <button
-            onClick={() =>
-              router.push(
-                `/customer/qr?table=${targetTableId}&user=${userId}&order=${orderId}`
-              )
-            }
+            onClick={() => router.push("/customer/qr")}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600"
           >
             <FaQrcode className="text-2xl mb-1" />

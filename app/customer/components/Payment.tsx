@@ -2,7 +2,8 @@
 // app/customer/payment/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import { supabase } from "@/app/lib/supabase/client";
@@ -56,12 +57,10 @@ interface InvoiceModalProps {
 const SatisfactionSurvey = ({
   onSubmit,
   onSkip,
-  tableId,
   customerName,
 }: {
   onSubmit: (rating: number, comment: string) => void;
   onSkip: () => void;
-  tableId: string | null;
   customerName: string;
 }) => {
   const [rating, setRating] = useState(0);
@@ -558,17 +557,19 @@ const formatNotesForPDF = (notes: string) => {
 
 export default function PaymentPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
-  const userId = searchParams.get("user");
-  const orderId = searchParams.get("order");
-
+  const { session, isLoading: sessionLoading } = useSession();
   const {
     currentTableId,
     notificationState,
     createBillNotification,
     refreshOrder,
   } = useOrder();
+
+  // Obtener datos de la sesión
+  const tableNumber = session?.tableNumber;
+  const tableId = session?.tableId;
+  const userId = session?.userId;
+  const orderId = session?.orderId;
 
   useEffect(() => {
     if (tableId && !currentTableId) {
@@ -813,8 +814,6 @@ export default function PaymentPage() {
     0
   );
 
-  // Agrega después de los otros useEffects, antes de las funciones
-
   // 1. SUSCRIPCIÓN EN TIEMPO REAL PARA ÓRDENES
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
@@ -822,21 +821,18 @@ export default function PaymentPage() {
 
     console.log("🔄 Iniciando suscripción en tiempo real para órdenes");
 
-    // Suscribirse a cambios en la tabla de órdenes
     const ordersSubscription = supabase
       .channel(`table-${targetTableId}-orders`)
       .on(
         "postgres_changes",
         {
-          event: "*", // INSERT, UPDATE, DELETE
+          event: "*",
           schema: "public",
           table: "orders",
           filter: `table_id=eq.${targetTableId}`,
         },
         (payload) => {
           console.log("📦 Cambio en órdenes recibido:", payload);
-
-          // Recargar las órdenes cuando haya cualquier cambio
           loadOrders();
         }
       )
@@ -857,7 +853,6 @@ export default function PaymentPage() {
 
     console.log("💰 Iniciando suscripción en tiempo real para pagos");
 
-    // Suscribirse a cambios en waiter_notifications
     const paymentsSubscription = supabase
       .channel(`table-${targetTableId}-payments`)
       .on(
@@ -871,12 +866,10 @@ export default function PaymentPage() {
         (payload) => {
           console.log("💳 Cambio en notificaciones de pago:", payload);
 
-          // Si es una actualización de estado de pago
           if (payload.eventType === "UPDATE") {
             const newStatus = payload.new.status;
             const notificationType = payload.new.type;
 
-            // Solo procesar notificaciones de tipo bill_request
             if (notificationType === "bill_request") {
               if (newStatus === "completed") {
                 console.log("✅ Pago completado en tiempo real");
@@ -890,7 +883,6 @@ export default function PaymentPage() {
             }
           }
 
-          // Si es una nueva notificación de pago
           if (payload.eventType === "INSERT") {
             const newNotification = payload.new;
             if (
@@ -898,7 +890,6 @@ export default function PaymentPage() {
               newNotification.status === "pending"
             ) {
               console.log("🔄 Nueva solicitud de pago recibida");
-              // Tu contexto useOrder ya debería manejar esto automáticamente
             }
           }
         }
@@ -913,14 +904,13 @@ export default function PaymentPage() {
     };
   }, [tableId, currentTableId]);
 
-  // 3. POLLING COMO FALLBACK (por si fallan los WebSockets)
+  // 3. POLLING COMO FALLBACK
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId) return;
 
     const interval = setInterval(async () => {
       try {
-        // Verificar estado de pago
         if (notificationState.hasPendingBill) {
           const { data: notifications, error } = await supabase
             .from("waiter_notifications")
@@ -961,17 +951,6 @@ export default function PaymentPage() {
     paymentConfirmed,
   ]);
 
-  useEffect(() => {
-    if (paymentConfirmed && countdown > 0 && surveyCompleted) {
-      const timer = setTimeout(() => {
-        setCountdown(countdown - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (paymentConfirmed && countdown === 0 && surveyCompleted) {
-      router.push("/");
-    }
-  }, [paymentConfirmed, countdown, surveyCompleted, router]);
-
   const handleSurveySubmit = async (rating: number, comment: string) => {
     try {
       await saveSurveyToDatabase(rating, comment);
@@ -998,7 +977,9 @@ export default function PaymentPage() {
         <html>
         <head>
           <meta charset="UTF-8">
-          <title>Ticket de Pago - Mesa ${tableId || currentTableId}</title>
+          <title>Ticket de Pago - Mesa ${
+            tableNumber || tableId || currentTableId
+          }</title>
           <style>
             body { 
               font-family: Arial, sans-serif; 
@@ -1134,7 +1115,9 @@ export default function PaymentPage() {
         <body>
           <div class="header">
             <div class="restaurant-name">RESTAURANTE</div>
-            <div class="table-info">Mesa ${tableId || currentTableId}</div>
+            <div class="table-info">Mesa ${
+              tableNumber || tableId || currentTableId
+            }</div>
             <div class="table-info">${new Date().toLocaleString("es-MX")}</div>
           </div>
 
@@ -1341,6 +1324,7 @@ export default function PaymentPage() {
 
       const invoiceData = {
         tableId: tableId || currentTableId,
+        tableNumber: tableNumber,
         customerEmail: email,
         customerSummaries: customerSummaries.map((summary) => ({
           customerName: summary.customerName,
@@ -1422,8 +1406,57 @@ export default function PaymentPage() {
       setPaymentConfirmed(true);
       setShowSurvey(true);
 
-      console.log("✅ Pago confirmado:", {
+      // Limpiar TODAS las claves relacionadas con el restaurante
+      const keysToRemove = [
+        // Claves específicas de tu imagen
+        "GDPR_REMOVAL_FLAG",
+        "app_session",
+        "currentOrder",
+        "currentOrderId",
+        "currentTableId",
+        "currentUserId",
+        "currentUserName",
+        "customerSession",
+        "historyUserData",
+        "orderItems",
+        "photoSphereViewer_touchSupport",
+        "restaurant_tableId",
+        "restaurant_userId",
+        "restaurant_userName",
+
+        // Claves con patrones dinámicos (buscamos por prefijo)
+        ...Object.keys(localStorage).filter(
+          (key) =>
+            key.startsWith("paymentState_") ||
+            key.startsWith("paymentStatus_") ||
+            key.startsWith("pendingItems_") ||
+            key.startsWith("currentOrder-table-") ||
+            key.startsWith("currentUser-table-")
+        ),
+
+        // Claves de mi solución anterior (por si acaso)
+        "session",
+        "session-tableId",
+        "session-userId",
+        "session-orderId",
+        "session-customerName",
+        "session-tableNumber",
+        "sessionCleanupTimer",
+        "sessionExpiryTime",
+      ];
+
+      // Eliminar cada key (sin duplicados)
+      const uniqueKeys = [...new Set(keysToRemove)];
+      uniqueKeys.forEach((key) => {
+        if (localStorage.getItem(key) !== null) {
+          localStorage.removeItem(key);
+          console.log(`🗑️ Eliminada: ${key}`);
+        }
+      });
+
+      console.log("✅ Pago confirmado y localStorage limpiado:", {
         tableId: tableId || currentTableId,
+        tableNumber: tableNumber,
         total: paymentSummary.total,
         cancelledAmount: paymentSummary.cancelledAmount,
         customers: customerSummaries.map((c) => c.customerName),
@@ -1482,6 +1515,42 @@ export default function PaymentPage() {
     );
   };
 
+  // Loading mientras verifica sesión
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando información de la mesa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay sesión válida
+  if (!session || !tableNumber) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Sesión no encontrada
+          </h2>
+          <p className="text-gray-600 mb-4">
+            No se pudo identificar la mesa. Por favor, regresa al menú
+            principal.
+          </p>
+          <button
+            onClick={() => router.push("/customer")}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
+          >
+            Volver al Inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -1503,11 +1572,7 @@ export default function PaymentPage() {
             No hay órdenes pendientes de pago en esta mesa.
           </p>
           <button
-            onClick={() =>
-              router.push(
-                `/customer/menu?table=${tableId}&user=${userId}&order=${orderId}`
-              )
-            }
+            onClick={() => router.push("/customer/")}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
           >
             Volver al Menú
@@ -1530,11 +1595,7 @@ export default function PaymentPage() {
             activas.
           </p>
           <button
-            onClick={() =>
-              router.push(
-                `/customer/menu?table=${tableId}&user=${userId}&order=${orderId}`
-              )
-            }
+            onClick={() => router.push("/customer/menu")}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
           >
             Volver al Menú
@@ -1592,15 +1653,15 @@ export default function PaymentPage() {
             </p>
 
             {surveyCompleted && (
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
-                  <FaClock />
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex items-center justify-center gap-2 text-green-600 mb-2">
+                  <FaCheck />
                   <span className="font-semibold">
-                    Redirigiendo en {countdown} segundos...
+                    ¡Gracias por tu feedback!
                   </span>
                 </div>
-                <p className="text-sm text-blue-600">
-                  Será dirigido automáticamente a la página principal
+                <p className="text-sm text-green-600">
+                  Tu opinión ha sido registrada exitosamente
                 </p>
               </div>
             )}
@@ -1610,7 +1671,6 @@ export default function PaymentPage() {
             <SatisfactionSurvey
               onSubmit={handleSurveySubmit}
               onSkip={handleSurveySkip}
-              tableId={tableId}
               customerName={customerSummaries[0]?.customerName || "Cliente"}
             />
           )}
@@ -1631,7 +1691,7 @@ export default function PaymentPage() {
                     Ticket de Pago
                   </h1>
                   <p className="text-sm text-gray-500">
-                    Mesa {tableId || currentTableId}
+                    Mesa {tableNumber} • {session.customerName}
                   </p>
                   <p className="text-sm text-blue-600 font-medium">
                     {customerSummaries.length} comensal
@@ -1683,9 +1743,7 @@ export default function PaymentPage() {
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
             <div className="bg-gray-800 text-white p-6 text-center">
               <h3 className="text-2xl font-bold">RESTAURANTE</h3>
-              <p className="text-gray-300 text-sm">
-                Mesa {tableId || currentTableId}
-              </p>
+              <p className="text-gray-300 text-sm">Mesa {tableNumber}</p>
               {mesaCancelledUnits > 0 && (
                 <p className="text-red-300 text-sm mt-2">
                   {mesaCancelledUnits} unidad(es) cancelada(s) excluida(s)
@@ -1866,7 +1924,4 @@ export default function PaymentPage() {
       />
     </>
   );
-}
-function setPaymentStatus(arg0: { status: string }) {
-  throw new Error("Function not implemented.");
 }
