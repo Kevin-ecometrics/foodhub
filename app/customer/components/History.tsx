@@ -55,8 +55,13 @@ interface CustomerOrderSummary {
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { session, isLoading: sessionLoading, updateSession } = useSession();
-  
+  const {
+    session,
+    isLoading: sessionLoading,
+    updateSession,
+    clearSession,
+  } = useSession();
+
   // Obtener datos de la sesión en lugar de searchParams
   const tableId = session?.tableId;
   const userId = session?.userId;
@@ -75,6 +80,10 @@ export default function HistoryPage() {
     setCurrentUserOrder,
   } = useOrder();
 
+  // Estados para verificar estado de la mesa
+  const [tableStatus, setTableStatus] = useState<string | null>(null);
+  const [checkingTableStatus, setCheckingTableStatus] = useState(false);
+
   const [orderHistory, setOrderHistory] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
@@ -87,6 +96,128 @@ export default function HistoryPage() {
   // Refs para prevenir loops infinitos
   const isSubscribedRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
+
+  // Función para limpiar localStorage
+  const clearLocalStorage = () => {
+    const keysToRemove = [
+      "GDPR_REMOVAL_FLAG",
+      "app_session",
+      "currentOrder",
+      "currentOrderId",
+      "currentTableId",
+      "currentUserId",
+      "currentUserName",
+      "customerSession",
+      "historyUserData",
+      "orderItems",
+      "photoSphereViewer_touchSupport",
+      "restaurant_tableId",
+      "restaurant_userId",
+      "restaurant_userName",
+    ];
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    Object.keys(localStorage).forEach((key) => {
+      if (
+        key.startsWith("paymentState_") ||
+        key.startsWith("paymentStatus_") ||
+        key.startsWith("pendingItems_")
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
+
+  // Efecto para verificar el estado de la mesa
+  useEffect(() => {
+    const checkTableStatus = async () => {
+      const targetTableId = tableId || currentTableId;
+      if (!targetTableId || sessionLoading) return;
+
+      setCheckingTableStatus(true);
+      try {
+        const { data: tableData, error } = await supabase
+          .from("tables")
+          .select("status")
+          .eq("id", targetTableId)
+          .single();
+
+        if (error) {
+          console.error("Error verificando estado de mesa:", error);
+          return;
+        }
+
+        const tableDataTyped = tableData as { status: string } | null;
+
+        if (tableDataTyped?.status) {
+          setTableStatus(tableDataTyped.status);
+
+          // Si la mesa está disponible, redirigir
+          if (tableDataTyped.status === "available") {
+            console.log("Mesa está disponible, redirigiendo desde History...");
+
+            clearLocalStorage();
+            clearSession();
+
+            setTimeout(() => {
+              router.push("/customer");
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error("Error al verificar estado de mesa:", error);
+      } finally {
+        setCheckingTableStatus(false);
+      }
+    };
+
+    if (!sessionLoading && (tableId || currentTableId)) {
+      checkTableStatus();
+    }
+  }, [tableId, currentTableId, sessionLoading, router, clearSession]);
+
+  // Suscripción en tiempo real para cambios en el estado de la mesa
+  useEffect(() => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId || sessionLoading) return;
+
+    const subscription = supabase
+      .channel(`history-table-status-${targetTableId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tables",
+          filter: `id=eq.${targetTableId}`,
+        },
+        (payload) => {
+          console.log(
+            "Cambio en estado de mesa en History:",
+            payload.new.status
+          );
+          setTableStatus(payload.new.status);
+
+          // Si la mesa cambia a disponible, redirigir
+          if (payload.new.status === "available") {
+            console.log("Mesa liberada, redirigiendo desde History...");
+
+            clearLocalStorage();
+            clearSession();
+
+            setTimeout(() => {
+              alert("👋 La mesa ha sido liberada. Gracias por su visita!");
+              router.push("/customer");
+            }, 300);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [tableId, currentTableId, sessionLoading, router, clearSession]);
 
   // Función para formatear notas y extras
   const formatItemNotes = (notes: string | null) => {
@@ -368,12 +499,12 @@ export default function HistoryPage() {
 
   // Cargar datos iniciales - MODIFICADO para usar SessionContext
   useEffect(() => {
-    if (sessionLoading) return;
+    if (sessionLoading || checkingTableStatus) return;
 
     const initializeData = async () => {
       try {
         setLoading(true);
-        
+
         if (!session) {
           router.push("/customer");
           return;
@@ -382,7 +513,7 @@ export default function HistoryPage() {
         if (tableId && orderId && userId) {
           console.log("📥 History: Cargando desde sesión");
           await setCurrentUserOrder(orderId, userId);
-          
+
           if (currentTableId) {
             await refreshOrder(currentTableId);
           }
@@ -393,7 +524,6 @@ export default function HistoryPage() {
 
         // Si no hay datos suficientes, redirigir
         router.push("/customer");
-
       } catch (error) {
         console.error("Error initializing data:", error);
         setError("Error al cargar los datos");
@@ -403,7 +533,15 @@ export default function HistoryPage() {
     };
 
     initializeData();
-  }, [session, sessionLoading, tableId, orderId, userId, router]);
+  }, [
+    session,
+    sessionLoading,
+    checkingTableStatus,
+    tableId,
+    orderId,
+    userId,
+    router,
+  ]);
 
   // Calcular impuestos y totales
   const calculateTaxes = (items: typeof orderItems): TaxCalculation => {
@@ -577,7 +715,7 @@ export default function HistoryPage() {
       updateSession({
         userId: user.id,
         orderId: user.orderId,
-        customerName: user.name
+        customerName: user.name,
       });
     } catch (error) {
       console.error("Error switching user:", error);
@@ -609,7 +747,7 @@ export default function HistoryPage() {
       updateSession({
         userId: newOrder.id,
         orderId: newOrder.id,
-        customerName: userName.trim()
+        customerName: userName.trim(),
       });
 
       alert(`✅ Bienvenido/a, ${userName.trim()}!`);
@@ -642,7 +780,7 @@ export default function HistoryPage() {
 
       // Redirigir a payment con sesión
       setTimeout(() => {
-        router.push('/customer/payment');
+        router.push("/customer/payment");
       }, 1000);
     } catch (error) {
       console.error("Error requesting ticket:", error);
@@ -659,7 +797,13 @@ export default function HistoryPage() {
 
   // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
   useEffect(() => {
-    if (!tableId || isSubscribedRef.current || sessionLoading) return;
+    if (
+      !tableId ||
+      isSubscribedRef.current ||
+      sessionLoading ||
+      checkingTableStatus
+    )
+      return;
 
     console.log("🔔 History: Iniciando suscripción para cambios en órdenes");
     isSubscribedRef.current = true;
@@ -743,7 +887,7 @@ export default function HistoryPage() {
       notificationSubscription.unsubscribe();
       isSubscribedRef.current = false;
     };
-  }, [tableId, sessionLoading]);
+  }, [tableId, sessionLoading, checkingTableStatus]);
 
   const handleAssistanceRequest = async () => {
     if (!tableId) return;
@@ -776,6 +920,45 @@ export default function HistoryPage() {
     }).format(amount);
   };
 
+  // Loading mientras verifica estado de mesa
+  if (checkingTableStatus) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando estado de la mesa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si la mesa está disponible, mostrar mensaje y redirigir
+  if (tableStatus === "available") {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
+          <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Mesa Liberada
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Esta mesa ha sido liberada. Por favor, escanea el código QR
+            nuevamente si deseas hacer un nuevo pedido.
+          </p>
+          <button
+            onClick={() => {
+              clearSession();
+              router.push("/customer");
+            }}
+            className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+          >
+            Volver al Escáner QR
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Loading mientras verifica sesión
   if (sessionLoading) {
     return (
@@ -796,10 +979,14 @@ export default function HistoryPage() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaExclamationTriangle className="text-2xl text-red-600" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Sesión Expirada</h2>
-          <p className="text-gray-600 mb-6">Por favor, escanea el código QR nuevamente.</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Sesión Expirada
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Por favor, escanea el código QR nuevamente.
+          </p>
           <button
-            onClick={() => router.push('/customer')}
+            onClick={() => router.push("/customer")}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
           >
             Volver al Inicio
@@ -862,6 +1049,17 @@ export default function HistoryPage() {
               </h1>
               <p className="text-sm text-gray-500">
                 Mesa {tableNumber} • {customerName}
+                {tableStatus && (
+                  <span
+                    className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                      tableStatus === "occupied"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {tableStatus === "occupied" ? "🟢 Ocupada" : "🟡 Pendiente"}
+                  </span>
+                )}
                 {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
               </p>
               <p className="text-sm text-blue-600 font-medium">
@@ -1035,7 +1233,7 @@ export default function HistoryPage() {
               Aún no has realizado ningún pedido en esta mesa
             </p>
             <button
-              onClick={() => router.push('/customer/menu')}
+              onClick={() => router.push("/customer/menu")}
               className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
             >
               Hacer mi primer pedido
@@ -1173,7 +1371,7 @@ export default function HistoryPage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
         <div className="max-w-7xl mx-auto flex justify-around py-3">
           <button
-            onClick={() => router.push('/customer/menu')}
+            onClick={() => router.push("/customer/menu")}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaUtensils className="text-2xl mb-1" />
@@ -1184,7 +1382,7 @@ export default function HistoryPage() {
             <span className="text-xs font-medium">Cuenta</span>
           </button>
           <button
-            onClick={() => router.push('/customer/qr')}
+            onClick={() => router.push("/customer/qr")}
             className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaQrcode className="text-2xl mb-1" />
