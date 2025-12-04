@@ -1223,21 +1223,29 @@ export default function HistoryPage() {
         )}
 
         {/* Estado vacío */}
-        {!currentOrder && customerSummaries.length === 0 && (
-          <div className="text-center py-12">
-            <FaHistory className="text-6xl text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              No hay órdenes
-            </h3>
-            <p className="text-gray-500">
-              Aún no has realizado ningún pedido en esta mesa
-            </p>
-            <button
-              onClick={() => router.push("/customer/menu")}
-              className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
-            >
-              Hacer mi primer pedido
-            </button>
+        {orderHistory.length === 0 && customerSummaries.length === 0 && (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center">
+            <div className="text-center max-w-md mx-auto">
+              <div className="w-48 h-48 rounded-full bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center mx-auto mb-8 shadow-inner">
+                <FaHistory className="text-7xl text-gray-300" />
+              </div>
+              <h3 className="text-3xl font-bold text-gray-400 mb-4">
+                Sin órdenes aún
+              </h3>
+              <p className="text-xl text-gray-500 text-center mb-10">
+                Aquí aparecerán tus órdenes
+                <br />
+                cuando realices un pedido
+              </p>
+              <div className="w-64 h-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent mb-10"></div>
+              <button
+                onClick={() => router.push("/customer/menu")}
+                className="bg-blue-600 text-white px-10 py-4 rounded-xl hover:bg-blue-700 transition font-semibold text-lg shadow-lg"
+              >
+                <FaUtensils className="inline mr-3" />
+                Ir al menú para ordenar
+              </button>
+            </div>
           </div>
         )}
       </main>
