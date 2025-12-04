@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import {
@@ -17,13 +18,8 @@ import {
   FaClock,
   FaUtensilSpoon,
   FaUser,
-  FaUsers,
-  FaMoneyBillWave,
-  FaCreditCard,
-  FaQuestion,
   FaStickyNote,
   FaPlus,
-  FaTimes,
   FaBan,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
@@ -57,21 +53,16 @@ interface CustomerOrderSummary {
   cancelledAmount: number;
 }
 
-// Interfaces para localStorage
-interface StoredUserData {
-  userId: string;
-  orderId: string;
-  tableId: number;
-  userName: string;
-  timestamp: number;
-}
-
 export default function HistoryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tableId = searchParams.get("table");
-  const userId = searchParams.get("user");
-  const orderId = searchParams.get("order");
+  const { session, isLoading: sessionLoading, updateSession } = useSession();
+
+  // Obtener datos de la sesión en lugar de searchParams
+  const tableId = session?.tableId;
+  const userId = session?.userId;
+  const orderId = session?.orderId;
+  const customerName = session?.customerName;
+  const tableNumber = session?.tableNumber;
 
   const {
     currentOrder,
@@ -93,67 +84,17 @@ export default function HistoryPage() {
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
 
-  // Estado local para datos persistidos
-  const [storedUserData, setStoredUserData] = useState<StoredUserData | null>(null);
-
   // Refs para prevenir loops infinitos
   const isSubscribedRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
-
-  // Funciones para localStorage
-  const saveUserToLocalStorage = (userData: StoredUserData) => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('historyUserData', JSON.stringify(userData));
-        setStoredUserData(userData);
-        console.log("💾 Datos guardados en localStorage:", userData);
-      } catch (error) {
-        console.error('Error saving to localStorage:', error);
-      }
-    }
-  };
-
-  const loadUserFromLocalStorage = (): StoredUserData | null => {
-    if (typeof window !== 'undefined') {
-      try {
-        const item = localStorage.getItem('historyUserData');
-        if (item) {
-          const data = JSON.parse(item);
-          // Verificar que los datos no sean muy viejos (menos de 24 horas)
-          const isExpired = Date.now() - data.timestamp > 24 * 60 * 60 * 1000;
-          if (!isExpired) {
-            console.log("📂 Datos cargados desde localStorage:", data);
-            setStoredUserData(data);
-            return data;
-          } else {
-            console.log("🧹 Datos localStorage expirados");
-            localStorage.removeItem('historyUserData');
-          }
-        }
-      } catch (error) {
-        console.error('Error loading from localStorage:', error);
-      }
-    }
-    return null;
-  };
-
-  const clearUserFromLocalStorage = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('historyUserData');
-      setStoredUserData(null);
-      console.log("🧹 Datos eliminados de localStorage");
-    }
-  };
 
   // Función para formatear notas y extras
   const formatItemNotes = (notes: string | null) => {
     if (!notes) return null;
 
-    // Detectar si tiene información de extras con precios
     const hasPricedExtras = notes.includes("(+$");
 
     if (hasPricedExtras) {
-      // Separar notas principales de extras
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
         (part) => !part.includes("Extras:") && !part.includes("Total:")
@@ -163,7 +104,6 @@ export default function HistoryPage() {
 
       return (
         <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          {/* Notas principales */}
           {mainNotes && (
             <div className="flex items-start gap-2">
               <FaStickyNote className="text-yellow-500 mt-0.5 flex-shrink-0" />
@@ -173,7 +113,6 @@ export default function HistoryPage() {
             </div>
           )}
 
-          {/* Extras con precios */}
           {extrasPart && (
             <div className="flex items-start gap-2">
               <FaPlus className="text-green-500 mt-0.5 flex-shrink-0" />
@@ -203,7 +142,6 @@ export default function HistoryPage() {
             </div>
           )}
 
-          {/* Total si está presente */}
           {totalPart && (
             <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
               <FaReceipt className="text-blue-500 mt-0.5 flex-shrink-0" />
@@ -216,7 +154,6 @@ export default function HistoryPage() {
       );
     }
 
-    // Detectar extras simples (sin precios)
     if (notes.includes("Extras:")) {
       const parts = notes.split(" | ");
       let mainNotes = "";
@@ -246,7 +183,6 @@ export default function HistoryPage() {
       );
     }
 
-    // Notas normales
     return (
       <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
         <p className="text-sm text-yellow-800 flex items-center gap-1">
@@ -257,15 +193,13 @@ export default function HistoryPage() {
     );
   };
 
-  // Función para renderizar items de orden (incluyendo cancelados)
+  // Función para renderizar items de orden
   const renderOrderItem = (item: any) => {
     const isCancelled = item.status === "cancelled";
     const cancelledQty = item.cancelled_quantity || 0;
     const activeQuantity = item.quantity - cancelledQty;
     const isPartiallyCancelled = cancelledQty > 0 && activeQuantity > 0;
     const isFullyCancelled = cancelledQty > 0 && activeQuantity === 0;
-
-    // DETERMINAR EL ESTADO REAL DEL PEDIDO
     const showOrderStatus = !isFullyCancelled;
 
     return (
@@ -293,7 +227,6 @@ export default function HistoryPage() {
                   {item.product_name}
                 </span>
 
-                {/* BADGE DE ESTADO - MOSTRAR SIEMPRE QUE NO ESTÉ COMPLETAMENTE CANCELADO */}
                 {showOrderStatus && (
                   <>
                     {item.status === "ordered" && (
@@ -319,7 +252,6 @@ export default function HistoryPage() {
                   </>
                 )}
 
-                {/* BADGE DE CANCELACIÓN - MOSTRAR SIEMPRE */}
                 {isFullyCancelled && (
                   <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
                     <FaBan className="text-xs" />
@@ -335,7 +267,6 @@ export default function HistoryPage() {
                 )}
               </div>
 
-              {/* Información de cantidades - MEJORADA */}
               <div className="text-sm text-gray-600 mb-2">
                 <div className="flex items-center gap-2">
                   <span>
@@ -355,7 +286,6 @@ export default function HistoryPage() {
                   <span>{formatCurrency(item.price)} c/u</span>
                 </div>
 
-                {/* INFORMACIÓN ESPECÍFICA DE CANCELACIÓN */}
                 {cancelledQty > 0 && (
                   <div className="text-xs text-red-600 mt-1">
                     {isFullyCancelled
@@ -364,7 +294,6 @@ export default function HistoryPage() {
                   </div>
                 )}
 
-                {/* INFORMACIÓN DEL ESTADO DEL PEDIDO PARA ITEMS PARCIALMENTE CANCELADOS */}
                 {isPartiallyCancelled && showOrderStatus && (
                   <div className="text-xs text-blue-600 mt-1 font-medium">
                     • {activeQuantity} unidad(es){" "}
@@ -373,7 +302,6 @@ export default function HistoryPage() {
                 )}
               </div>
 
-              {/* NOTAS Y EXTRAS MEJORADOS */}
               {formatItemNotes(item.notes)}
             </div>
             <div className="text-right ml-4">
@@ -387,21 +315,18 @@ export default function HistoryPage() {
                 {formatCurrency(item.price * activeQuantity)}
               </div>
 
-              {/* INFORMACIÓN DE MONTO CANCELADO */}
               {cancelledQty > 0 && (
                 <div className="text-xs text-red-600 font-medium mt-1">
                   Cancelado: {formatCurrency(item.price * cancelledQty)}
                 </div>
               )}
 
-              {/* MENSAJE DE NO COBRO SOLO PARA COMPLETAMENTE CANCELADOS */}
               {isFullyCancelled && (
                 <div className="text-xs text-red-600 font-medium mt-1 bg-red-100 px-2 py-1 rounded">
                   No se cobrará
                 </div>
               )}
 
-              {/* MENSAJE PARA PARCIALMENTE CANCELADOS */}
               {isPartiallyCancelled && (
                 <div className="text-xs text-orange-600 font-medium mt-1 bg-orange-100 px-2 py-1 rounded">
                   Solo se cobrarán {activeQuantity} unidad(es)
@@ -427,11 +352,10 @@ export default function HistoryPage() {
 
   // Cargar usuarios de la mesa
   useEffect(() => {
-    const targetTableId = tableId || storedUserData?.tableId;
-    if (targetTableId) {
-      loadTableUsers(parseInt(targetTableId.toString()));
+    if (tableId) {
+      loadTableUsers(parseInt(tableId));
     }
-  }, [tableId, storedUserData]);
+  }, [tableId]);
 
   const loadTableUsers = async (tableId: number) => {
     try {
@@ -442,51 +366,33 @@ export default function HistoryPage() {
     }
   };
 
-  // Cargar datos iniciales - MODIFICADO con persistencia
+  // Cargar datos iniciales - MODIFICADO para usar SessionContext
   useEffect(() => {
+    if (sessionLoading) return;
+
     const initializeData = async () => {
       try {
         setLoading(true);
-        
-        // PRIMERO: Intentar cargar desde localStorage
-        const storedData = loadUserFromLocalStorage();
-        
-        // SEGUNDO: Si hay datos en localStorage y no tenemos parámetros URL, usarlos
-        if (storedData && (!userId || !orderId)) {
-          console.log("🔄 Usando datos persistidos de localStorage");
-          await setCurrentUserOrder(storedData.orderId, storedData.userId);
-          await loadHistory(storedData.tableId);
-          setLoading(false);
+
+        if (!session) {
+          router.push("/customer");
           return;
         }
 
-        // TERCERO: Si tenemos parámetros URL, usarlos y guardar en localStorage
         if (tableId && orderId && userId) {
-          console.log("📥 Cargando desde parámetros URL");
-          
-          // Guardar en localStorage para futuros refreshes
-          const userData: StoredUserData = {
-            userId,
-            orderId,
-            tableId: parseInt(tableId),
-            userName: currentOrder?.customer_name || "Usuario",
-            timestamp: Date.now()
-          };
-          saveUserToLocalStorage(userData);
-          
-          await loadInitialData(parseInt(tableId), orderId, userId);
+          console.log("📥 History: Cargando desde sesión");
+          await setCurrentUserOrder(orderId, userId);
+
+          if (currentTableId) {
+            await refreshOrder(currentTableId);
+          }
+
+          await loadHistory(parseInt(tableId));
           return;
         }
 
-        // CUARTO: Si solo tenemos mesa, redirigir a select-user
-        if (tableId) {
-          router.push(`/customer/select-user?table=${tableId}`);
-          return;
-        }
-
-        // QUINTO: Si no hay nada, redirigir al inicio
+        // Si no hay datos suficientes, redirigir
         router.push("/customer");
-
       } catch (error) {
         console.error("Error initializing data:", error);
         setError("Error al cargar los datos");
@@ -496,33 +402,7 @@ export default function HistoryPage() {
     };
 
     initializeData();
-  }, [tableId, orderId, userId, router]);
-
-  const loadInitialData = async (
-    tableId: number,
-    orderId: string,
-    userId: string
-  ) => {
-    try {
-      setLoading(true);
-
-      // Usar setCurrentUserOrder para cargar la orden
-      await setCurrentUserOrder(orderId, userId);
-      
-      // También refrescar la orden actual para obtener los últimos items
-      if (currentTableId) {
-        await refreshOrder(currentTableId);
-      }
-
-      await loadHistory(tableId);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      alert("Error al cargar el historial. Redirigiendo...");
-      router.push("/customer/select-user?table=" + tableId);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [session, sessionLoading, tableId, orderId, userId, router]);
 
   // Calcular impuestos y totales
   const calculateTaxes = (items: typeof orderItems): TaxCalculation => {
@@ -569,21 +449,16 @@ export default function HistoryPage() {
       const customerSummary = customerMap.get(customerName)!;
       customerSummary.orders.push(order);
 
-      // Calcular subtotal de esta orden (excluyendo cancelados)
       const orderCalculations = order.order_items.reduce(
         (acc, item) => {
           const cancelledQty = item.cancelled_quantity || 0;
           const activeQuantity = item.quantity - cancelledQty;
 
-          // Contar items completamente cancelados
           if (activeQuantity === 0) {
             acc.cancelledItemsCount++;
           }
 
-          // Contar unidades canceladas
           acc.cancelledUnitsCount += cancelledQty;
-
-          // Calcular montos
           acc.activeAmount += item.price * activeQuantity;
           acc.cancelledAmount += item.price * cancelledQty;
 
@@ -604,12 +479,10 @@ export default function HistoryPage() {
         orderCalculations.cancelledUnitsCount;
       customerSummary.cancelledAmount += orderCalculations.cancelledAmount;
 
-      // Contar solo items con cantidad activa
       customerSummary.itemsCount += order.order_items.filter(
         (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0
       ).length;
 
-      // Actualizar la fecha más reciente
       if (
         new Date(order.created_at) > new Date(customerSummary.latestOrderDate)
       ) {
@@ -617,7 +490,6 @@ export default function HistoryPage() {
       }
     });
 
-    // Calcular impuestos y totales para cada cliente
     const taxRate = 0.08;
     customerMap.forEach((customerSummary) => {
       customerSummary.taxAmount = customerSummary.subtotal * taxRate;
@@ -625,7 +497,6 @@ export default function HistoryPage() {
         customerSummary.subtotal + customerSummary.taxAmount;
     });
 
-    // Ordenar por fecha más reciente
     return Array.from(customerMap.values()).sort(
       (a, b) =>
         new Date(b.latestOrderDate).getTime() -
@@ -674,15 +545,11 @@ export default function HistoryPage() {
       const history = await historyService.getCustomerOrderHistory(tableId);
       console.log("📊 Historial cargado:", history.length, "órdenes");
 
-      // Procesar los datos para asegurar consistencia
       const processedHistory = history.map((order) => ({
         ...order,
         order_items: order.order_items.map((item) => ({
           ...item,
-          // Asegurar que cancelled_quantity siempre tenga un valor
           cancelled_quantity: item.cancelled_quantity || 0,
-          // Si el item está marcado como 'cancelled' pero no tiene cancelled_quantity,
-          // asumimos que toda la cantidad está cancelada
           ...(item.status === "cancelled" &&
             !item.cancelled_quantity && {
               cancelled_quantity: item.quantity,
@@ -699,39 +566,30 @@ export default function HistoryPage() {
     }
   };
 
-  // Cambiar de usuario - MODIFICADO para guardar en localStorage
+  // Cambiar de usuario - MODIFICADO para actualizar sesión
   const handleSwitchUser = async (user: TableUser) => {
     try {
       await switchUserOrder(user.orderId, user.id);
       setShowUserSwitch(false);
 
-      // Guardar en localStorage
-      const userData: StoredUserData = {
+      // ACTUALIZAR SESIÓN
+      updateSession({
         userId: user.id,
         orderId: user.orderId,
-        tableId: parseInt(tableId || currentTableId?.toString() || "0"),
-        userName: user.name,
-        timestamp: Date.now()
-      };
-      saveUserToLocalStorage(userData);
-
-      // Actualizar URL (opcional, para compatibilidad)
-      router.push(
-        `/customer/history?table=${tableId}&user=${user.id}&order=${user.orderId}`
-      );
+        customerName: user.name,
+      });
     } catch (error) {
       console.error("Error switching user:", error);
       alert("Error al cambiar de usuario");
     }
   };
 
-  // Agregar nuevo usuario - MODIFICADO para guardar en localStorage
+  // Agregar nuevo usuario - MODIFICADO para actualizar sesión
   const handleAddNewUser = async () => {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
 
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) {
+    if (!tableId) {
       alert("No se encontró la mesa");
       return;
     }
@@ -739,28 +597,18 @@ export default function HistoryPage() {
     try {
       // Crear nueva orden para el nuevo usuario
       const newOrder = await historyService.createOrder(
-        parseInt(targetTableId.toString()),
+        parseInt(tableId),
         userName.trim()
       );
 
       // Actualizar lista de usuarios
-      await loadTableUsers(parseInt(targetTableId.toString()));
+      await loadTableUsers(parseInt(tableId));
 
-      // Guardar en localStorage inmediatamente
-      const userData: StoredUserData = {
+      // ACTUALIZAR SESIÓN para el nuevo usuario
+      updateSession({
         userId: newOrder.id,
         orderId: newOrder.id,
-        tableId: parseInt(targetTableId.toString()),
-        userName: userName.trim(),
-        timestamp: Date.now()
-      };
-      saveUserToLocalStorage(userData);
-
-      // Cambiar al nuevo usuario
-      await handleSwitchUser({
-        id: newOrder.id,
-        name: userName.trim(),
-        orderId: newOrder.id,
+        customerName: userName.trim(),
       });
 
       alert(`✅ Bienvenido/a, ${userName.trim()}!`);
@@ -777,26 +625,23 @@ export default function HistoryPage() {
 
   // Confirmar solicitud de ticket
   const confirmTicketRequest = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!tableId) return;
 
     setBillLoading(true);
     try {
       await historyService.requestBill(
-        parseInt(targetTableId.toString()),
+        parseInt(tableId),
         currentOrder?.id,
         "ticket"
       );
 
       alert("✅ Se ha solicitado la cuenta. El mesero te lo traerá pronto.");
 
-      // Cerrar modal
       setShowPaymentMethodModal(false);
 
+      // Redirigir a payment con sesión
       setTimeout(() => {
-        router.push(
-          `/customer/payment?table=${targetTableId}&user=${userId}&order=${orderId}`
-        );
+        router.push("/customer/payment");
       }, 1000);
     } catch (error) {
       console.error("Error requesting ticket:", error);
@@ -813,33 +658,28 @@ export default function HistoryPage() {
 
   // SUSCRIPCIÓN EN TIEMPO REAL MEJORADA
   useEffect(() => {
-    const targetTableId = tableId || currentTableId || storedUserData?.tableId;
-    if (!targetTableId || isSubscribedRef.current) return;
+    if (!tableId || isSubscribedRef.current || sessionLoading) return;
 
     console.log("🔔 History: Iniciando suscripción para cambios en órdenes");
     isSubscribedRef.current = true;
 
-    // Función debounced para prevenir actualizaciones rápidas
     const debouncedUpdate = () => {
       const now = Date.now();
       if (now - lastUpdateRef.current > 2000) {
         lastUpdateRef.current = now;
-        if (targetTableId) {
-          loadHistory(parseInt(targetTableId.toString()));
-        }
+        loadHistory(parseInt(tableId));
       }
     };
 
-    // Suscripción para cambios en órdenes
     const orderSubscription = supabase
-      .channel(`history-orders-${targetTableId}`)
+      .channel(`history-orders-${tableId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "orders",
-          filter: `table_id=eq.${targetTableId}`,
+          filter: `table_id=eq.${tableId}`,
         },
         async (payload) => {
           console.log(
@@ -853,9 +693,8 @@ export default function HistoryPage() {
         console.log("History: Estado de suscripción a órdenes:", status);
       });
 
-    // Suscripción para cambios en items de orden
     const orderItemsSubscription = supabase
-      .channel(`history-order-items-${targetTableId}`)
+      .channel(`history-order-items-${tableId}`)
       .on(
         "postgres_changes",
         {
@@ -872,24 +711,21 @@ export default function HistoryPage() {
         console.log("History: Estado de suscripción a items:", status);
       });
 
-    // Suscripción para notificaciones del mesero (mesa liberada)
     const notificationSubscription = supabase
-      .channel(`customer-history-table-${targetTableId}`)
+      .channel(`customer-history-table-${tableId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "waiter_notifications",
-          filter: `table_id=eq.${targetTableId}`,
+          filter: `table_id=eq.${tableId}`,
         },
         (payload) => {
           console.log("📨 History: Notificación recibida:", payload.new.type);
 
           if (payload.new.type === "table_freed") {
             console.log("🚨 History: Mesa liberada - Redirigiendo...");
-            // Limpiar localStorage cuando se libere la mesa
-            clearUserFromLocalStorage();
             alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
             window.location.href = "/customer";
           }
@@ -906,17 +742,14 @@ export default function HistoryPage() {
       notificationSubscription.unsubscribe();
       isSubscribedRef.current = false;
     };
-  }, [tableId, currentTableId, storedUserData]);
+  }, [tableId, sessionLoading]);
 
   const handleAssistanceRequest = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!tableId) return;
 
     setAssistanceLoading(true);
     try {
-      await historyService.requestAssistance(
-        parseInt(targetTableId.toString())
-      );
+      await historyService.requestAssistance(parseInt(tableId));
       alert("✅ El mesero ha sido notificado. Pronto te atenderá.");
     } catch (error) {
       console.error("Error requesting assistance:", error);
@@ -927,10 +760,9 @@ export default function HistoryPage() {
   };
 
   const handleRefresh = async () => {
-    const targetTableId = tableId || currentTableId;
-    if (!targetTableId) return;
+    if (!tableId) return;
 
-    await loadHistory(parseInt(targetTableId.toString()));
+    await loadHistory(parseInt(tableId));
     if (currentTableId) {
       await refreshOrder(currentTableId);
     }
@@ -943,24 +775,38 @@ export default function HistoryPage() {
     }).format(amount);
   };
 
-  // Obtener datos del usuario actual (del contexto o localStorage)
-  const getCurrentUserDisplay = () => {
-    if (currentOrder?.customer_name) {
-      return currentOrder.customer_name;
-    }
-    if (storedUserData?.userName) {
-      return storedUserData.userName;
-    }
-    return "Invitado";
-  };
-
-  // Mostrar loading mientras se obtiene tableId
-  if (tableId === null && !storedUserData) {
+  // Loading mientras verifica sesión
+  if (sessionLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando...</p>
+          <p className="text-gray-600">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay sesión válida
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaExclamationTriangle className="text-2xl text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Sesión Expirada
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Por favor, escanea el código QR nuevamente.
+          </p>
+          <button
+            onClick={() => router.push("/customer")}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+          >
+            Volver al Inicio
+          </button>
         </div>
       </div>
     );
@@ -991,7 +837,6 @@ export default function HistoryPage() {
     );
   }
 
-  const targetTableId = tableId || currentTableId || storedUserData?.tableId;
   const customerSummaries = groupOrdersByCustomer();
 
   // Calcular total general de la mesa
@@ -1019,8 +864,8 @@ export default function HistoryPage() {
                 Historial de Pedidos
               </h1>
               <p className="text-sm text-gray-500">
-                Mesa {targetTableId} • {getCurrentUserDisplay()}
-                {storedUserData && ""}
+                Mesa {tableNumber} • {customerName}
+                {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
               </p>
               <p className="text-sm text-blue-600 font-medium">
                 {customerSummaries.length} comensal
@@ -1193,12 +1038,7 @@ export default function HistoryPage() {
               Aún no has realizado ningún pedido en esta mesa
             </p>
             <button
-              onClick={() => {
-                const targetTableId = tableId || currentTableId;
-                if (targetTableId) {
-                  router.push(`/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`);
-                }
-              }}
+              onClick={() => router.push("/customer/menu")}
               className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition"
             >
               Hacer mi primer pedido
@@ -1268,7 +1108,7 @@ export default function HistoryPage() {
                   ✕
                 </button>
               </div>
-              <p className="text-gray-600">Mesa {targetTableId}</p>
+              <p className="text-gray-600">Mesa {tableNumber}</p>
             </div>
 
             <div className="p-6">
@@ -1336,13 +1176,8 @@ export default function HistoryPage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
         <div className="max-w-7xl mx-auto flex justify-around py-3">
           <button
-            onClick={() => {
-              const targetTableId = tableId || currentTableId;
-              if (targetTableId) {
-                router.push(`/customer/menu?table=${targetTableId}&user=${userId}&order=${orderId}`);
-              }
-            }}
-            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
+            onClick={() => router.push("/customer/menu")}
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaUtensils className="text-2xl mb-1" />
             <span className="text-xs font-medium">Menu</span>
@@ -1352,13 +1187,8 @@ export default function HistoryPage() {
             <span className="text-xs font-medium">Cuenta</span>
           </button>
           <button
-            onClick={() => {
-              const targetTableId = tableId || currentTableId;
-              if (targetTableId) {
-                router.push(`/customer/qr?table=${targetTableId}&user=${userId}&order=${orderId}`);
-              }
-            }}
-            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
+            onClick={() => router.push("/customer/qr")}
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaQrcode className="text-2xl mb-1" />
             <span className="text-xs font-medium">Mi QR</span>

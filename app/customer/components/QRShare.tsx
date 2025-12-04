@@ -1,28 +1,36 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { FaQrcode, FaUtensils, FaHistory } from "react-icons/fa";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/app/context/SessionContext";
+import {
+  FaQrcode,
+  FaUtensils,
+  FaHistory,
+  FaSpinner,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 
 export default function QRSharePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const { session, isLoading } = useSession();
   const [copied, setCopied] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
 
-  // Obtener todos los parámetros necesarios
-  const tableNumber = searchParams.get("table");
-  const userId = searchParams.get("user");
-  const orderId = searchParams.get("order");
+  // Obtener datos de la sesión en lugar de searchParams
+  const tableNumber = session?.tableNumber;
+  const tableId = session?.tableId;
+  const userId = session?.userId;
+  const orderId = session?.orderId;
 
   useEffect(() => {
-    if (tableNumber) {
-      const baseUrl = "https://wayna.e-commetrics.com";
-      // Incluir todos los parámetros en el QR
+    if (tableId && tableNumber) {
+      const baseUrl = window.location.origin; // Usar el origen actual en lugar de URL fija
+      // URL simplificada sin parámetros sensibles
       const url = `${baseUrl}/customer?table=${tableNumber}`;
       setCurrentUrl(url);
     }
-  }, [tableNumber, userId, orderId]);
+  }, [tableId, tableNumber, userId, orderId]);
 
   const handleCopyLink = async () => {
     if (!currentUrl) return;
@@ -51,12 +59,14 @@ export default function QRSharePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Únete a mi mesa - Wayna Drink House",
-          text: "Únete a mi mesa en Wayna Drink House",
+          title: "Únete a mi mesa - FoodHub",
+          text: `Únete a mi mesa ${tableNumber} en FoodHub`,
           url: currentUrl,
         });
       } catch (err) {
         console.error("Error al compartir:", err);
+        // Si falla el share nativo, usar copy
+        handleCopyLink();
       }
     } else {
       handleCopyLink();
@@ -68,13 +78,31 @@ export default function QRSharePage() {
     currentUrl
   )}`;
 
-  if (!tableNumber) {
+  // Loading mientras verifica sesión
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-          <FaQrcode className="text-6xl text-blue-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Mesa no especificada
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaSpinner className="text-3xl text-blue-600 animate-spin" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Cargando...</h1>
+          <p className="text-gray-600">Verificando información de la mesa</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay sesión válida
+  if (!session || !tableNumber) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaExclamationTriangle className="text-3xl text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            Sesión no encontrada
           </h1>
           <p className="text-gray-600 mb-6">
             No se pudo identificar la mesa. Por favor, regresa al menú
@@ -98,7 +126,9 @@ export default function QRSharePage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
           <div>
             <h1 className="text-xl font-bold">Compartir Mesa</h1>
-            <p className="text-sm">Mesa {tableNumber}</p>
+            <p className="text-sm">
+              Mesa {tableNumber} • {session.customerName}
+            </p>
           </div>
         </div>
       </header>
@@ -118,15 +148,37 @@ export default function QRSharePage() {
           {/* Código QR */}
           <div className="bg-gray-50 p-6 rounded-2xl mb-8 border-2 border-dashed border-gray-200">
             <div className="bg-white p-4 rounded-xl inline-block">
-              <img
-                src={qrCodeUrl}
-                alt="Código QR para unirse a la mesa"
-                className="w-64 h-64 mx-auto"
-                onError={(e) => {
-                  // Fallback si la imagen del QR falla
-                  e.currentTarget.style.display = "none";
-                }}
-              />
+              {currentUrl ? (
+                <img
+                  src={qrCodeUrl}
+                  alt="Código QR para unirse a la mesa"
+                  className="w-64 h-64 mx-auto"
+                  onError={(e) => {
+                    // Fallback si la imagen del QR falla
+                    e.currentTarget.style.display = "none";
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      const fallbackDiv = document.createElement("div");
+                      fallbackDiv.className =
+                        "w-64 h-64 bg-gray-200 flex items-center justify-center rounded-xl";
+                      fallbackDiv.innerHTML = `
+                        <div class="text-center">
+                          <FaQrcode class="text-4xl text-gray-400 mx-auto mb-2" />
+                          <p class="text-sm text-gray-500">Error cargando QR</p>
+                        </div>
+                      `;
+                      parent.appendChild(fallbackDiv);
+                    }
+                  }}
+                />
+              ) : (
+                <div className="w-64 h-64 bg-gray-100 flex items-center justify-center rounded-xl">
+                  <div className="text-center">
+                    <FaSpinner className="text-4xl text-gray-400 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Generando QR...</p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800 font-medium">
@@ -144,7 +196,17 @@ export default function QRSharePage() {
             disabled={!currentUrl}
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {copied ? "¡Enlace Copiado!" : "Compartir Mesa"}
+            {copied ? (
+              <>
+                <FaQrcode />
+                ¡Enlace Copiado!
+              </>
+            ) : (
+              <>
+                <FaQrcode />
+                Compartir Mesa
+              </>
+            )}
           </button>
 
           {/* Enlace de texto */}
@@ -155,6 +217,12 @@ export default function QRSharePage() {
             <p className="text-xs text-gray-800 break-all bg-white p-2 rounded border">
               {currentUrl || "Generando enlace..."}
             </p>
+            <button
+              onClick={handleCopyLink}
+              className="w-full mt-2 text-blue-600 text-sm font-medium hover:text-blue-700 transition"
+            >
+              Copiar enlace
+            </button>
           </div>
         </div>
 
@@ -170,30 +238,31 @@ export default function QRSharePage() {
             <li>• Perfecto para pedidos grupales</li>
           </ul>
         </div>
+
+        {/* Información adicional */}
+        <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
+          <h3 className="font-semibold text-green-800 mb-2">💡 Tip útil</h3>
+          <p className="text-sm text-green-700 text-left">
+            Los nuevos comensales podrán agregar sus propios items al pedido y
+            cada uno tendrá su propia cuenta al final.
+          </p>
+        </div>
       </main>
 
-      {/* Navegación Inferior - MANTENIENDO LA MISMA ESTRUCTURA */}
+      {/* Navegación Inferior - ACTUALIZADA */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
         <div className="max-w-7xl mx-auto flex justify-around py-3">
           <button
-            onClick={() =>
-              router.push(
-                `/customer/menu?table=${tableNumber}&user=${userId}&order=${orderId}`
-              )
-            }
-            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
+            onClick={() => router.push("/customer/menu")}
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaUtensils className="text-2xl mb-1" />
             <span className="text-xs font-medium">Menu</span>
           </button>
 
           <button
-            onClick={() =>
-              router.push(
-                `/customer/history?table=${tableNumber}&user=${userId}&order=${orderId}`
-              )
-            }
-            className="flex flex-col items-center text-gray-400 hover:text-gray-600"
+            onClick={() => router.push("/customer/history")}
+            className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition"
           >
             <FaHistory className="text-2xl mb-1" />
             <span className="text-xs font-medium">Cuenta</span>
