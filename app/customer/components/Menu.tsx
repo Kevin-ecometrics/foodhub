@@ -137,6 +137,10 @@ export default function MenuPage() {
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
 
+  // Estados para verificar estado de la mesa
+  const [tableStatus, setTableStatus] = useState<string | null>(null);
+  const [checkingTableStatus, setCheckingTableStatus] = useState(false);
+
   // Referencias para las secciones de categorías
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const containerRef = useRef<HTMLDivElement>(null);
@@ -149,6 +153,37 @@ export default function MenuPage() {
   const [selectedExtras, setSelectedExtras] = useState<{
     [key: string]: boolean;
   }>({});
+
+  // Función para limpiar localStorage
+  const clearLocalStorage = () => {
+    const keysToRemove = [
+      "GDPR_REMOVAL_FLAG",
+      "app_session",
+      "currentOrder",
+      "currentOrderId",
+      "currentTableId",
+      "currentUserId",
+      "currentUserName",
+      "customerSession",
+      "historyUserData",
+      "orderItems",
+      "photoSphereViewer_touchSupport",
+      "restaurant_tableId",
+      "restaurant_userId",
+      "restaurant_userName",
+    ];
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    Object.keys(localStorage).forEach((key) => {
+      if (
+        key.startsWith("paymentState_") ||
+        key.startsWith("paymentStatus_") ||
+        key.startsWith("pendingItems_")
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
 
   // Función para formatear notas y extras
   const formatItemNotes = (notes: string | null) => {
@@ -254,6 +289,95 @@ export default function MenuPage() {
       </div>
     );
   };
+
+  // Efecto para verificar el estado de la mesa
+  useEffect(() => {
+    const checkTableStatus = async () => {
+      const targetTableId = tableId || currentTableId;
+      if (!targetTableId || !hasCheckedSession) return;
+
+      setCheckingTableStatus(true);
+      try {
+        const { data: tableData, error } = await supabase
+          .from("tables")
+          .select("status")
+          .eq("id", targetTableId)
+          .single();
+
+        if (error) {
+          console.error("Error verificando estado de mesa:", error);
+          return;
+        }
+
+        // SOLUCIÓN: Usa type assertion
+        const tableDataTyped = tableData as { status: string } | null;
+
+        if (tableDataTyped?.status) {
+          setTableStatus(tableDataTyped.status);
+
+          // Si la mesa está disponible (no ocupada), redirigir
+          if (tableDataTyped.status === "available") {
+            console.log("Mesa está disponible, redirigiendo...");
+
+            clearLocalStorage();
+            clearSession();
+
+            setTimeout(() => {
+              router.push("/customer");
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error("Error al verificar estado de mesa:", error);
+      } finally {
+        setCheckingTableStatus(false);
+      }
+    };
+
+    if (hasCheckedSession && (tableId || currentTableId)) {
+      checkTableStatus();
+    }
+  }, [hasCheckedSession, tableId, currentTableId, router, clearSession]);
+
+  // Suscripción en tiempo real para cambios en el estado de la mesa
+  useEffect(() => {
+    const targetTableId = tableId || currentTableId;
+    if (!targetTableId || !hasCheckedSession) return;
+
+    const subscription = supabase
+      .channel(`table-status-${targetTableId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tables",
+          filter: `id=eq.${targetTableId}`,
+        },
+        (payload) => {
+          console.log("Cambio en estado de mesa:", payload.new.status);
+          setTableStatus(payload.new.status);
+
+          // Si la mesa cambia a disponible, redirigir
+          if (payload.new.status === "available") {
+            console.log("Mesa liberada, redirigiendo...");
+
+            clearLocalStorage();
+            clearSession();
+
+            setTimeout(() => {
+              alert("👋 La mesa ha sido liberada. Gracias por su visita!");
+              router.push("/customer");
+            }, 300);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [tableId, currentTableId, hasCheckedSession, router, clearSession]);
 
   // Cargar datos iniciales - MEJORADO PARA MANEJAR REFRESH
   useEffect(() => {
@@ -826,7 +950,7 @@ export default function MenuPage() {
     if (uniqueProducts > 4) estimatedTime += 8;
     else if (uniqueProducts > 2) estimatedTime += 5;
 
-    return Math.min(Math.max(estimatedTime, 5), 45);
+    return Math.min(Math.max(estimatedTime, 2), 45);
   };
 
   const getPopularItems = () => {
@@ -1011,6 +1135,45 @@ export default function MenuPage() {
       }
     }, 10);
   };
+
+  // Loading mientras verifica estado de mesa
+  if (checkingTableStatus) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="text-4xl text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando estado de la mesa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si la mesa está disponible, mostrar mensaje y redirigir
+  if (tableStatus === "available") {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
+          <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Mesa Liberada
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Esta mesa ha sido liberada. Por favor, escanea el código QR
+            nuevamente si deseas hacer un nuevo pedido.
+          </p>
+          <button
+            onClick={() => {
+              clearSession();
+              router.push("/customer");
+            }}
+            className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+          >
+            Volver al Escáner QR
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Loading mientras verifica sesión
   if (!hasCheckedSession || isInitialLoad) {
