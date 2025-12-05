@@ -408,7 +408,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   const generateQRCode = async (tableNumber: number) => {
-    const baseUrl = "la-maquila.e-commetrics.com";
+    const baseUrl = window.location.origin;
     const url = `${baseUrl}/customer?table=${tableNumber}`;
 
     try {
