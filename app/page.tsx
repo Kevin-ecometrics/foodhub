@@ -14,7 +14,9 @@ export default function HomePage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">FoodHub</h1>
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">
+              Casa Jardin Burgers
+            </h1>
             <p className="text-gray-600 text-lg">
               Sabores que enamoran, servicio que inspira
             </p>
@@ -27,7 +29,7 @@ export default function HomePage() {
         <div className="max-w-md w-full text-center">
           <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
-              Bienvenido a FoodHub
+              Bienvenido a Casa Jardin Burgers
             </h2>
             <p className="text-gray-600 mb-8">
               Disfruta de una experiencia culinaria única con nuestro menú
@@ -73,8 +75,8 @@ export default function HomePage() {
       <footer className="bg-white border-t py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-600">
-            © {new Date().getFullYear()} Foodhub. Todos los derechos reservados
-            by{" "}
+            © {new Date().getFullYear()} Casa Jardin Burgers. Todos los derechos
+            reservados by{" "}
             <a
               className="text-green-500 hover:text-green-700"
               href="https://e-commetrics.com"

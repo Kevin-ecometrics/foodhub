@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Food Hub Restaurant - Sistema Gestión Meseros",
+  title: "Casa Jardin Burgers - Sistema Gestión Meseros",
   description:
-    "Sistema profesional de gestión para restaurantes Food Hub. Administra pedidos en tiempo real, controla mesas y recibe notificaciones instantáneas. Optimiza tu servicio con nuestro panel mesero.",
+    "Sistema profesional de gestión para restaurantes Casa Jardin Burgers. Administra pedidos en tiempo real, controla mesas y recibe notificaciones instantáneas. Optimiza tu servicio con nuestro panel mesero.",
   keywords:
-    "food hub, restaurante, mesero, pedidos, gestión restaurante, sistema meseros, ordenes comida, administración mesas",
+    "Casa Jardin Burgers, restaurante, mesero, pedidos, gestión restaurante, sistema meseros, ordenes comida, administración mesas",
   authors: [{ name: "Ecommetrica" }],
   publisher: "Ecommetrica",
   robots: "index, follow",

@@ -109,5 +109,5 @@ export interface ProductExtra {
 // Credenciales fijas del administrador
 export const ADMIN_CREDENTIALS = {
   username: "admin",
-  password: "restaurant",
+  password: "casajardin2025",
 };
