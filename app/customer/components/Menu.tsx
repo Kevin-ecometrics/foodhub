@@ -32,6 +32,7 @@ import { OrderItem } from "@/app/lib/supabase/order-items";
 import { historyService } from "@/app/lib/supabase/history";
 
 const CATEGORIES = [
+  // 🔥 Se mantienen exactamente igual
   {
     id: "favorites",
     name: "Favoritos",
@@ -44,26 +45,79 @@ const CATEGORIES = [
     icon: "🔄",
     description: "Tus items recientes de esta orden",
   },
+
+  // ✅ Nuevas categorías agregadas
   {
-    id: "drinks",
-    name: "Drinks",
-    icon: "🥤",
-    description: "Refill de bebidas",
+    id: "entradas",
+    name: "Entradas",
+    icon: "🥟",
+    description: "Aperitivos y botanas",
   },
   {
-    id: "combos",
-    name: "Combos",
+    id: "los-favoritos",
+    name: "Los Favoritos",
+    icon: "⭐",
+    description: "Selección especial del menú",
+  },
+  {
+    id: "burritos",
+    name: "Burritos",
+    icon: "🌯",
+    description: "Nuestra selección de burritos",
+  },
+  {
+    id: "burgers",
+    name: "Burgers",
     icon: "🍔",
-    description: "Combos especiales",
+    description: "Hamburguesas especiales",
   },
-  { id: "breakfast", name: "Breakfast", icon: "🍳", description: "Desayunos" },
-  { id: "lunch", name: "Lunch", icon: "🍱", description: "Almuerzos" },
-  { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
   {
-    id: "refill",
-    name: "Refill",
+    id: "fuertes",
+    name: "Fuertes",
+    icon: "🍽️",
+    description: "Platos fuertes",
+  },
+  {
+    id: "pizza",
+    name: "Pizza",
+    icon: "🍕",
+    description: "Pizzas de la casa",
+  },
+  {
+    id: "jumbos",
+    name: "Jumbos",
+    icon: "🍟",
+    description: "Porciones grandes",
+  },
+  {
+    id: "bebidas",
+    name: "Bebidas",
     icon: "🥤",
-    description: "Refill de bebidas",
+    description: "Refrescos y bebidas",
+  },
+  {
+    id: "cerveza",
+    name: "Cerveza",
+    icon: "🍺",
+    description: "Cerveza nacional",
+  },
+  {
+    id: "cerveza-artesanal",
+    name: "Cerveza Artesanal",
+    icon: "🍻",
+    description: "Cerveza especial y artesanal",
+  },
+  {
+    id: "coquetos",
+    name: "Coquetos",
+    icon: "🍸",
+    description: "Cocteles especiales",
+  },
+  {
+    id: "coquetos-clasicos",
+    name: "Coquetos Clásicos",
+    icon: "🍹",
+    description: "Cocteles clásicos",
   },
 ];
 
@@ -954,19 +1008,27 @@ export default function MenuPage() {
     switch (categoryId) {
       case "favorites":
         return favoriteItems;
+
       case "repite-item":
         return recentItems;
-      case "popular":
-        return getPopularItems();
+
       default:
+        // 🆕 Mapa actualizado con tus categorías reales
         const categoryMap: { [key: string]: string } = {
-          drinks: "Drinks",
-          combos: "Combos",
-          breakfast: "Breakfast",
-          lunch: "Lunch",
-          dinner: "Dinner",
-          refill: "Refill",
+          entradas: "Entradas",
+          "los-favoritos": "Los Favoritos",
+          burritos: "Burritos",
+          burgers: "Burgers",
+          fuertes: "Fuertes",
+          pizza: "Pizza",
+          jumbos: "Jumbos",
+          bebidas: "Bebidas",
+          cerveza: "Cerveza",
+          "cerveza-artesanal": "Cerveza Artesanal",
+          coquetos: "Coquetos",
+          "coquetos-clasicos": "Coquetos Clasicos",
         };
+
         return products.filter(
           (product) => product.category === categoryMap[categoryId]
         );
@@ -1293,7 +1355,7 @@ export default function MenuPage() {
             <button
               key={category.id}
               onClick={() => scrollToCategory(category.id)}
-              className={`flex flex-col items-center gap-1 px-4 py-3 rounded-2xl font-medium whitespace-nowrap transition min-w-[100px] ${
+              className={`flex flex-col items-center gap-1 px-4 py-3 rounded-2xl font-medium whitespace-nowrap transition min-w-auto ${
                 selectedCategory === category.id
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"

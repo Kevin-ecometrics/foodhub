@@ -1193,7 +1193,7 @@ export default function Dashboard({
   </head>
   <body>
     <div class="header">
-      <div class="restaurant-name">FOODHUB RESTAURANT</div>
+      <div class="restaurant-name">La Maquila</div>
       <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS - ACTIVOS</div>
       <div class="date-info">
         <div><strong>Fecha del Reporte:</strong> ${reportDate}</div>
@@ -1294,7 +1294,7 @@ export default function Dashboard({
 
     <div class="footer">
       <div>*** REPORTE DE PRODUCTOS ACTIVOS - GENERADO AUTOMÁTICAMENTE ***</div>
-      <div>FoodHub Restaurant - Sistema de Gestión</div>
+      <div>La Maquila - Sistema de Gestión</div>
       <div>${window.location.hostname}</div>
     </div>
   </body>
@@ -1420,7 +1420,7 @@ export default function Dashboard({
     </head>
     <body>
       <div class="header">
-        <div class="restaurant-name">FOODHUB RESTAURANT</div>
+        <div class="restaurant-name">La Maquila</div>
         <div>*** TICKET DE VENTA ***</div>
       </div>
       
@@ -1493,7 +1493,7 @@ export default function Dashboard({
       
       <div class="footer">
         <div>*** GRACIAS POR SU VISITA ***</div>
-        <div>FoodHub Restaurant</div>
+        <div>La Maquila</div>
         <div>${window.location.hostname}</div>
       </div>
     </body>
