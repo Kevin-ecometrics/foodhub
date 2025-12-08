@@ -32,6 +32,7 @@ import { OrderItem } from "@/app/lib/supabase/order-items";
 import { historyService } from "@/app/lib/supabase/history";
 
 const CATEGORIES = [
+  // 🔥 Se mantienen sin modificar
   {
     id: "favorites",
     name: "Favoritos",
@@ -44,26 +45,55 @@ const CATEGORIES = [
     icon: "🔄",
     description: "Tus items recientes de esta orden",
   },
+
+  // 🆕 Tus nuevas categorías
   {
-    id: "drinks",
-    name: "Drinks",
-    icon: "🥤",
-    description: "Refill de bebidas",
-  },
-  {
-    id: "combos",
-    name: "Combos",
+    id: "las-burgers",
+    name: "Las Burgers",
     icon: "🍔",
-    description: "Combos especiales",
+    description: "Hamburguesas especiales",
   },
-  { id: "breakfast", name: "Breakfast", icon: "🍳", description: "Desayunos" },
-  { id: "lunch", name: "Lunch", icon: "🍱", description: "Almuerzos" },
-  { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
   {
-    id: "refill",
-    name: "Refill",
+    id: "alitas",
+    name: "Alitas",
+    icon: "🍗",
+    description: "Alitas clásicas y especiales",
+  },
+  {
+    id: "boneless",
+    name: "Boneless",
+    icon: "🍗",
+    description: "Trozos de pollo sin hueso",
+  },
+  {
+    id: "aros-cebolla",
+    name: "Aros de Cebolla",
+    icon: "🧅",
+    description: "Aros crujientes de cebolla",
+  },
+  {
+    id: "dedos-queso",
+    name: "Dedos de Queso",
+    icon: "🧀",
+    description: "Dedos de queso empanizados",
+  },
+  {
+    id: "papas",
+    name: "Papas",
+    icon: "🍟",
+    description: "Papas fritas y especiales",
+  },
+  {
+    id: "aderezos",
+    name: "Aderezos",
+    icon: "🥣",
+    description: "Aderezos para acompañar",
+  },
+  {
+    id: "bebidas",
+    name: "Bebidas",
     icon: "🥤",
-    description: "Refill de bebidas",
+    description: "Refrescos y bebidas",
   },
 ];
 
@@ -954,19 +984,22 @@ export default function MenuPage() {
     switch (categoryId) {
       case "favorites":
         return favoriteItems;
+
       case "repite-item":
         return recentItems;
-      case "popular":
-        return getPopularItems();
+
       default:
         const categoryMap: { [key: string]: string } = {
-          drinks: "Drinks",
-          combos: "Combos",
-          breakfast: "Breakfast",
-          lunch: "Lunch",
-          dinner: "Dinner",
-          refill: "Refill",
+          "las-burgers": "Las Burgers",
+          alitas: "Alitas",
+          boneless: "Boneless",
+          "aros-cebolla": "Aros de Cebolla",
+          "dedos-queso": "Dedos de Queso",
+          papas: "Papas",
+          aderezos: "Aderezos",
+          bebidas: "Bebidas",
         };
+
         return products.filter(
           (product) => product.category === categoryMap[categoryId]
         );
@@ -1293,7 +1326,7 @@ export default function MenuPage() {
             <button
               key={category.id}
               onClick={() => scrollToCategory(category.id)}
-              className={`flex flex-col items-center gap-1 px-4 py-3 rounded-2xl font-medium whitespace-nowrap transition min-w-[100px] ${
+              className={`flex flex-col items-center gap-1 px-4 py-3 rounded-2xl font-medium whitespace-nowrap transition min-w-auto ${
                 selectedCategory === category.id
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"

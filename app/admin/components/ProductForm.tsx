@@ -292,11 +292,14 @@ export default function ProductForm({
               }`}
             >
               <option value="">Seleccionar categoría</option>
-              <option value="Breakfast">Breakfast</option>
-              <option value="Lunch">Lunch</option>
-              <option value="Dinner">Dinner</option>
-              <option value="Combos">Combos</option>
-              <option value="Drinks">Drinks</option>
+              <option value="Las Burgers">Las Burgers</option>
+              <option value="Alitas">Alitas</option>
+              <option value="Boneless">Boneless</option>
+              <option value="Aros de Cebolla">Aros de Cebolla</option>
+              <option value="Dedos de Queso">Dedos de Queso</option>
+              <option value="Papas">Papas</option>
+              <option value="Aderezos">Aderezos</option>
+              <option value="Bebidas">Bebidas</option>
             </select>
             {errors.category && (
               <p className="text-red-500 text-xs mt-1">{errors.category}</p>
