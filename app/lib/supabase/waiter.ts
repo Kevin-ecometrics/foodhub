@@ -3,7 +3,7 @@ import { supabase } from './client'
 // Tipos base
 type NotificationType =
   | 'new_order'
-  | 'refill'
+  | 'refill'           // ¡Ahora incluido en el tipo!
   | 'assistance'
   | 'bill_request'
   | 'order_updated'
@@ -20,7 +20,7 @@ export interface WaiterNotification {
   id: string
   table_id: number
   order_id: string | null
-  type: NotificationType
+  type: NotificationType  // ¡Ahora incluye 'refill'!
   message: string
   status: NotificationStatus
   payment_method: PaymentMethod
@@ -33,6 +33,8 @@ export interface WaiterNotification {
     total_amount: number
     customer_name: string | null
   }
+  // Agregar campo para table_number directo (para casos donde no haya join)
+  table_number?: number
 }
 
 export interface OrderItem {
@@ -158,7 +160,29 @@ export const waiterService = {
       .returns<WaiterNotification[]>()
 
     if (error) throw error
-    return data || []
+    
+    // Procesar los datos para asegurar que table_number esté disponible
+    const processedData = (data || []).map(notification => {
+      // Asegurar que table_number esté disponible
+      const tableNumber = notification.tables?.number || notification.table_number || 0;
+      
+      // También podríamos asegurar que type sea válido
+      const validTypes: NotificationType[] = ['new_order', 'refill', 'assistance', 'bill_request', 'order_updated', 'table_freed'];
+      const notificationType: NotificationType = validTypes.includes(notification.type as NotificationType) 
+        ? notification.type as NotificationType 
+        : 'assistance'; // Valor por defecto
+      
+      return {
+        ...notification,
+        type: notificationType,
+        // Agregar table_number si no está presente
+        ...(notification.tables?.number && !notification.table_number 
+          ? { table_number: notification.tables.number } 
+          : {})
+      };
+    });
+    
+    return processedData;
   },
 
   async getTablesWithOrders(): Promise<TableWithOrder[]> {
@@ -493,7 +517,7 @@ async cancelOrderItem(itemId: string, cancelQuantity: number = 1) {
       .from('order_items')
       .select('*')
       .eq('id', itemId)
-      .maybeSingle(); // <--- evita errores de tipos y funciona igual
+      .maybeSingle();
 
     if (fetchError) throw fetchError;
     if (!data) throw new Error('Item no encontrado');
@@ -534,5 +558,4 @@ async cancelOrderItem(itemId: string, cancelQuantity: number = 1) {
     throw error;
   }
 }
-
 }

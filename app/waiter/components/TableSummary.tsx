@@ -2,18 +2,35 @@ interface TableSummaryProps {
   tableTotal: number;
   customerCount: number;
   orderCount: number;
+  // Nueva prop para el filtro FCFS
+  isHighlighted?: boolean;
 }
 
 export default function TableSummary({
   tableTotal,
   customerCount,
   orderCount,
+  isHighlighted = false,
 }: TableSummaryProps) {
   return (
-    <div className="mt-4 pt-4 border-t border-gray-300">
+    <div
+      className={`mt-4 pt-4 border-t ${
+        isHighlighted ? "border-red-300" : "border-gray-300"
+      }`}
+    >
       <div className="flex justify-between items-center">
-        <span className="font-bold text-lg text-gray-800">TOTAL A PAGAR:</span>
-        <span className="text-xl font-bold text-green-600">
+        <span
+          className={`font-bold text-lg ${
+            isHighlighted ? "text-red-800" : "text-gray-800"
+          }`}
+        >
+          TOTAL A PAGAR:
+        </span>
+        <span
+          className={`text-xl font-bold ${
+            isHighlighted ? "text-red-700" : "text-green-600"
+          }`}
+        >
           ${tableTotal.toFixed(2)}
         </span>
       </div>
