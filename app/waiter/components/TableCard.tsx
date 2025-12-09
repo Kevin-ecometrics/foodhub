@@ -11,6 +11,10 @@ interface TableCardProps {
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
+  // Nuevas props opcionales
+  occupationTime?: string;
+  hasNotifications?: boolean;
+  isHighlighted?: boolean;
 }
 
 export default function TableCard({
@@ -21,6 +25,9 @@ export default function TableCard({
   onCobrarMesa,
   calculateTableTotal,
   notifications,
+  occupationTime,
+  hasNotifications,
+  isHighlighted = false,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
 
@@ -70,19 +77,46 @@ export default function TableCard({
   return (
     <div
       className={`bg-white rounded-lg shadow-lg p-4 transition-all duration-300 hover:shadow-xl ${
-        table.status === "occupied"
+        isHighlighted
+          ? "border-2 border-red-500"
+          : table.status === "occupied"
           ? "border-l-4 border-l-green-500"
           : table.status === "reserved"
           ? "border-l-4 border-l-yellow-500"
           : "border-l-4 border-l-gray-300"
       }`}
     >
+      {/* Información adicional de tiempo de ocupación */}
+      {occupationTime && (
+        <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-blue-800 font-medium">
+              Tiempo de ocupación:
+            </span>
+            <span
+              className={`font-bold ${
+                occupationTime.includes("h")
+                  ? "text-red-600"
+                  : occupationTime.includes("min") &&
+                    parseInt(occupationTime) > 30
+                  ? "text-orange-600"
+                  : "text-green-600"
+              }`}
+            >
+              {occupationTime}
+            </span>
+          </div>
+        </div>
+      )}
+
       <TableHeader
         table={table}
         tableTotal={tableTotal}
         processing={processing}
         onCobrarMesa={onCobrarMesa}
         notifications={notifications}
+        hasNotifications={hasNotifications}
+        isHighlighted={isHighlighted}
       />
 
       {customerSummaries.map((customerSummary) => (
@@ -100,6 +134,7 @@ export default function TableCard({
           tableTotal={tableTotal}
           customerCount={customerSummaries.length}
           orderCount={table.orders.length}
+          isHighlighted={isHighlighted}
         />
       )}
 

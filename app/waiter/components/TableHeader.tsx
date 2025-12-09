@@ -8,6 +8,7 @@ import {
   FaQuestion,
   FaPlus,
   FaUtensils,
+  FaClock,
 } from "react-icons/fa";
 import { useState, useEffect } from "react";
 
@@ -18,6 +19,10 @@ interface TableHeaderProps {
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   notifications: WaiterNotification[];
   onOrderAdded?: () => void;
+  // Nuevas props para el filtro FCFS
+  hasNotifications?: boolean;
+  isHighlighted?: boolean;
+  occupationTime?: string;
 }
 
 interface Product {
@@ -42,6 +47,9 @@ export default function TableHeader({
   onCobrarMesa,
   notifications = [],
   onOrderAdded,
+  hasNotifications = false,
+  isHighlighted = false,
+  occupationTime,
 }: TableHeaderProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -137,9 +145,17 @@ export default function TableHeader({
       : null;
 
   const getPaymentMethodInfo = (paymentMethod: string | null) => {
-    if (paymentMethod === "ticket") {
+    if (paymentMethod === "cash") {
       return {
-        text: "Cuenta Solicitada",
+        text: "EFECTIVO",
+        icon: FaDollarSign,
+        bgColor: "bg-green-100",
+        textColor: "text-green-800",
+        borderColor: "border-green-300",
+      };
+    } else if (paymentMethod === "terminal") {
+      return {
+        text: "TARJETA",
         icon: FaReceipt,
         bgColor: "bg-blue-100",
         textColor: "text-blue-800",
@@ -147,7 +163,7 @@ export default function TableHeader({
       };
     } else {
       return {
-        text: "Método no especificado",
+        text: "PENDIENTE",
         icon: FaQuestion,
         bgColor: "bg-gray-100",
         textColor: "text-gray-800",
@@ -201,17 +217,13 @@ export default function TableHeader({
         0
       );
 
-      console.log("Creando orden para mesa:", table.id);
-      console.log("Total de la orden:", orderTotal);
-      console.log("Items a agregar:", selectedItems);
-
-      // CREAR LA ORDEN EN LA TABLA ORDERS CON STATUS "sent" y "Mesero + número"
+      // CREAR LA ORDEN EN LA TABLA ORDERS
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert([
           {
             table_id: table.id,
-            customer_name: `Mesero ${table.number}`, // CAMBIADO: "Mesero" en lugar de "Mesa"
+            customer_name: `Mesero ${table.number}`,
             status: "sent",
             total_amount: orderTotal,
           },
@@ -236,8 +248,6 @@ export default function TableHeader({
         cancelled_quantity: 0,
       }));
 
-      console.log("Insertando items en order_items:", orderItemsData);
-
       // CREAR LOS ITEMS EN LA TABLA ORDER_ITEMS
       const { data: orderItems, error: itemsError } = await supabase
         .from("order_items")
@@ -255,8 +265,6 @@ export default function TableHeader({
 
         throw new Error(`Error creando items: ${itemsError.message}`);
       }
-
-      console.log("Order_items creados exitosamente:", orderItems);
 
       // ÉXITO - Cerrar modal y limpiar
       setShowAddModal(false);
@@ -305,15 +313,61 @@ export default function TableHeader({
   const totalItems = calculateTotalItems(table);
   const statusCounts = calculateItemsByStatus(table);
 
+  // Determinar color según tiempo de ocupación
+  const getTimeColor = () => {
+    if (!occupationTime) return "text-gray-600";
+
+    if (occupationTime.includes("h")) {
+      return "text-red-600";
+    } else if (
+      occupationTime.includes("min") &&
+      parseInt(occupationTime) > 30
+    ) {
+      return "text-orange-600";
+    }
+    return "text-green-600";
+  };
+
   return (
     <>
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
-          <h3 className="font-bold text-lg flex items-center gap-2">
-            Mesa {table.number}
-          </h3>
+          {/* Línea superior con información principal */}
+          <div className="flex items-center gap-2 mb-2">
+            <h3
+              className={`text-lg font-bold ${
+                isHighlighted ? "text-red-700" : "text-gray-800"
+              }`}
+            >
+              Mesa {table.number}
+            </h3>
+          </div>
 
-          <div className="flex flex-wrap gap-1 mt-2">
+          {/* Información de tiempo de ocupación */}
+          {occupationTime && (
+            <div className="flex items-center gap-1 mb-2 text-sm">
+              <FaClock className={`${getTimeColor()}`} size={12} />
+              <span className={`font-medium ${getTimeColor()}`}>
+                {occupationTime}
+              </span>
+              <span className="text-gray-500 mx-1">•</span>
+              <span className="text-gray-500 text-xs">
+                Ocupada desde:{" "}
+                {table.orders.length > 0
+                  ? new Date(table.orders[0].created_at).toLocaleTimeString(
+                      [],
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    )
+                  : "Sin registro"}
+              </span>
+            </div>
+          )}
+
+          {/* Badges de estado */}
+          <div className="flex flex-wrap gap-1 mb-2">
             <span
               className={`text-xs px-2 py-1 rounded ${
                 table.status === "occupied"
@@ -324,10 +378,10 @@ export default function TableHeader({
               }`}
             >
               {table.status === "occupied"
-                ? "🟢 Ocupada"
+                ? "Ocupada"
                 : table.status === "reserved"
-                ? "🟡 Reservada"
-                : "⚪ Disponible"}
+                ? "Reservada"
+                : "Disponible"}
             </span>
 
             {/* NOTIFICACIÓN DE CUENTA CON MÉTODO DE PAGO */}
@@ -341,7 +395,7 @@ export default function TableHeader({
                 } ${
                   getPaymentMethodInfo(latestBillRequest.payment_method)
                     .borderColor
-                } flex items-center gap-1 animate-pulse`}
+                } flex items-center gap-1`}
               >
                 {(() => {
                   const IconComponent = getPaymentMethodInfo(
@@ -353,30 +407,39 @@ export default function TableHeader({
               </span>
             )}
 
-            {totalItems > 0 && (
-              <>
-                <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                  🍽️ {statusCounts.served} servidos
-                </span>
-              </>
+            {/* Items servidos */}
+            {totalItems > 0 && statusCounts.served > 0 && (
+              <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                {statusCounts.served} servido
+                {statusCounts.served > 1 ? "s" : ""}
+              </span>
+            )}
+
+            {/* Items listos */}
+            {statusCounts.ready > 0 && (
+              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                {statusCounts.ready} listo{statusCounts.ready > 1 ? "s" : ""}
+              </span>
+            )}
+
+            {/* Items pendientes */}
+            {statusCounts.pending > 0 && (
+              <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                {statusCounts.pending} pendiente
+                {statusCounts.pending > 1 ? "s" : ""}
+              </span>
             )}
           </div>
 
-          {/* INFORMACIÓN ADICIONAL DEL MÉTODO DE PAGO */}
-          {latestBillRequest && (
-            <div className="mt-2 text-xs text-gray-600">
-              <p>💡 El cliente solicito la cuenta</p>
-            </div>
-          )}
-
-          <p className="text-sm text-gray-500 mt-1">
+          {/* Información adicional de ubicación */}
+          <p className="text-sm text-gray-500">
             {table.location} • {table.capacity} personas
           </p>
         </div>
 
         {/* BOTONES DE ACCIÓN */}
         <div className="flex gap-2 ml-2">
-          {/* BOTÓN DE AGREGAR - SIEMPRE VISIBLE PARA MESAS OCUPADAS Y RESERVADAS */}
+          {/* BOTÓN DE AGREGAR */}
           {(table.status === "occupied" || table.status === "reserved") && (
             <button
               onClick={handleAddClick}
@@ -408,7 +471,7 @@ export default function TableHeader({
         </div>
       </div>
 
-      {/* MODAL PARA AGREGAR PRODUCTOS */}
+      {/* MODAL PARA AGREGAR PRODUCTOS (sin cambios) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
