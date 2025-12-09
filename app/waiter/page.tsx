@@ -15,25 +15,21 @@ import TablesTab from "./components/TablesTab";
 import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
 
-// Modal de confirmación con contraseña
+// Modal de confirmación con contraseña - SIMPLIFICADO
 function PasswordModal({
   isOpen,
   onClose,
   onConfirm,
-  title,
-  message,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  title: string;
-  message: string;
 }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleConfirm = () => {
-    if (password === "lamaquila2025") {
+    if (password === "restaurant") {
       setError("");
       setPassword("");
       onConfirm();
@@ -54,19 +50,24 @@ function PasswordModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        <p className="text-gray-600 mb-4">{message}</p>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+          Confirmar Cancelación
+        </h3>
+
+        <p className="text-gray-600 mb-4">
+          Ingrese la contraseña para confirmar la cancelación del producto.
+        </p>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Contraseña de confirmación:
+            Contraseña:
           </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ingresa la contraseña"
+            placeholder="Contraseña de autorización"
             onKeyPress={(e) => {
               if (e.key === "Enter") {
                 handleConfirm();
@@ -88,7 +89,59 @@ function PasswordModal({
             className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
             disabled={!password}
           >
-            Confirmar Cancelación
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente simple para ordenar mesas
+function TablesOrderSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="mb-4 p-3 bg-white rounded-lg border border-gray-300">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700">
+          Ordenar mesas:
+        </span>
+
+        <div className="flex bg-gray-100 rounded-lg">
+          <button
+            onClick={() => onChange("number")}
+            className={`
+          flex items-center gap-2 px-3 py-2 rounded-l-lg text-sm
+          ${
+            value === "number"
+              ? "bg-blue-500 text-white"
+              : "text-gray-600 hover:bg-gray-200"
+          }
+        `}
+            title="Ordenar por número de mesa"
+          >
+            <span>#</span>
+            <span>Número</span>
+          </button>
+          <button
+            onClick={() => onChange("occupation")}
+            className={`
+          flex items-center gap-2 px-3 py-2 rounded-r-lg text-sm
+          ${
+            value === "occupation"
+              ? "bg-blue-500 text-white"
+              : "text-gray-600 hover:bg-gray-200"
+          }
+        `}
+            title="Ordenar por tiempo de ocupación"
+          >
+            <span>🕐</span>
+            <span>Tiempo</span>
           </button>
         </div>
       </div>
@@ -108,6 +161,26 @@ export default function WaiterDashboard() {
     Set<string>
   >(new Set());
 
+  // Estado para el filtro FCFS (notificaciones)
+  const [fcfsFilter, setFcfsFilter] = useState(() => {
+    // Cargar desde localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("waiter_fcfs_filter");
+      return saved === "true";
+    }
+    return false;
+  });
+
+  // Estado para ordenar mesas
+  const [tablesOrder, setTablesOrder] = useState<string>(() => {
+    // Cargar desde localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("waiter_tables_order");
+      return saved || "number";
+    }
+    return "number";
+  });
+
   // Estados para el modal de contraseña
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingCancelAction, setPendingCancelAction] = useState<{
@@ -124,23 +197,15 @@ export default function WaiterDashboard() {
     const unsubscribe = setupRealtimeSubscription();
 
     const interval = setInterval(() => {
-      if (isUpdatingRef.current) return; // Evitar múltiples actualizaciones simultáneas
+      if (isUpdatingRef.current) return;
 
       isUpdatingRef.current = true;
-      // Guardar posición actual del scroll antes de actualizar
       scrollPositionRef.current =
         window.scrollY || document.documentElement.scrollTop;
 
-      console.log(
-        "🔄 Auto-actualizando, posición guardada:",
-        scrollPositionRef.current
-      );
-
       loadData().finally(() => {
-        // Pequeño delay para asegurar que el DOM se haya actualizado
         setTimeout(() => {
           window.scrollTo(0, scrollPositionRef.current);
-          console.log("📍 Scroll restaurado a:", scrollPositionRef.current);
           isUpdatingRef.current = false;
         }, 100);
       });
@@ -152,6 +217,15 @@ export default function WaiterDashboard() {
     };
   }, []);
 
+  // Guardar estados en localStorage cuando cambian
+  useEffect(() => {
+    localStorage.setItem("waiter_fcfs_filter", fcfsFilter.toString());
+  }, [fcfsFilter]);
+
+  useEffect(() => {
+    localStorage.setItem("waiter_tables_order", tablesOrder);
+  }, [tablesOrder]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -160,17 +234,19 @@ export default function WaiterDashboard() {
         waiterService.getTablesWithOrders(),
       ]);
 
-      // PROCESAR LOS DATOS PARA ASEGURAR QUE CANCELLED_QUANTITY ESTÉ CORRECTO
+      // Aplicar filtro FCFS si está activo
+      let processedNotifications = [...notifsData];
+      if (fcfsFilter) {
+        processedNotifications = applyFcfsFilter(processedNotifications);
+      }
+
+      // Procesar los datos
       const processedTables = tablesData.map((table) => ({
         ...table,
         orders: table.orders.map((order) => ({
           ...order,
           order_items: order.order_items.map((item) => {
-            // Asegurar que cancelled_quantity siempre tenga un valor
             const cancelledQty = item.cancelled_quantity || 0;
-
-            // Si el item está marcado como 'cancelled' pero no tiene cancelled_quantity,
-            // asumimos que toda la cantidad está cancelada
             const finalCancelledQty =
               item.status === "cancelled" && cancelledQty === 0
                 ? item.quantity
@@ -184,9 +260,11 @@ export default function WaiterDashboard() {
         })),
       }));
 
-      // Actualizar estados solo si los datos realmente cambiaron
+      // Actualizar estados
       setNotifications((prev) =>
-        JSON.stringify(prev) === JSON.stringify(notifsData) ? prev : notifsData
+        JSON.stringify(prev) === JSON.stringify(processedNotifications)
+          ? prev
+          : processedNotifications
       );
 
       setTables((prev) =>
@@ -194,20 +272,39 @@ export default function WaiterDashboard() {
           ? prev
           : processedTables
       );
-
-      console.log("🔄 Datos actualizados - Items procesados:", {
-        totalMesas: processedTables.length,
-        itemsConCancelados: processedTables.flatMap((t) =>
-          t.orders.flatMap((o) =>
-            o.order_items.filter((i) => i.cancelled_quantity > 0)
-          )
-        ).length,
-      });
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error cargando datos:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Función para aplicar el filtro FCFS
+  const applyFcfsFilter = (notificationsList: WaiterNotification[]) => {
+    return [...notificationsList].sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateA - dateB;
+    });
+  };
+
+  // Función para alternar el filtro FCFS
+  const toggleFcfsFilter = () => {
+    const newFcfsState = !fcfsFilter;
+    setFcfsFilter(newFcfsState);
+
+    // Aplicar/remover filtro inmediatamente
+    if (notifications.length > 0 && newFcfsState) {
+      const filteredNotifications = applyFcfsFilter(notifications);
+      setNotifications(filteredNotifications);
+    } else if (notifications.length > 0 && !newFcfsState) {
+      loadData();
+    }
+  };
+
+  // Función para cambiar el orden de mesas
+  const handleTablesOrderChange = (order: string) => {
+    setTablesOrder(order);
   };
 
   const setupRealtimeSubscription = () => {
@@ -328,7 +425,7 @@ export default function WaiterDashboard() {
     try {
       setAttendedNotifications((prev) => new Set(prev).add(notificationId));
     } catch (error) {
-      console.error("Error acknowledging notification:", error);
+      console.error("Error marcando notificación como atendida:", error);
     } finally {
       setProcessing(null);
     }
@@ -345,7 +442,7 @@ export default function WaiterDashboard() {
         return newSet;
       });
     } catch (error) {
-      console.error("Error completing notification:", error);
+      console.error("Error completando notificación:", error);
     } finally {
       setProcessing(null);
     }
@@ -355,12 +452,10 @@ export default function WaiterDashboard() {
     itemId: string,
     cancelQuantity: number = 1
   ) => {
-    // Mostrar modal de confirmación con contraseña
     setPendingCancelAction({ itemId, cancelQuantity });
     setShowPasswordModal(true);
   };
 
-  // Función que se ejecuta después de confirmar la contraseña
   const executeCancelItem = async () => {
     if (!pendingCancelAction) return;
 
@@ -368,10 +463,8 @@ export default function WaiterDashboard() {
     setProcessing(itemId);
 
     try {
-      // Cancelar la cantidad específica
       await waiterService.cancelOrderItem(itemId, cancelQuantity);
 
-      // Actualizar el estado local
       setTables((prevTables) =>
         prevTables.map((table) => ({
           ...table,
@@ -397,11 +490,9 @@ export default function WaiterDashboard() {
           })),
         }))
       );
-
-      console.log(`✅ ${cancelQuantity} producto(s) cancelado(s) exitosamente`);
     } catch (error: any) {
       console.error("Error cancelando producto:", error);
-      alert(`❌ Error al cancelar el producto:\n${error.message}`);
+      alert(`Error al cancelar el producto:\n${error.message}`);
       await loadData();
     } finally {
       setProcessing(null);
@@ -412,10 +503,8 @@ export default function WaiterDashboard() {
   const handleUpdateItemStatus = async (itemId: string, newStatus: string) => {
     setProcessing(itemId);
     try {
-      // Actualizar solo el item específico en lugar de recargar todo
       await waiterService.updateItemStatus(itemId, newStatus as never);
 
-      // En lugar de loadData(), actualizar solo el estado local
       setTables((prevTables) =>
         prevTables.map((table) => ({
           ...table,
@@ -431,8 +520,7 @@ export default function WaiterDashboard() {
         }))
       );
     } catch (error) {
-      console.error("Error updating item status:", error);
-      // Si hay error, entonces sí recargar todo
+      console.error("Error actualizando estado:", error);
       await loadData();
     } finally {
       setProcessing(null);
@@ -443,7 +531,6 @@ export default function WaiterDashboard() {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
-    // Calcular cantidad de items cancelados
     const cancelledItemsCount = table
       ? table.orders.reduce((count, order) => {
           return (
@@ -454,35 +541,32 @@ export default function WaiterDashboard() {
         }, 0)
       : 0;
 
-    // Buscar notificación de cuenta para esta mesa
     const billNotification = notifications.find(
       (notification) =>
         notification.table_id === tableId &&
         notification.type === "bill_request"
     );
 
-    // Obtener el método de pago de la notificación (si existe)
     const paymentMethod = billNotification?.payment_method || null;
 
     let paymentMethodText = "";
     if (paymentMethod === "cash") {
-      paymentMethodText = "💰 Pago en EFECTIVO";
+      paymentMethodText = "Pago en EFECTIVO";
     } else if (paymentMethod === "terminal") {
-      paymentMethodText = "💳 Pago con TERMINAL";
+      paymentMethodText = "Pago con TERMINAL";
     } else {
-      paymentMethodText = "❓ Método de pago no especificado";
+      paymentMethodText = "Método de pago no especificado";
     }
 
-    let confirmationMessage = `¿Estás seguro de que quieres COBRAR la Mesa ${tableNumber}?\n\n${paymentMethodText}\n💰 Total: $${tableTotal.toFixed(
+    let confirmationMessage = `¿Cobrar Mesa ${tableNumber}?\n\n${paymentMethodText}\nTotal: $${tableTotal.toFixed(
       2
     )}`;
 
-    // Agregar información sobre cancelados si existen
     if (cancelledItemsCount > 0) {
-      confirmationMessage += `\n\n📝 Nota: ${cancelledItemsCount} producto(s) cancelado(s) no se incluirán en la cuenta.`;
+      confirmationMessage += `\n\n${cancelledItemsCount} producto(s) cancelado(s) excluidos.`;
     }
 
-    confirmationMessage += `\n\n📊 Se guardará el historial de venta y se liberará la mesa.`;
+    confirmationMessage += `\n\nSe guardará el historial y se liberará la mesa.`;
 
     if (!confirm(confirmationMessage)) {
       return;
@@ -490,37 +574,30 @@ export default function WaiterDashboard() {
 
     setProcessing(`cobrar-${tableId}`);
     try {
-      console.log(
-        `💵 Iniciando cobro para mesa ${tableNumber}, método: ${paymentMethod}`
-      );
-
       await waiterService.freeTableAndClean(
         tableId,
         tableNumber,
         paymentMethod
       );
 
-      let successMessage = `✅ Mesa ${tableNumber} cobrada exitosamente!\n\n`;
+      let successMessage = `Mesa ${tableNumber} cobrada.\n\n`;
       if (paymentMethod === "cash") {
-        successMessage += `💰 Pago en EFECTIVO\n`;
+        successMessage += `Pago en EFECTIVO\n`;
       } else if (paymentMethod === "terminal") {
-        successMessage += `💳 Pago con TERMINAL\n`;
+        successMessage += `Pago con TERMINAL\n`;
       }
-      successMessage += `💵 Total: $${tableTotal.toFixed(2)}\n`;
+      successMessage += `Total: $${tableTotal.toFixed(2)}\n`;
 
-      // Agregar info sobre cancelados en el mensaje de éxito
       if (cancelledItemsCount > 0) {
-        successMessage += `📝 ${cancelledItemsCount} producto(s) cancelado(s) excluidos\n`;
+        successMessage += `${cancelledItemsCount} producto(s) cancelado(s) excluidos\n`;
       }
-
-      successMessage += `📈 Historial guardado correctamente`;
 
       alert(successMessage);
 
       await loadData();
     } catch (error: any) {
       console.error("Error cobrando mesa:", error);
-      alert(`❌ Error al cobrar la mesa ${tableNumber}:\n${error.message}`);
+      alert(`Error al cobrar la mesa ${tableNumber}:\n${error.message}`);
     } finally {
       setProcessing(null);
     }
@@ -534,17 +611,14 @@ export default function WaiterDashboard() {
     alert(error);
   };
 
-  // FUNCIÓN CORREGIDA: Calcular el total REAL excluyendo cancelados
   const calculateTableTotal = (table: TableWithOrder) => {
     return table.orders.reduce((total, order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
         const orderTotal = order.order_items.reduce(
           (orderSum: number, item: any) => {
-            // Calcular cantidad activa (excluyendo cancelados)
             const cancelledQty = item.cancelled_quantity || 0;
             const activeQuantity = item.quantity - cancelledQty;
 
-            // Solo sumar si hay cantidad activa
             if (activeQuantity > 0) {
               return orderSum + item.price * activeQuantity;
             }
@@ -563,7 +637,7 @@ export default function WaiterDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <Header loading={loading} onRefresh={loadData} />
 
       <Tabs
@@ -577,26 +651,36 @@ export default function WaiterDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "notifications" && (
-          <NotificationsTab
-            notifications={notifications}
-            processing={processing}
-            attendedNotifications={attendedNotifications}
-            onAcknowledgeNotification={handleAcknowledgeNotification}
-            onCompleteNotification={handleCompleteNotification}
-            onGoToTables={handleGoToTables}
-          />
+          <>
+            <NotificationsTab
+              notifications={notifications}
+              processing={processing}
+              attendedNotifications={attendedNotifications}
+              onAcknowledgeNotification={handleAcknowledgeNotification}
+              onCompleteNotification={handleCompleteNotification}
+              onGoToTables={handleGoToTables}
+            />
+          </>
         )}
 
         {activeTab === "tables" && (
-          <TablesTab
-            tables={tables}
-            processing={processing}
-            onUpdateItemStatus={handleUpdateItemStatus}
-            onCobrarMesa={handleCobrarMesa}
-            calculateTableTotal={calculateTableTotal}
-            notifications={notifications}
-            onCancelItem={handleCancelItem}
-          />
+          <>
+            <TablesOrderSelect
+              value={tablesOrder}
+              onChange={handleTablesOrderChange}
+            />
+
+            <TablesTab
+              tables={tables}
+              processing={processing}
+              onUpdateItemStatus={handleUpdateItemStatus}
+              onCobrarMesa={handleCobrarMesa}
+              calculateTableTotal={calculateTableTotal}
+              notifications={notifications}
+              onCancelItem={handleCancelItem}
+              tablesOrder={tablesOrder}
+            />
+          </>
         )}
 
         {activeTab === "products" && (
@@ -604,13 +688,10 @@ export default function WaiterDashboard() {
         )}
       </main>
 
-      {/* Modal de confirmación con contraseña */}
       <PasswordModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
         onConfirm={executeCancelItem}
-        title="Confirmar Cancelación de Producto"
-        message="Para cancelar este producto, ingresa la contraseña de autorización:"
       />
     </div>
   );
