@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/customer/menu/page.tsx
 "use client";
 import { useEffect, useState, useRef } from "react";
@@ -26,13 +27,13 @@ import {
   FaQuestion,
   FaStickyNote,
   FaExclamationTriangle,
+  FaTag,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
 import { historyService } from "@/app/lib/supabase/history";
 
 const CATEGORIES = [
-  // 🔥 Se mantienen exactamente igual
   {
     id: "favorites",
     name: "Favoritos",
@@ -45,8 +46,6 @@ const CATEGORIES = [
     icon: "🔄",
     description: "Tus items recientes de esta orden",
   },
-
-  // ✅ Nuevas categorías agregadas
   {
     id: "entradas",
     name: "Entradas",
@@ -115,7 +114,7 @@ const CATEGORIES = [
   },
   {
     id: "coquetos-clasicos",
-    name: "Coquetos Clásicos",
+    name: "Coquetos Clasicos",
     icon: "🍹",
     description: "Cocteles clásicos",
   },
@@ -131,11 +130,9 @@ export default function MenuPage() {
   const router = useRouter();
   const { session, clearSession, updateSession } = useSession();
 
-  // Estados para controlar la carga y verificación
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Obtener datos de la sesión en lugar de searchParams
   const tableId = session?.tableId;
   const userId = session?.userId;
   const orderId = session?.orderId;
@@ -176,15 +173,12 @@ export default function MenuPage() {
   const [showUserSwitch, setShowUserSwitch] = useState(false);
   const [assistanceLoading, setAssistanceLoading] = useState(false);
 
-  // Estados para verificar estado de la mesa
   const [tableStatus, setTableStatus] = useState<string | null>(null);
   const [checkingTableStatus, setCheckingTableStatus] = useState(false);
 
-  // Referencias para las secciones de categorías
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ESTADOS PARA NOTAS Y EXTRAS
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [notes, setNotes] = useState("");
@@ -193,7 +187,11 @@ export default function MenuPage() {
     [key: string]: boolean;
   }>({});
 
-  // Función para limpiar localStorage
+  const [promoCode, setPromoCode] = useState("");
+  const [isPromoApplied, setIsPromoApplied] = useState(false);
+  const [promoError, setPromoError] = useState("");
+  const [showPromoModal, setShowPromoModal] = useState(false);
+
   const clearLocalStorage = () => {
     const keysToRemove = [
       "GDPR_REMOVAL_FLAG",
@@ -210,6 +208,7 @@ export default function MenuPage() {
       "restaurant_tableId",
       "restaurant_userId",
       "restaurant_userName",
+      "studentDiscountApplied",
     ];
 
     keysToRemove.forEach((key) => localStorage.removeItem(key));
@@ -224,7 +223,6 @@ export default function MenuPage() {
     });
   };
 
-  // Función para formatear notas y extras
   const formatItemNotes = (notes: string | null) => {
     if (!notes) return null;
 
@@ -329,7 +327,94 @@ export default function MenuPage() {
     );
   };
 
-  // Efecto para verificar el estado de la mesa
+  // FUNCIÓN PARA VALIDAR SI ES PRODUCTO CON UN SOLO EXTRA
+  const isSingleExtraProduct = (productId: number): boolean => {
+    return [42, 43, 44].includes(productId);
+  };
+
+  const applyPromoCode = () => {
+    const code = promoCode.trim().toUpperCase();
+
+    if (code === "PROMO2026") {
+      setIsPromoApplied(true);
+      setPromoError("");
+      setShowPromoModal(false);
+
+      const productNames = products
+        .filter((p) => [54, 57, 59, 60, 42, 43, 44].includes(p.id))
+        .map((p) => `• ${p.name} (ID ${p.id})`)
+        .join("\n");
+
+      alert(`✅ Código de estudiante aplicado`);
+    } else {
+      setPromoError("❌ Código de promoción inválido");
+      setIsPromoApplied(false);
+    }
+  };
+
+  const getDiscountedPrice = (product: Product): number => {
+    if (isPromoApplied) {
+      switch (product.id) {
+        case 54:
+          return 80;
+        case 57:
+          return 120;
+        case 59:
+          return 60;
+        case 60:
+          return 60;
+        case 42:
+        case 43:
+        case 44:
+          // CON CUPÓN: $99 FIJO incluso con extras
+          return 99;
+        default:
+          return product.price;
+      }
+    }
+    return product.price;
+  };
+
+  const hasDiscount = (productId: number): boolean => {
+    return isPromoApplied && [54, 57, 59, 60, 42, 43, 44].includes(productId);
+  };
+
+  const getDiscountPercentage = (productId: number): number => {
+    if (!isPromoApplied) return 0;
+
+    const product = products.find((p) => p.id === productId);
+    if (!product) return 0;
+
+    const originalPrice = product.price;
+    const discountedPrice = getDiscountedPrice(product);
+
+    if (originalPrice <= 0) return 0;
+
+    const percentage = Math.round(
+      ((originalPrice - discountedPrice) / originalPrice) * 100
+    );
+    return Math.max(percentage, 0);
+  };
+
+  const getDiscountAmount = (product: Product): number => {
+    if (!hasDiscount(product.id)) return 0;
+
+    const originalPrice = product.price;
+    const discountedPrice = getDiscountedPrice(product);
+    return Math.max(originalPrice - discountedPrice, 0);
+  };
+
+  useEffect(() => {
+    const savedPromo = localStorage.getItem("studentDiscountApplied");
+    if (savedPromo === "true") {
+      setIsPromoApplied(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("studentDiscountApplied", isPromoApplied.toString());
+  }, [isPromoApplied]);
+
   useEffect(() => {
     const checkTableStatus = async () => {
       const targetTableId = tableId || currentTableId;
@@ -348,13 +433,11 @@ export default function MenuPage() {
           return;
         }
 
-        // SOLUCIÓN: Usa type assertion
         const tableDataTyped = tableData as { status: string } | null;
 
         if (tableDataTyped?.status) {
           setTableStatus(tableDataTyped.status);
 
-          // Si la mesa está disponible (no ocupada), redirigir
           if (tableDataTyped.status === "available") {
             console.log("Mesa está disponible, redirigiendo...");
 
@@ -378,7 +461,6 @@ export default function MenuPage() {
     }
   }, [hasCheckedSession, tableId, currentTableId, router, clearSession]);
 
-  // Suscripción en tiempo real para cambios en el estado de la mesa
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId || !hasCheckedSession) return;
@@ -397,7 +479,6 @@ export default function MenuPage() {
           console.log("Cambio en estado de mesa:", payload.new.status);
           setTableStatus(payload.new.status);
 
-          // Si la mesa cambia a disponible, redirigir
           if (payload.new.status === "available") {
             console.log("Mesa liberada, redirigiendo...");
 
@@ -418,14 +499,10 @@ export default function MenuPage() {
     };
   }, [tableId, currentTableId, hasCheckedSession, router, clearSession]);
 
-  // Cargar datos iniciales - MEJORADO PARA MANEJAR REFRESH
   useEffect(() => {
-    // Primer efecto: verificar y cargar sesión
     const checkAndLoadSession = async () => {
-      // Si ya verificamos, no hacer nada
       if (hasCheckedSession) return;
 
-      // Intentar recuperar sesión del localStorage como fallback
       if (!session && !tableId && !orderId && !userId) {
         try {
           const storedSession = localStorage.getItem("customerSession");
@@ -434,7 +511,6 @@ export default function MenuPage() {
             console.log("Recuperando sesión de localStorage:", parsedSession);
             updateSession(parsedSession);
 
-            // Dar tiempo para que la sesión se actualice
             setTimeout(() => {
               setHasCheckedSession(true);
               setIsInitialLoad(false);
@@ -446,13 +522,11 @@ export default function MenuPage() {
         }
       }
 
-      // Si tenemos datos de sesión, marcar como verificados
       if (tableId && orderId && userId) {
         console.log("Sesión válida encontrada:", { tableId, orderId, userId });
         setHasCheckedSession(true);
         setIsInitialLoad(false);
       } else if (session) {
-        // Si hay sesión pero faltan datos, intentar recuperar
         console.log("Sesión parcial, intentando recuperar datos...");
         setHasCheckedSession(true);
         setIsInitialLoad(false);
@@ -462,12 +536,10 @@ export default function MenuPage() {
     checkAndLoadSession();
   }, [session, tableId, orderId, userId, hasCheckedSession, updateSession]);
 
-  // Segundo efecto: cargar datos una vez verificada la sesión
   useEffect(() => {
     if (!hasCheckedSession || isInitialLoad) return;
 
     const loadData = async () => {
-      // Si no tenemos los datos mínimos, redirigir
       if (!tableId || !orderId || !userId) {
         console.log("Faltan datos esenciales, redirigiendo...");
         router.push("/customer");
@@ -485,21 +557,17 @@ export default function MenuPage() {
     loadData();
   }, [hasCheckedSession, isInitialLoad, tableId, orderId, userId, router]);
 
-  // Cargar usuarios de la mesa
   useEffect(() => {
     if (tableId && hasCheckedSession) {
       loadTableUsers(parseInt(tableId));
     }
   }, [tableId, hasCheckedSession]);
 
-  // Scroll handling (mantener igual)
   useEffect(() => {
     if (products.length === 0 || !hasCheckedSession) return;
 
     const handleScroll = () => {
-      // Calcular la altura real del navbar (incluyendo todos los elementos fijos)
-      const navbarHeight = 220; // Ajusta este valor según la altura real de tu navbar
-
+      const navbarHeight = 220;
       const scrollPosition = window.scrollY + navbarHeight;
       const availableCategories = CATEGORIES.filter(
         (category) => getProductsByCategory(category.id).length > 0
@@ -561,14 +629,11 @@ export default function MenuPage() {
     try {
       setIsLoading(true);
 
-      // Verificar que la orden exista
       try {
         const orderExists = await ordersService.getOrder(orderId);
         if (!orderExists) {
           console.log("La orden no existe, creando nueva...");
-          // Crear nueva orden
           const newOrderId = await createNewOrder(customerName || "Cliente");
-          // Actualizar sesión con la nueva orden
           updateSession({
             userId: newOrderId,
             orderId: newOrderId,
@@ -579,7 +644,6 @@ export default function MenuPage() {
         }
       } catch (orderError) {
         console.error("Error verificando orden:", orderError);
-        // Continuar intentando cargar productos
       }
 
       const productsData = await productsService.getProducts();
@@ -587,19 +651,14 @@ export default function MenuPage() {
       await updateRecentItems();
     } catch (error) {
       console.error("Error loading data:", error);
-      // NO redirigir inmediatamente, intentar recuperar
       try {
-        // Cargar productos como mínimo
         const productsData = await productsService.getProducts();
         setProducts(productsData);
-
-        // Mostrar mensaje al usuario
         alert(
           "⚠️ Hubo un problema al cargar tu orden anterior, pero puedes hacer un nuevo pedido."
         );
       } catch (recoveryError) {
         console.error("Error en recuperación:", recoveryError);
-        // Solo redirigir si falla todo
         router.push("/customer");
       }
     } finally {
@@ -659,23 +718,47 @@ export default function MenuPage() {
     setFavoriteItems(favorites);
   };
 
-  // FUNCIONES PARA MANEJAR EXTRAS (mantener igual)
   const handleExtraToggle = (extraName: string) => {
-    setSelectedExtras((prev) => ({
-      ...prev,
-      [extraName]: !prev[extraName],
-    }));
+    if (selectedProduct && isSingleExtraProduct(selectedProduct.id)) {
+      const isCurrentlySelected = !!selectedExtras[extraName];
+
+      if (isCurrentlySelected) {
+        setSelectedExtras((prev) => ({
+          ...prev,
+          [extraName]: false,
+        }));
+      } else {
+        const newSelectedExtras: { [key: string]: boolean } = {};
+        newSelectedExtras[extraName] = true;
+        setSelectedExtras(newSelectedExtras);
+      }
+    } else {
+      setSelectedExtras((prev) => ({
+        ...prev,
+        [extraName]: !prev[extraName],
+      }));
+    }
   };
 
+  // CORREGIDO: Precio SIEMPRE $99 con cupón para productos 42, 43, 44 (extras incluidos)
   const calculateTotalWithExtras = () => {
     if (!selectedProduct) return 0;
-    const basePrice = selectedProduct.price;
+
+    // SI ES PRODUCTO 42, 43, 44 Y CUPÓN ACTIVADO: $99 FIJO
+    if (isPromoApplied && isSingleExtraProduct(selectedProduct.id)) {
+      return 99; // PRECIO FIJO $99 incluso con extras
+    }
+
+    // PARA TODOS LOS DEMÁS CASOS:
+    const basePrice = getDiscountedPrice(selectedProduct);
+
     const extrasTotal = Object.entries(selectedExtras)
       .filter(([_, isSelected]) => isSelected)
       .reduce((total, [extraName]) => {
         const extra = selectedProduct.extras?.find((e) => e.name === extraName);
         return total + (extra?.price || 0);
       }, 0);
+
     return basePrice + extrasTotal;
   };
 
@@ -687,7 +770,11 @@ export default function MenuPage() {
   };
 
   const handleAddToCartWithNotes = (product: Product) => {
-    setSelectedProduct(product);
+    const productWithDiscount = {
+      ...product,
+      price: getDiscountedPrice(product),
+    };
+    setSelectedProduct(productWithDiscount);
     setNotes("");
     setSelectedExtras({});
     setEditingItem(null);
@@ -697,7 +784,11 @@ export default function MenuPage() {
   const handleEditNotes = (item: OrderItem) => {
     const product = products.find((p) => p.id === item.product_id);
     if (product) {
-      setSelectedProduct(product);
+      const productWithDiscount = {
+        ...product,
+        price: getDiscountedPrice(product),
+      };
+      setSelectedProduct(productWithDiscount);
       setNotes(item.notes || "");
       setSelectedExtras({});
       setEditingItem(item);
@@ -707,6 +798,16 @@ export default function MenuPage() {
 
   const handleConfirmAddWithNotes = async () => {
     if (!selectedProduct) return;
+
+    // Validar solo un extra para productos 42, 43, 44
+    if (isSingleExtraProduct(selectedProduct.id)) {
+      const selectedCount =
+        Object.values(selectedExtras).filter(Boolean).length;
+      if (selectedCount > 1) {
+        alert("❌ Solo puedes seleccionar un extra para este producto");
+        return;
+      }
+    }
 
     const trimmedNotes = notes.trim();
     const hasValidNotes = trimmedNotes.length > 0;
@@ -730,7 +831,18 @@ export default function MenuPage() {
     if (!hasExtras && !hasValidNotes) {
       setAddingProduct(selectedProduct.id);
       try {
-        await addToCart(selectedProduct);
+        const productWithOriginalData = products.find(
+          (p) => p.id === selectedProduct.id
+        );
+        if (productWithOriginalData) {
+          const finalProduct = {
+            ...productWithOriginalData,
+            price: getDiscountedPrice(productWithOriginalData),
+          };
+          await addToCart(finalProduct);
+        } else {
+          await addToCart(selectedProduct);
+        }
         setShowNotesModal(false);
         resetExtras();
       } catch (error) {
@@ -743,22 +855,32 @@ export default function MenuPage() {
 
     setAddingProduct(selectedProduct.id);
     try {
-      const basePrice = selectedProduct.price;
-      const extrasTotal = Object.entries(selectedExtras)
-        .filter(([_, isSelected]) => isSelected)
-        .reduce((total, [extraName]) => {
-          const extra = selectedProduct.extras?.find(
-            (e) => e.name === extraName
-          );
-          return total + (extra?.price || 0);
-        }, 0);
+      const originalProduct = products.find((p) => p.id === selectedProduct.id);
+      if (!originalProduct) throw new Error("Producto no encontrado");
 
-      const totalPrice = basePrice + extrasTotal;
+      // CALCULAR PRECIO FINAL CORRECTAMENTE
+      let finalPrice;
+      if (isPromoApplied && isSingleExtraProduct(originalProduct.id)) {
+        // CON CUPÓN: $99 FIJO incluso con extras
+        finalPrice = 99;
+      } else {
+        // SIN CUPÓN O PRODUCTOS NORMALES
+        const basePrice = getDiscountedPrice(originalProduct);
+        const extrasTotal = Object.entries(selectedExtras)
+          .filter(([_, isSelected]) => isSelected)
+          .reduce((total, [extraName]) => {
+            const extra = originalProduct.extras?.find(
+              (e) => e.name === extraName
+            );
+            return total + (extra?.price || 0);
+          }, 0);
+        finalPrice = basePrice + extrasTotal;
+      }
 
       const selectedExtrasList = Object.entries(selectedExtras)
         .filter(([_, isSelected]) => isSelected)
         .map(([extraName]) => {
-          const extra = selectedProduct.extras?.find(
+          const extra = originalProduct.extras?.find(
             (e) => e.name === extraName
           );
           return {
@@ -769,25 +891,47 @@ export default function MenuPage() {
 
       let finalNotes = hasValidNotes ? trimmedNotes : "";
       if (selectedExtrasList.length > 0) {
-        const extrasDetails = selectedExtrasList
-          .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
-          .join(", ");
+        // Si hay cupón activo para productos 42, 43, 44, los extras son GRATIS
+        if (isPromoApplied && isSingleExtraProduct(originalProduct.id)) {
+          const extrasDetails = selectedExtrasList
+            .map((extra) => `${extra.name} (GRATIS con cupón)`)
+            .join(", ");
 
-        const extrasText = `Extras: ${extrasDetails}`;
-        finalNotes = hasValidNotes
-          ? `${trimmedNotes} | ${extrasText}`
-          : extrasText;
+          const extrasText = `Extras: ${extrasDetails}`;
+          finalNotes = hasValidNotes
+            ? `${trimmedNotes} | ${extrasText}`
+            : extrasText;
+        } else {
+          const extrasDetails = selectedExtrasList
+            .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
+            .join(", ");
 
-        if (extrasTotal > 0) {
-          finalNotes += ` | Total: $${totalPrice.toFixed(2)}`;
+          const extrasText = `Extras: ${extrasDetails}`;
+          finalNotes = hasValidNotes
+            ? `${trimmedNotes} | ${extrasText}`
+            : extrasText;
+
+          // Solo mostrar total si es diferente al precio base (para productos sin cupón)
+          if (finalPrice > getDiscountedPrice(originalProduct)) {
+            finalNotes += ` | Total: $${finalPrice.toFixed(2)}`;
+          }
+        }
+      }
+
+      // Si hay cupón activo y es producto 42, 43, 44, agregar nota especial
+      if (isPromoApplied && isSingleExtraProduct(originalProduct.id)) {
+        if (finalNotes) {
+          finalNotes += ` | Precio con cupón: $99 (extras incluidos)`;
+        } else {
+          finalNotes = `Precio con cupón: $99 (extras incluidos)`;
         }
       }
 
       const existingItem = orderItems.find(
         (item) =>
-          item.product_id === selectedProduct.id &&
+          item.product_id === originalProduct.id &&
           item.notes === finalNotes &&
-          item.price === totalPrice
+          item.price === finalPrice
       );
 
       if (existingItem) {
@@ -797,10 +941,10 @@ export default function MenuPage() {
           editingItem.id,
           editingItem.quantity,
           finalNotes,
-          totalPrice
+          finalPrice
         );
       } else {
-        await addToCart(selectedProduct, 1, finalNotes, totalPrice);
+        await addToCart(originalProduct, 1, finalNotes, finalPrice);
       }
 
       setShowNotesModal(false);
@@ -812,7 +956,6 @@ export default function MenuPage() {
     }
   };
 
-  // Suscripción para detectar liberación de mesa
   useEffect(() => {
     const targetTableId = tableId || currentTableId;
     if (!targetTableId || !hasCheckedSession) return;
@@ -845,7 +988,11 @@ export default function MenuPage() {
   const handleAddToCart = async (product: Product) => {
     setAddingProduct(product.id);
     try {
-      await addToCart(product);
+      const productWithDiscount = {
+        ...product,
+        price: getDiscountedPrice(product),
+      };
+      await addToCart(productWithDiscount);
       const button = document.getElementById(`product-${product.id}`);
       if (button) {
         button.classList.add("bg-green-500");
@@ -860,9 +1007,11 @@ export default function MenuPage() {
     }
   };
 
-  // FUNCIÓN MODIFICADA: Enviar orden a cocina
   const handleSendOrder = async () => {
     if (!currentOrder || orderItems.length === 0) return;
+
+    setIsPromoApplied(false);
+    localStorage.removeItem("studentDiscountApplied");
 
     setSendingOrder(true);
     try {
@@ -881,16 +1030,13 @@ export default function MenuPage() {
         currentOrder.id
       );
 
-      // Crear NUEVA orden para el MISMO usuario
       const newOrderId = await createNewOrder(currentOrder.customer_name);
 
-      // ACTUALIZAR SESIÓN con la nueva orden
       updateSession({
         userId: newOrderId,
         orderId: newOrderId,
       });
 
-      // Actualizar lista de usuarios
       await loadTableUsers(currentOrder.table_id);
 
       setLastOrderSent(true);
@@ -907,13 +1053,11 @@ export default function MenuPage() {
     }
   };
 
-  // MODIFICADA: Cambiar de usuario
   const handleSwitchUser = async (user: TableUser) => {
     try {
       await switchUserOrder(user.orderId, user.id);
       setShowUserSwitch(false);
 
-      // ACTUALIZAR SESIÓN
       updateSession({
         userId: user.id,
         orderId: user.orderId,
@@ -924,7 +1068,6 @@ export default function MenuPage() {
     }
   };
 
-  // MODIFICADA: Agregar nuevo usuario
   const handleAddNewUser = async () => {
     const userName = prompt("Ingresa el nombre del nuevo comensal:");
     if (!userName?.trim()) return;
@@ -942,7 +1085,6 @@ export default function MenuPage() {
 
       await loadTableUsers(parseInt(tableId));
 
-      // ACTUALIZAR SESIÓN para el nuevo usuario
       updateSession({
         userId: newOrder.id,
         orderId: newOrder.id,
@@ -1013,7 +1155,6 @@ export default function MenuPage() {
         return recentItems;
 
       default:
-        // 🆕 Mapa actualizado con tus categorías reales
         const categoryMap: { [key: string]: string } = {
           entradas: "Entradas",
           "los-favoritos": "Los Favoritos",
@@ -1183,7 +1324,6 @@ export default function MenuPage() {
     }, 10);
   };
 
-  // Loading mientras verifica estado de mesa
   if (checkingTableStatus) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -1195,7 +1335,6 @@ export default function MenuPage() {
     );
   }
 
-  // Si la mesa está disponible, mostrar mensaje y redirigir
   if (tableStatus === "available") {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -1222,7 +1361,6 @@ export default function MenuPage() {
     );
   }
 
-  // Loading mientras verifica sesión
   if (!hasCheckedSession || isInitialLoad) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -1243,7 +1381,6 @@ export default function MenuPage() {
     );
   }
 
-  // Si ya verificamos pero no hay sesión válida
   if (hasCheckedSession && (!tableId || !orderId || !userId)) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -1299,6 +1436,19 @@ export default function MenuPage() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowPromoModal(true)}
+              className={`px-3 py-2 rounded-full flex items-center gap-2 ${
+                isPromoApplied
+                  ? "bg-green-100 text-green-800 border border-green-300"
+                  : "bg-purple-100 text-purple-800 border border-purple-300"
+              } hover:opacity-90 transition`}
+              title="Ingresar código promocional"
+            >
+              <FaTag className="text-sm" />
+              {isPromoApplied ? "🎓 Descuento Activo" : "🎫 Cupón"}
+            </button>
+
+            <button
               onClick={handleAssistanceRequest}
               disabled={assistanceLoading}
               className="bg-yellow-500 text-white px-4 py-2 rounded-full hover:bg-yellow-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
@@ -1313,7 +1463,6 @@ export default function MenuPage() {
         </div>
       </header>
 
-      {/* Banner de confirmación cuando se acaba de enviar una orden */}
       {lastOrderSent && (
         <div className="bg-green-50 border-b border-green-200">
           <div className="max-w-7xl mx-auto px-4 py-3">
@@ -1326,7 +1475,6 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* Sección de estado rápido */}
       {orderItems.length > 0 && (
         <div className="bg-blue-50 border-b border-blue-200">
           <div className="max-w-7xl mx-auto px-4 py-2">
@@ -1336,6 +1484,12 @@ export default function MenuPage() {
                   <FaShoppingCart className="text-xs" />
                   {orderItems.length} items en carrito de {customerName}
                 </span>
+                {isPromoApplied && (
+                  <span className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                    <FaTag className="text-xs" />
+                    Descuento de estudiante activo
+                  </span>
+                )}
               </div>
               <span className="text-gray-600">
                 ⏱️ Tiempo estimado: ~{getEstimatedTime()} min
@@ -1345,7 +1499,6 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* Navegación de categorías */}
       <div className="bg-white shadow-sm sticky top-16 z-20 overflow-x-auto">
         <div className="flex gap-2 px-4 py-4 max-w-7xl mx-auto mt-4">
           {CATEGORIES.filter((category) => {
@@ -1368,9 +1521,7 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* Contenedor principal con todas las categorías */}
       <main className="max-w-7xl mx-auto px-4 py-6" ref={containerRef}>
-        {/* Renderizar todas las categorías con productos */}
         {CATEGORIES.filter(
           (category) => getProductsByCategory(category.id).length > 0
         ).map((category) => {
@@ -1412,7 +1563,6 @@ export default function MenuPage() {
                       key={product.id}
                       className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group relative"
                     >
-                      {/* Badge de popularidad */}
                       {product.rating !== null &&
                         product.rating !== undefined &&
                         product.rating >= 4.5 && (
@@ -1421,6 +1571,15 @@ export default function MenuPage() {
                             Popular
                           </div>
                         )}
+
+                      {hasDiscount(product.id) && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+                          <FaTag className="text-xs" />
+                          {isSingleExtraProduct(product.id) && isPromoApplied
+                            ? "$99 (extras incluidos)"
+                            : `-${getDiscountPercentage(product.id)}% Est.`}
+                        </div>
+                      )}
 
                       {product.image_url ? (
                         <div className="relative overflow-hidden h-48">
@@ -1436,7 +1595,6 @@ export default function MenuPage() {
                             {renderStarRating(product.rating || 0)}
                           </div>
 
-                          {/* Badge de favorito */}
                           {product.is_favorite && (
                             <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
                               <FaHeart className="text-xs" />
@@ -1444,7 +1602,6 @@ export default function MenuPage() {
                             </div>
                           )}
 
-                          {/* Badge de cantidad en órdenes recientes */}
                           {category.id === "repite-item" &&
                             totalRecentQuantity > 0 && (
                               <div className="absolute bottom-2 left-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
@@ -1452,7 +1609,6 @@ export default function MenuPage() {
                               </div>
                             )}
 
-                          {/* Badge de en carrito actual */}
                           {isInCart && (
                             <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
                               {currentQuantity} en carrito
@@ -1469,7 +1625,6 @@ export default function MenuPage() {
                           {product.description}
                         </p>
 
-                        {/* Mostrar extras disponibles */}
                         {product.extras && product.extras.length > 0 && (
                           <div className="mb-3">
                             <p className="text-xs text-green-600 font-medium">
@@ -1479,15 +1634,56 @@ export default function MenuPage() {
                                   .length
                               }{" "}
                               extras disponibles
+                              {isSingleExtraProduct(product.id) && (
+                                <span className="text-yellow-600 ml-2">
+                                  ⚠️ Solo un extra
+                                </span>
+                              )}
                             </p>
                           </div>
                         )}
 
                         <div className="flex justify-between items-center">
                           <div>
-                            <span className="text-2xl font-bold text-blue-600">
-                              ${product.price.toFixed(2)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {hasDiscount(product.id) ? (
+                                <>
+                                  {isSingleExtraProduct(product.id) &&
+                                  isPromoApplied ? (
+                                    // PRODUCTOS 42, 43, 44 CON CUPÓN: $99 (EXTRAS INCLUIDOS)
+                                    <>
+                                      <span className="text-xl font-bold text-green-600">
+                                        $99.00
+                                      </span>
+                                      <span className="text-sm line-through text-gray-400">
+                                        ${product.price.toFixed(2)}
+                                      </span>
+                                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                                        ¡Extras incluidos!
+                                      </span>
+                                    </>
+                                  ) : (
+                                    // PRODUCTOS NORMALES CON DESCUENTO
+                                    <>
+                                      <span className="text-xl font-bold text-green-600">
+                                        $
+                                        {getDiscountedPrice(product).toFixed(2)}
+                                      </span>
+                                      <span className="text-sm line-through text-gray-400">
+                                        ${product.price.toFixed(2)}
+                                      </span>
+                                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                                        -{getDiscountPercentage(product.id)}%
+                                      </span>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-2xl font-bold text-blue-600">
+                                  ${product.price.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
                             {product.preparation_time && (
                               <p className="text-xs text-gray-500 mt-1">
                                 ⏱️ {product.preparation_time} min
@@ -1562,7 +1758,6 @@ export default function MenuPage() {
                           </div>
                         </div>
 
-                        {/* Mostrar notas si existen */}
                         {isInCart && currentNotes && (
                           <div className="mt-2">
                             {formatItemNotes(currentNotes)}
@@ -1578,7 +1773,190 @@ export default function MenuPage() {
         })}
       </main>
 
-      {/* MODAL DE NOTAS MEJORADO CON EXTRAS */}
+      {showPromoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  🎓 Descuento de Estudiante
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowPromoModal(false);
+                    setPromoError("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {isPromoApplied ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <FaCheck className="text-green-600 text-xl" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-green-800">
+                        Descuento activo
+                      </h3>
+                      <p className="text-sm text-green-600">
+                        Código <strong>PROMO2026</strong> aplicado
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-gray-700">
+                      Productos con descuento:
+                    </p>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      {products
+                        .filter((p) =>
+                          [54, 57, 59, 60, 42, 43, 44].includes(p.id)
+                        )
+                        .map((product) => (
+                          <li key={product.id} className="flex justify-between">
+                            <span>• {product.name}</span>
+                            <span>
+                              {[42, 43, 44].includes(product.id) ? (
+                                <span className="font-bold text-green-700">
+                                  $99 fijo (extras incluidos)
+                                  {product.price > 99 && (
+                                    <span className="line-through text-gray-400 ml-2">
+                                      ${product.price.toFixed(2)}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="line-through">
+                                    ${product.price.toFixed(2)}
+                                  </span>{" "}
+                                  →{" "}
+                                  <span className="font-bold text-green-700">
+                                    ${getDiscountedPrice(product).toFixed(2)}
+                                  </span>{" "}
+                                  (-{getDiscountPercentage(product.id)}%)
+                                </>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : // <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              //   <h3 className="font-bold text-blue-800 mb-2">
+              //     Beneficios del código:
+              //   </h3>
+              //   <ul className="text-sm text-blue-700 space-y-2">
+              //     {products
+              //       .filter((p) =>
+              //         [54, 57, 59, 60, 42, 43, 44].includes(p.id)
+              //       )
+              //       .map((product) => (
+              //         <li
+              //           key={product.id}
+              //           className="flex justify-between items-center"
+              //         >
+              //           <span>
+              //             • {product.name} (ID {product.id}):
+              //           </span>
+              //           {[42, 43, 44].includes(product.id) ? (
+              //             <span className="font-bold">
+              //               ${product.price.toFixed(2)} → $99 fijo
+              //               <span className="text-xs text-blue-600 ml-2">
+              //                 (extras incluidos)
+              //               </span>
+              //             </span>
+              //           ) : (
+              //             <span className="font-bold">
+              //               ${product.price.toFixed(2)} → $
+              //               {getDiscountedPrice(product).toFixed(2)}
+              //               (-{getDiscountPercentage(product.id)}%)
+              //             </span>
+              //           )}
+              //         </li>
+              //       ))}
+              //   </ul>
+              //   <p className="text-sm text-blue-600 mt-3">
+              //     💡 <strong>¡Oferta especial!</strong> Los productos 42, 43,
+              //     44 son <strong>$99 fijos con extras incluidos</strong>{" "}
+              //     (huevo o pollo).
+              //   </p>
+              //   <p className="text-xs text-blue-500 mt-2">
+              //     ⚠️ Solo se puede elegir un extra por producto para 42, 43,
+              //     44
+              //   </p>
+              // </div>
+              null}
+            </div>
+
+            <div className="p-6">
+              {!isPromoApplied ? (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ingresa el código de promoción:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoCode}
+                        onChange={(e) => {
+                          setPromoCode(e.target.value);
+                          setPromoError("");
+                        }}
+                        placeholder="Codigo de estudiante"
+                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            applyPromoCode();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={applyPromoCode}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                    {promoError && (
+                      <p className="text-red-500 text-sm mt-2">{promoError}</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <button
+                    onClick={() => {
+                      setIsPromoApplied(false);
+                      setPromoCode("");
+                      setPromoError("");
+                      setShowPromoModal(false);
+                      alert("Descuento removido");
+                    }}
+                    className="w-full py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition"
+                  >
+                    Remover descuento
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowPromoModal(false)}
+                className="w-full mt-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition"
+              >
+                {isPromoApplied ? "Cerrar" : "Cancelar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showNotesModal && selectedProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -1599,7 +1977,6 @@ export default function MenuPage() {
                 </button>
               </div>
 
-              {/* Información del producto */}
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
                 <div className="flex items-start gap-3">
                   {selectedProduct.image_url && (
@@ -1617,9 +1994,46 @@ export default function MenuPage() {
                       {selectedProduct.description}
                     </p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-lg font-bold text-blue-600">
-                        ${selectedProduct.price.toFixed(2)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {isPromoApplied &&
+                        isSingleExtraProduct(selectedProduct.id) ? (
+                          // PRODUCTOS 42, 43, 44 CON CUPÓN: $99 (EXTRAS INCLUIDOS)
+                          <>
+                            <span className="text-lg font-bold text-green-600">
+                              $99.00
+                            </span>
+                            <span className="text-sm line-through text-gray-400">
+                              ${selectedProduct.price.toFixed(2)}
+                            </span>
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                              ¡Extras incluidos!
+                            </span>
+                          </>
+                        ) : hasDiscount(selectedProduct.id) ? (
+                          // PRODUCTOS NORMALES CON DESCUENTO
+                          <>
+                            <span className="text-lg font-bold text-green-600">
+                              ${getDiscountedPrice(selectedProduct).toFixed(2)}
+                            </span>
+                            <span className="text-sm line-through text-gray-400">
+                              $
+                              {products
+                                .find((p) => p.id === selectedProduct.id)
+                                ?.price.toFixed(2) ||
+                                selectedProduct.price.toFixed(2)}
+                            </span>
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                              -{getDiscountPercentage(selectedProduct.id)}%
+                              Estudiante
+                            </span>
+                          </>
+                        ) : (
+                          // SIN DESCUENTO
+                          <span className="text-lg font-bold text-blue-600">
+                            ${selectedProduct.price.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
                       {selectedProduct.preparation_time && (
                         <span className="text-sm text-gray-500 flex items-center gap-1">
                           <FaClock className="text-xs" />
@@ -1633,12 +2047,16 @@ export default function MenuPage() {
             </div>
 
             <div className="p-6">
-              {/* SECCIÓN DE EXTRAS */}
               {selectedProduct.extras && selectedProduct.extras.length > 0 && (
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     <FaPlus className="text-green-600" />
                     Agregar Extras
+                    {isSingleExtraProduct(selectedProduct.id) && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
+                        ⚠️ Solo puedes elegir un extra
+                      </span>
+                    )}
                   </h3>
                   <div className="space-y-2">
                     {selectedProduct.extras
@@ -1654,17 +2072,32 @@ export default function MenuPage() {
                         >
                           <div className="flex items-center gap-3">
                             <input
-                              type="checkbox"
+                              type={
+                                isSingleExtraProduct(selectedProduct.id)
+                                  ? "radio"
+                                  : "checkbox"
+                              }
                               checked={!!selectedExtras[extra.name]}
                               onChange={() => handleExtraToggle(extra.name)}
-                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                              className={
+                                isSingleExtraProduct(selectedProduct.id)
+                                  ? "w-4 h-4 text-green-600 border-gray-300 rounded-full focus:ring-green-500"
+                                  : "w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                              }
                             />
                             <div>
                               <span className="font-medium text-gray-800">
                                 {extra.name}
                               </span>
                               <p className="text-sm text-gray-600">
-                                +${extra.price.toFixed(2)}
+                                {isPromoApplied &&
+                                isSingleExtraProduct(selectedProduct.id) ? (
+                                  <span className="text-green-600 font-bold">
+                                    GRATIS con cupón
+                                  </span>
+                                ) : (
+                                  `+$${extra.price.toFixed(2)}`
+                                )}
                               </p>
                             </div>
                           </div>
@@ -1675,7 +2108,6 @@ export default function MenuPage() {
                       ))}
                   </div>
 
-                  {/* Resumen de extras seleccionados */}
                   {Object.keys(selectedExtras).filter(
                     (key) => selectedExtras[key]
                   ).length > 0 && (
@@ -1696,17 +2128,31 @@ export default function MenuPage() {
                                 className="flex justify-between"
                               >
                                 <span>• {extraName}</span>
-                                <span>+${extra?.price.toFixed(2)}</span>
+                                <span>
+                                  {isPromoApplied &&
+                                  isSingleExtraProduct(selectedProduct.id) ? (
+                                    <span className="text-green-600 font-bold">
+                                      GRATIS
+                                    </span>
+                                  ) : (
+                                    `+$${extra?.price.toFixed(2)}`
+                                  )}
+                                </span>
                               </li>
                             );
                           })}
                       </ul>
+                      {isPromoApplied &&
+                        isSingleExtraProduct(selectedProduct.id) && (
+                          <p className="text-xs text-green-600 mt-2">
+                            ✅ Los extras son gratuitos con el cupón activado
+                          </p>
+                        )}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* SECCIÓN DE NOTAS - MEJORADA */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   <FaStickyNote className="inline mr-2 text-yellow-600" />
@@ -1741,7 +2187,6 @@ export default function MenuPage() {
                 </div>
               </div>
 
-              {/* RESUMEN FINAL Y PRECIO */}
               <div className="bg-gray-50 p-4 rounded-lg mb-6">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-gray-800">Total:</span>
@@ -1749,18 +2194,23 @@ export default function MenuPage() {
                     ${calculateTotalWithExtras().toFixed(2)}
                   </span>
                 </div>
-                {calculateTotalWithExtras() > selectedProduct.price && (
+                {isPromoApplied && isSingleExtraProduct(selectedProduct.id) ? (
                   <p className="text-sm text-gray-600 mt-1 text-right">
-                    (Base: ${selectedProduct.price.toFixed(2)} + Extras: $
-                    {(
-                      calculateTotalWithExtras() - selectedProduct.price
-                    ).toFixed(2)}
-                    )
+                    ✅ Precio con cupón: $99 (extras incluidos)
                   </p>
+                ) : (
+                  calculateTotalWithExtras() > selectedProduct.price && (
+                    <p className="text-sm text-gray-600 mt-1 text-right">
+                      (Base: ${selectedProduct.price.toFixed(2)} + Extras: $
+                      {(
+                        calculateTotalWithExtras() - selectedProduct.price
+                      ).toFixed(2)}
+                      )
+                    </p>
+                  )
                 )}
               </div>
 
-              {/* BOTONES DE ACCIÓN */}
               <div className="flex gap-3">
                 <button
                   onClick={() => {
@@ -1800,7 +2250,6 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* MODAL DE SELECCIÓN DE USUARIO */}
       {showUserSwitch && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
@@ -1881,7 +2330,6 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* MODAL DEL CARRITO - MEJORADO */}
       {showCart && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-end animate-in slide-in-from-right">
           <div className="bg-white w-full max-w-md h-full overflow-y-auto">
@@ -1935,7 +2383,6 @@ export default function MenuPage() {
               </div>
             ) : (
               <>
-                {/* Items actuales en carrito */}
                 <div className="divide-y max-h-96 overflow-y-auto">
                   {orderItems.map((item) => (
                     <div
@@ -1948,18 +2395,33 @@ export default function MenuPage() {
                             {item.product_name}
                           </h3>
                           <button
-                            onClick={() => handleEditNotes(item)}
+                            onClick={() => {
+                              const product = products.find(
+                                (p) => p.id === item.product_id
+                              );
+                              if (product) handleEditNotes(item);
+                            }}
                             className="text-gray-400 hover:text-blue-600 transition opacity-0 group-hover:opacity-100"
                             title="Editar notas"
                           >
                             <FaEdit className="text-sm" />
                           </button>
                         </div>
-                        <p className="text-lg font-bold text-blue-600">
-                          {formatCurrency(item.price)}
-                        </p>
 
-                        {/* NOTAS Y EXTRAS MEJORADOS EN EL CARRITO */}
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-bold text-blue-600">
+                            {formatCurrency(item.price)}
+                          </p>
+                          {hasDiscount(item.product_id) && (
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                              {isSingleExtraProduct(item.product_id) &&
+                              isPromoApplied
+                                ? "$99 (extras incluidos)"
+                                : "Descuento aplicado"}
+                            </span>
+                          )}
+                        </div>
+
                         {item.notes && (
                           <div className="mt-2">
                             {formatItemNotes(item.notes)}
@@ -1997,15 +2459,68 @@ export default function MenuPage() {
                   ))}
                 </div>
 
-                {/* Resumen y acciones */}
                 <div className="p-6 bg-gray-50 sticky bottom-0">
                   <div className="space-y-2 mb-6">
+                    {isPromoApplied &&
+                      orderItems.some((item) =>
+                        [54, 57, 59, 60, 42, 43, 44].includes(item.product_id)
+                      ) && (
+                        <div></div>
+                        // <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                        //   <div className="flex justify-between items-center mb-2">
+                        //     <span className="text-green-700 font-medium">
+                        //       🎓 Descuento de estudiante aplicado
+                        //     </span>
+                        //     <span className="text-green-700 font-bold">
+                        //       -$
+                        //       {orderItems
+                        //         .filter((item) =>
+                        //           [54, 57, 59, 60, 42, 43, 44].includes(
+                        //             item.product_id
+                        //           )
+                        //         )
+                        //         .reduce((total, item) => {
+                        //           const originalPrice =
+                        //             products.find(
+                        //               (p) => p.id === item.product_id
+                        //             )?.price || 0;
+                        //           const discountedPrice =
+                        //             isSingleExtraProduct(item.product_id) &&
+                        //             isPromoApplied
+                        //               ? 99
+                        //               : getDiscountedPrice(
+                        //                   products.find(
+                        //                     (p) => p.id === item.product_id
+                        //                   ) || (item as any)
+                        //                 );
+                        //           const discountPerItem =
+                        //             originalPrice - discountedPrice;
+                        //           return (
+                        //             total + discountPerItem * item.quantity
+                        //           );
+                        //         }, 0)
+                        //         .toFixed(2)}
+                        //     </span>
+                        //   </div>
+                        //   <p className="text-xs text-green-600">
+                        //     Productos con descuento:{" "}
+                        //     {[54, 57, 59, 60, 42, 43, 44]
+                        //       .filter((id) =>
+                        //         orderItems.some(
+                        //           (item) => item.product_id === id
+                        //         )
+                        //       )
+                        //       .map((id) => `ID ${id}`)
+                        //       .join(", ")}
+                        //   </p>
+                        // </div>
+                      )}
+
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>
                       <span>{formatCurrency(cartTotal)}</span>
                     </div>
 
-                    {/* Tiempo estimado */}
                     <div className="flex justify-between items-center text-sm text-gray-600 bg-white p-3 rounded-lg mt-3">
                       <span>⏱️ Tiempo estimado:</span>
                       <span className="font-semibold">
