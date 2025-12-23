@@ -199,7 +199,7 @@ export default function CustomerPage() {
               <FaQrcode className="text-4xl text-white" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Bienvenido a FoodHub
+              Bienvenido a Casa Jardin Burgers
             </h1>
             <p className="text-gray-600 mb-6">
               Escanea el código QR de tu mesa para comenzar
