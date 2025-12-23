@@ -76,6 +76,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   extras?: ProductExtra[];
+    available_period: 'am' | 'pm' | 'both'; 
 }
 
 export type AdminSection = "dashboard" | "tables" | "products";
@@ -97,6 +98,7 @@ export interface ProductFormData {
   is_favorite: boolean;
   rating: string;
   extras?: ProductExtra[];
+  available_period: 'am' | 'pm' | 'both';
 }
 
 export interface ProductExtra {

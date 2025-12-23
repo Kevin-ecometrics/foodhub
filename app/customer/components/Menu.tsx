@@ -28,6 +28,8 @@ import {
   FaStickyNote,
   FaExclamationTriangle,
   FaTag,
+  FaSun,
+  FaMoon,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
@@ -192,6 +194,51 @@ export default function MenuPage() {
   const [promoError, setPromoError] = useState("");
   const [showPromoModal, setShowPromoModal] = useState(false);
 
+  // NUEVOS ESTADOS PARA MANEJAR HORARIO
+  const [currentPeriod, setCurrentPeriod] = useState<"am" | "pm">("pm");
+  const [timeFilterApplied, setTimeFilterApplied] = useState(false);
+
+  // FUNCIÓN PARA VERIFICAR SI ES AM O PM
+  const isAMTime = (): boolean => {
+    const hour = new Date().getHours();
+    // AM: de 8:00 AM a 14:00 PM
+    return hour >= 8 && hour < 14;
+  };
+
+  // FUNCIÓN PARA VERIFICAR SI UN PRODUCTO ESTÁ DISPONIBLE SEGÚN EL HORARIO
+  const isProductAvailableNow = (product: Product): boolean => {
+    // Si el producto no tiene campo available_period, mostrarlo siempre
+    if (!product.available_period || product.available_period === "both") {
+      return true;
+    }
+
+    const isAM = isAMTime();
+
+    // Si es AM, mostrar solo productos con 'am' o 'both'
+    if (isAM) {
+      return product.available_period === "am";
+    }
+
+    // Si es PM, mostrar solo productos con 'pm' o 'both'
+    return product.available_period === "pm";
+  };
+
+  // FUNCIÓN PARA OBTENER EL PERÍODO ACTUAL
+  const getCurrentPeriod = (): "am" | "pm" => {
+    return isAMTime() ? "am" : "pm";
+  };
+
+  // FUNCIÓN PARA IDENTIFICAR PRODUCTOS CON PROTEÍNA (CHILAQUILES)
+  const isProteinProduct = (productId: number): boolean => {
+    return [42, 43, 44].includes(productId);
+  };
+
+  // FUNCIÓN PARA VERIFICAR SI UN EXTRA ES DE PROTEÍNA (HUEVO O POLLO)
+  const isProteinExtra = (extraName: string): boolean => {
+    const normalized = extraName.toLowerCase();
+    return normalized.includes("huevo") || normalized.includes("pollo");
+  };
+
   const clearLocalStorage = () => {
     const keysToRemove = [
       "GDPR_REMOVAL_FLAG",
@@ -327,7 +374,6 @@ export default function MenuPage() {
     );
   };
 
-  // FUNCIÓN PARA VALIDAR SI ES PRODUCTO CON UN SOLO EXTRA
   const isSingleExtraProduct = (productId: number): boolean => {
     return [42, 43, 44].includes(productId);
   };
@@ -352,6 +398,7 @@ export default function MenuPage() {
     }
   };
 
+  // CORREGIDO: Precios correctos con cupón
   const getDiscountedPrice = (product: Product): number => {
     if (isPromoApplied) {
       switch (product.id) {
@@ -366,7 +413,6 @@ export default function MenuPage() {
         case 42:
         case 43:
         case 44:
-          // CON CUPÓN: $99 FIJO incluso con extras
           return 99;
         default:
           return product.price;
@@ -404,6 +450,46 @@ export default function MenuPage() {
     return Math.max(originalPrice - discountedPrice, 0);
   };
 
+  // FUNCIÓN PARA CALCULAR EL PRECIO TOTAL CON EXTRAS
+  const calculateTotalWithExtras = () => {
+    if (!selectedProduct) return 0;
+
+    // SI ES PRODUCTO 42, 43, 44 Y CUPÓN ACTIVADO: $99 FIJO + extras (proteína gratis)
+    if (isPromoApplied && isProteinProduct(selectedProduct.id)) {
+      const basePrice = 99; // PRECIO FIJO $99 con cupón
+
+      const extrasTotal = Object.entries(selectedExtras)
+        .filter(([_, isSelected]) => isSelected)
+        .reduce((total, [extraName]) => {
+          const extra = selectedProduct.extras?.find(
+            (e) => e.name === extraName
+          );
+          const extraPrice = extra?.price || 0;
+
+          // Si es proteína (huevo o pollo) y hay cupón, es GRATIS
+          if (isProteinExtra(extraName)) {
+            return total; // Proteína gratis
+          }
+
+          return total + extraPrice; // Otros extras se cobran
+        }, 0);
+
+      return basePrice + extrasTotal;
+    }
+
+    // PARA TODOS LOS DEMÁS CASOS (sin cupón o otros productos):
+    const basePrice = getDiscountedPrice(selectedProduct);
+
+    const extrasTotal = Object.entries(selectedExtras)
+      .filter(([_, isSelected]) => isSelected)
+      .reduce((total, [extraName]) => {
+        const extra = selectedProduct.extras?.find((e) => e.name === extraName);
+        return total + (extra?.price || 0);
+      }, 0);
+
+    return basePrice + extrasTotal;
+  };
+
   useEffect(() => {
     const savedPromo = localStorage.getItem("studentDiscountApplied");
     if (savedPromo === "true") {
@@ -414,6 +500,22 @@ export default function MenuPage() {
   useEffect(() => {
     localStorage.setItem("studentDiscountApplied", isPromoApplied.toString());
   }, [isPromoApplied]);
+
+  // useEffect PARA ACTUALIZAR EL PERÍODO AUTOMÁTICAMENTE
+  useEffect(() => {
+    const updateTimePeriod = () => {
+      const period = getCurrentPeriod();
+      setCurrentPeriod(period);
+    };
+
+    // Actualizar al cargar
+    updateTimePeriod();
+
+    // Configurar un intervalo para verificar cada minuto
+    const interval = setInterval(updateTimePeriod, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const checkTableStatus = async () => {
@@ -718,48 +820,49 @@ export default function MenuPage() {
     setFavoriteItems(favorites);
   };
 
+  // MODIFICADO: Manejo de extras para productos con proteína
   const handleExtraToggle = (extraName: string) => {
-    if (selectedProduct && isSingleExtraProduct(selectedProduct.id)) {
+    if (!selectedProduct) return;
+
+    // Solo aplicar validación para productos con proteína (chilaquiles)
+    if (isProteinProduct(selectedProduct.id)) {
       const isCurrentlySelected = !!selectedExtras[extraName];
+      const isProtein = isProteinExtra(extraName);
 
       if (isCurrentlySelected) {
+        // Si está seleccionado, deseleccionar
         setSelectedExtras((prev) => ({
           ...prev,
           [extraName]: false,
         }));
-      } else {
-        const newSelectedExtras: { [key: string]: boolean } = {};
+      } else if (isProtein) {
+        // Si es proteína (huevo o pollo), asegurar que solo uno esté seleccionado
+        const newSelectedExtras = { ...selectedExtras };
+
+        // Deseleccionar otras proteínas si ya hay una seleccionada
+        Object.keys(newSelectedExtras).forEach((key) => {
+          if (isProteinExtra(key) && newSelectedExtras[key]) {
+            newSelectedExtras[key] = false;
+          }
+        });
+
+        // Seleccionar la nueva proteína
         newSelectedExtras[extraName] = true;
         setSelectedExtras(newSelectedExtras);
+      } else {
+        // Para extras que NO son proteína, permitir múltiples selecciones
+        setSelectedExtras((prev) => ({
+          ...prev,
+          [extraName]: true,
+        }));
       }
     } else {
+      // Para productos sin restricción, comportamiento normal
       setSelectedExtras((prev) => ({
         ...prev,
         [extraName]: !prev[extraName],
       }));
     }
-  };
-
-  // CORREGIDO: Precio SIEMPRE $99 con cupón para productos 42, 43, 44 (extras incluidos)
-  const calculateTotalWithExtras = () => {
-    if (!selectedProduct) return 0;
-
-    // SI ES PRODUCTO 42, 43, 44 Y CUPÓN ACTIVADO: $99 FIJO
-    if (isPromoApplied && isSingleExtraProduct(selectedProduct.id)) {
-      return 99; // PRECIO FIJO $99 incluso con extras
-    }
-
-    // PARA TODOS LOS DEMÁS CASOS:
-    const basePrice = getDiscountedPrice(selectedProduct);
-
-    const extrasTotal = Object.entries(selectedExtras)
-      .filter(([_, isSelected]) => isSelected)
-      .reduce((total, [extraName]) => {
-        const extra = selectedProduct.extras?.find((e) => e.name === extraName);
-        return total + (extra?.price || 0);
-      }, 0);
-
-    return basePrice + extrasTotal;
   };
 
   const resetExtras = () => {
@@ -799,14 +902,20 @@ export default function MenuPage() {
   const handleConfirmAddWithNotes = async () => {
     if (!selectedProduct) return;
 
-    // Validar solo un extra para productos 42, 43, 44
-    if (isSingleExtraProduct(selectedProduct.id)) {
-      const selectedCount =
-        Object.values(selectedExtras).filter(Boolean).length;
-      if (selectedCount > 1) {
-        alert("❌ Solo puedes seleccionar un extra para este producto");
+    // Validación específica para productos con proteína (chilaquiles)
+    if (isProteinProduct(selectedProduct.id)) {
+      const selectedProteinExtras = Object.entries(selectedExtras).filter(
+        ([extraName, isSelected]) => isSelected && isProteinExtra(extraName)
+      );
+
+      // No se permite tener más de una proteína
+      if (selectedProteinExtras.length > 1) {
+        alert("❌ Solo puedes seleccionar una proteína (huevo O pollo)");
         return;
       }
+
+      // Pueden tener múltiples extras que NO sean proteína
+      // No hay límite para extras no proteicos
     }
 
     const trimmedNotes = notes.trim();
@@ -860,9 +969,30 @@ export default function MenuPage() {
 
       // CALCULAR PRECIO FINAL CORRECTAMENTE
       let finalPrice;
-      if (isPromoApplied && isSingleExtraProduct(originalProduct.id)) {
-        // CON CUPÓN: $99 FIJO incluso con extras
-        finalPrice = 99;
+
+      // Si hay cupón y es producto de chilaquiles (42,43,44)
+      if (isPromoApplied && isProteinProduct(originalProduct.id)) {
+        // PRECIO BASE: $99 FIJO con cupón
+        const basePrice = 99;
+
+        // Calcular extras total (proteína gratis, otros se cobran)
+        const extrasTotal = Object.entries(selectedExtras)
+          .filter(([_, isSelected]) => isSelected)
+          .reduce((total, [extraName]) => {
+            const extra = originalProduct.extras?.find(
+              (e) => e.name === extraName
+            );
+            const extraPrice = extra?.price || 0;
+
+            // Si es proteína (huevo o pollo) y hay cupón, es GRATIS
+            if (isProteinExtra(extraName)) {
+              return total; // Proteína gratis
+            }
+
+            return total + extraPrice; // Otros extras se cobran
+          }, 0);
+
+        finalPrice = basePrice + extrasTotal;
       } else {
         // SIN CUPÓN O PRODUCTOS NORMALES
         const basePrice = getDiscountedPrice(originalProduct);
@@ -883,47 +1013,50 @@ export default function MenuPage() {
           const extra = originalProduct.extras?.find(
             (e) => e.name === extraName
           );
+          const isProtein = isProteinExtra(extraName);
+
           return {
             name: extraName,
             price: extra?.price || 0,
+            isProtein: isProtein,
           };
         });
 
       let finalNotes = hasValidNotes ? trimmedNotes : "";
       if (selectedExtrasList.length > 0) {
-        // Si hay cupón activo para productos 42, 43, 44, los extras son GRATIS
-        if (isPromoApplied && isSingleExtraProduct(originalProduct.id)) {
-          const extrasDetails = selectedExtrasList
-            .map((extra) => `${extra.name} (GRATIS con cupón)`)
-            .join(", ");
+        const extrasDetails = selectedExtrasList
+          .map((extra) => {
+            // Si hay cupón, producto es chilaquiles y extra es proteína, es GRATIS
+            if (
+              isPromoApplied &&
+              isProteinProduct(originalProduct.id) &&
+              extra.isProtein
+            ) {
+              return `${extra.name} (GRATIS con cupón)`;
+            } else {
+              return `${extra.name} (+$${extra.price.toFixed(2)})`;
+            }
+          })
+          .join(", ");
 
-          const extrasText = `Extras: ${extrasDetails}`;
-          finalNotes = hasValidNotes
-            ? `${trimmedNotes} | ${extrasText}`
-            : extrasText;
-        } else {
-          const extrasDetails = selectedExtrasList
-            .map((extra) => `${extra.name} (+$${extra.price.toFixed(2)})`)
-            .join(", ");
+        const extrasText = `Extras: ${extrasDetails}`;
+        finalNotes = hasValidNotes
+          ? `${trimmedNotes} | ${extrasText}`
+          : extrasText;
 
-          const extrasText = `Extras: ${extrasDetails}`;
-          finalNotes = hasValidNotes
-            ? `${trimmedNotes} | ${extrasText}`
-            : extrasText;
-
-          // Solo mostrar total si es diferente al precio base (para productos sin cupón)
-          if (finalPrice > getDiscountedPrice(originalProduct)) {
-            finalNotes += ` | Total: $${finalPrice.toFixed(2)}`;
-          }
+        // Solo mostrar total si es diferente al precio base
+        if (finalPrice > getDiscountedPrice(originalProduct)) {
+          finalNotes += ` | Total: $${finalPrice.toFixed(2)}`;
         }
       }
 
       // Si hay cupón activo y es producto 42, 43, 44, agregar nota especial
-      if (isPromoApplied && isSingleExtraProduct(originalProduct.id)) {
+      if (isPromoApplied && isProteinProduct(originalProduct.id)) {
+        const discountAmount = getDiscountAmount(originalProduct);
         if (finalNotes) {
-          finalNotes += ` | Precio con cupón: $99 (extras incluidos)`;
+          finalNotes += ` | Cupón: descuento aplicado (chilaquiles $99 + proteína gratis)`;
         } else {
-          finalNotes = `Precio con cupón: $99 (extras incluidos)`;
+          finalNotes = `Cupón: descuento aplicado (chilaquiles $99 + proteína gratis)`;
         }
       }
 
@@ -1146,13 +1279,15 @@ export default function MenuPage() {
       .reduce((total, item) => total + item.quantity, 0);
   };
 
-  const getProductsByCategory = (categoryId: string) => {
+  const getProductsByCategory = (categoryId: string): Product[] => {
     switch (categoryId) {
       case "favorites":
-        return favoriteItems;
+        return favoriteItems.filter((product) =>
+          isProductAvailableNow(product)
+        );
 
       case "repite-item":
-        return recentItems;
+        return recentItems.filter((product) => isProductAvailableNow(product));
 
       default:
         const categoryMap: { [key: string]: string } = {
@@ -1171,7 +1306,9 @@ export default function MenuPage() {
         };
 
         return products.filter(
-          (product) => product.category === categoryMap[categoryId]
+          (product) =>
+            product.category === categoryMap[categoryId] &&
+            isProductAvailableNow(product)
         );
     }
   };
@@ -1184,16 +1321,21 @@ export default function MenuPage() {
         if (favoriteItems.length === 0) {
           return "No hay productos marcados como favoritos";
         }
-        return `${favoriteItems.length} productos destacados`;
+        return `${
+          favoriteItems.filter((p) => isProductAvailableNow(p)).length
+        } productos destacados disponibles`;
       case "repite-item":
         if (recentItems.length === 0) {
           return "Tus pedidos anteriores aparecerán aquí";
         }
-        return `${recentItems.length} productos de tus órdenes anteriores`;
-      case "popular":
-        return "Los productos más pedidos por nuestros clientes";
+        return `${
+          recentItems.filter((p) => isProductAvailableNow(p)).length
+        } productos de tus órdenes anteriores disponibles`;
       default:
-        return category?.description || "";
+        const productsCount = getProductsByCategory(categoryId).length;
+        return `${productsCount} productos disponibles ${
+          currentPeriod === "am" ? "en el menú matutino" : "en el menú nocturno"
+        }`;
     }
   };
 
@@ -1458,10 +1600,73 @@ export default function MenuPage() {
               {assistanceLoading ? "Enviando..." : "Ayuda"}
             </button>
 
+            {/* Indicador del período actual
+            <div
+              className={`px-3 py-2 rounded-full flex items-center gap-2 ${
+                currentPeriod === "am"
+                  ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                  : "bg-blue-100 text-blue-800 border border-blue-300"
+              }`}
+            >
+              {currentPeriod === "am" ? (
+                <FaSun className="text-yellow-600" />
+              ) : (
+                <FaMoon className="text-blue-600" />
+              )}
+              <span className="text-sm font-medium">
+                {currentPeriod === "am" ? "Menú Matutino" : "Menú Nocturno"}
+              </span>
+            </div> */}
+
             <CartBadge />
           </div>
         </div>
       </header>
+
+      {/* Banner informativo del horario */}
+      {currentPeriod === "am" ? (
+        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-b border-yellow-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                <div>
+                  <p className="text-sm font-medium text-yellow-800">
+                    ☀️ <strong>Menú Matutino</strong> (8:00 AM - 2:00 PM)
+                  </p>
+                  {/* <p className="text-xs text-yellow-600">
+                    Solo se muestran productos disponibles en este horario
+                  </p> */}
+                </div>
+              </div>
+              {/* <div className="text-xs text-yellow-700">
+                Hamburguesas, platos fuertes y bebidas disponibles
+              </div> */}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                <div>
+                  <p className="text-sm font-medium text-blue-800">
+                    🌙 <strong>Menú Nocturno</strong> (2:00 PM - 10:00 PM)
+                  </p>
+                  {/* <p className="text-xs text-blue-600">
+                    Menú completo con todas las categorías disponibles
+                  </p> */}
+                </div>
+              </div>
+              {/* <div className="text-xs text-blue-700">
+                Botanas, cervezas y cocteles disponibles
+              </div> */}
+            </div>
+          </div>
+        </div>
+      )}
 
       {lastOrderSent && (
         <div className="bg-green-50 border-b border-green-200">
@@ -1572,11 +1777,29 @@ export default function MenuPage() {
                           </div>
                         )}
 
+                      {/* Indicador de horario del producto */}
+                      {product.available_period &&
+                        product.available_period !== "both" && (
+                          <div
+                            className={`absolute top-2 left-2 px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10 ${
+                              product.available_period === "am"
+                                ? "bg-yellow-500 text-white"
+                                : "bg-blue-500 text-white"
+                            }`}
+                          >
+                            {product.available_period === "am"
+                              ? "☀️ AM"
+                              : "🌙 PM"}
+                          </div>
+                        )}
+
                       {hasDiscount(product.id) && (
-                        <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+                        <div
+                          className={`absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10`}
+                        >
                           <FaTag className="text-xs" />
-                          {isSingleExtraProduct(product.id) && isPromoApplied
-                            ? "$99 (extras incluidos)"
+                          {isProteinProduct(product.id) && isPromoApplied
+                            ? `$99 (proteína gratis)`
                             : `-${getDiscountPercentage(product.id)}% Est.`}
                         </div>
                       )}
@@ -1634,9 +1857,9 @@ export default function MenuPage() {
                                   .length
                               }{" "}
                               extras disponibles
-                              {isSingleExtraProduct(product.id) && (
-                                <span className="text-yellow-600 ml-2">
-                                  ⚠️ Solo un extra
+                              {isProteinProduct(product.id) && (
+                                <span className="text-blue-600 ml-2">
+                                  🍗 Incluye 1 proteína (huevo o pollo)
                                 </span>
                               )}
                             </p>
@@ -1648,18 +1871,18 @@ export default function MenuPage() {
                             <div className="flex items-center gap-2">
                               {hasDiscount(product.id) ? (
                                 <>
-                                  {isSingleExtraProduct(product.id) &&
+                                  {isProteinProduct(product.id) &&
                                   isPromoApplied ? (
-                                    // PRODUCTOS 42, 43, 44 CON CUPÓN: $99 (EXTRAS INCLUIDOS)
+                                    // CHILAQUILES CON CUPÓN: $99 FIJO
                                     <>
                                       <span className="text-xl font-bold text-green-600">
                                         $99.00
                                       </span>
-                                      <span className="text-sm line-through text-gray-400">
+                                      {/* <span className="text-sm line-through text-gray-400">
                                         ${product.price.toFixed(2)}
-                                      </span>
+                                      </span> */}
                                       <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
-                                        ¡Extras incluidos!
+                                        (proteína gratis)
                                       </span>
                                     </>
                                   ) : (
@@ -1821,14 +2044,32 @@ export default function MenuPage() {
                             <span>• {product.name}</span>
                             <span>
                               {[42, 43, 44].includes(product.id) ? (
-                                <span className="font-bold text-green-700">
-                                  $99 fijo (extras incluidos)
-                                  {product.price > 99 && (
-                                    <span className="line-through text-gray-400 ml-2">
-                                      ${product.price.toFixed(2)}
-                                    </span>
+                                <>
+                                  {isPromoApplied ? (
+                                    <>
+                                      <span className="line-through">
+                                        ${product.price.toFixed(2)}
+                                      </span>{" "}
+                                      →{" "}
+                                      <span className="font-bold text-green-700">
+                                        $99.00
+                                      </span>{" "}
+                                      (proteína gratis)
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="line-through">
+                                        ${product.price.toFixed(2)}
+                                      </span>{" "}
+                                      →{" "}
+                                      <span className="font-bold text-green-700">
+                                        $
+                                        {getDiscountedPrice(product).toFixed(2)}
+                                      </span>{" "}
+                                      (-{getDiscountPercentage(product.id)}%)
+                                    </>
                                   )}
-                                </span>
+                                </>
                               ) : (
                                 <>
                                   <span className="line-through">
@@ -1847,51 +2088,7 @@ export default function MenuPage() {
                     </ul>
                   </div>
                 </div>
-              ) : // <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              //   <h3 className="font-bold text-blue-800 mb-2">
-              //     Beneficios del código:
-              //   </h3>
-              //   <ul className="text-sm text-blue-700 space-y-2">
-              //     {products
-              //       .filter((p) =>
-              //         [54, 57, 59, 60, 42, 43, 44].includes(p.id)
-              //       )
-              //       .map((product) => (
-              //         <li
-              //           key={product.id}
-              //           className="flex justify-between items-center"
-              //         >
-              //           <span>
-              //             • {product.name} (ID {product.id}):
-              //           </span>
-              //           {[42, 43, 44].includes(product.id) ? (
-              //             <span className="font-bold">
-              //               ${product.price.toFixed(2)} → $99 fijo
-              //               <span className="text-xs text-blue-600 ml-2">
-              //                 (extras incluidos)
-              //               </span>
-              //             </span>
-              //           ) : (
-              //             <span className="font-bold">
-              //               ${product.price.toFixed(2)} → $
-              //               {getDiscountedPrice(product).toFixed(2)}
-              //               (-{getDiscountPercentage(product.id)}%)
-              //             </span>
-              //           )}
-              //         </li>
-              //       ))}
-              //   </ul>
-              //   <p className="text-sm text-blue-600 mt-3">
-              //     💡 <strong>¡Oferta especial!</strong> Los productos 42, 43,
-              //     44 son <strong>$99 fijos con extras incluidos</strong>{" "}
-              //     (huevo o pollo).
-              //   </p>
-              //   <p className="text-xs text-blue-500 mt-2">
-              //     ⚠️ Solo se puede elegir un extra por producto para 42, 43,
-              //     44
-              //   </p>
-              // </div>
-              null}
+              ) : null}
             </div>
 
             <div className="p-6">
@@ -1995,37 +2192,44 @@ export default function MenuPage() {
                     </p>
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2">
-                        {isPromoApplied &&
-                        isSingleExtraProduct(selectedProduct.id) ? (
-                          // PRODUCTOS 42, 43, 44 CON CUPÓN: $99 (EXTRAS INCLUIDOS)
+                        {hasDiscount(selectedProduct.id) ? (
+                          // PRODUCTOS CON DESCUENTO
                           <>
-                            <span className="text-lg font-bold text-green-600">
-                              $99.00
-                            </span>
-                            <span className="text-sm line-through text-gray-400">
-                              ${selectedProduct.price.toFixed(2)}
-                            </span>
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
-                              ¡Extras incluidos!
-                            </span>
-                          </>
-                        ) : hasDiscount(selectedProduct.id) ? (
-                          // PRODUCTOS NORMALES CON DESCUENTO
-                          <>
-                            <span className="text-lg font-bold text-green-600">
-                              ${getDiscountedPrice(selectedProduct).toFixed(2)}
-                            </span>
-                            <span className="text-sm line-through text-gray-400">
-                              $
-                              {products
-                                .find((p) => p.id === selectedProduct.id)
-                                ?.price.toFixed(2) ||
-                                selectedProduct.price.toFixed(2)}
-                            </span>
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
-                              -{getDiscountPercentage(selectedProduct.id)}%
-                              Estudiante
-                            </span>
+                            {isProteinProduct(selectedProduct.id) &&
+                            isPromoApplied ? (
+                              // CHILAQUILES CON CUPÓN: $99 FIJO
+                              <>
+                                <span className="text-lg font-bold text-green-600">
+                                  $99.00
+                                </span>
+                                {/* <span className="text-sm line-through text-gray-400">
+                                  ${selectedProduct.price.toFixed(2)}
+                                </span> */}
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                                  (proteína gratis)
+                                </span>
+                              </>
+                            ) : (
+                              // OTROS PRODUCTOS CON DESCUENTO
+                              <>
+                                <span className="text-lg font-bold text-green-600">
+                                  $
+                                  {getDiscountedPrice(selectedProduct).toFixed(
+                                    2
+                                  )}
+                                </span>
+                                <span className="text-sm line-through text-gray-400">
+                                  $
+                                  {products
+                                    .find((p) => p.id === selectedProduct.id)
+                                    ?.price.toFixed(2) ||
+                                    selectedProduct.price.toFixed(2)}
+                                </span>
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
+                                  -{getDiscountPercentage(selectedProduct.id)}%
+                                </span>
+                              </>
+                            )}
                           </>
                         ) : (
                           // SIN DESCUENTO
@@ -2041,6 +2245,18 @@ export default function MenuPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Información especial para productos con proteína */}
+                    {isProteinProduct(selectedProduct.id) && (
+                      <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-blue-700 font-medium">
+                          🍗 Este producto <strong>incluye 1 proteína</strong>{" "}
+                          (huevo O pollo).
+                          {/* {isPromoApplied &&
+                            " 🎓 Con cupón: chilaquiles $99 + proteína GRATIS, otros extras se cobran."} */}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2052,60 +2268,72 @@ export default function MenuPage() {
                   <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     <FaPlus className="text-green-600" />
                     Agregar Extras
-                    {isSingleExtraProduct(selectedProduct.id) && (
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
-                        ⚠️ Solo puedes elegir un extra
+                    {/* {isProteinProduct(selectedProduct.id) && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                        🍗 Solo 1 proteína (huevo O pollo)
+                        {isPromoApplied && " 🎓 Gratis con cupón"}
                       </span>
-                    )}
+                    )} */}
                   </h3>
                   <div className="space-y-2">
                     {selectedProduct.extras
                       .filter((extra) => extra.is_available)
-                      .map((extra, index) => (
-                        <label
-                          key={index}
-                          className={`flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                            selectedExtras[extra.name]
-                              ? "border-green-500 bg-green-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type={
-                                isSingleExtraProduct(selectedProduct.id)
-                                  ? "radio"
-                                  : "checkbox"
-                              }
-                              checked={!!selectedExtras[extra.name]}
-                              onChange={() => handleExtraToggle(extra.name)}
-                              className={
-                                isSingleExtraProduct(selectedProduct.id)
-                                  ? "w-4 h-4 text-green-600 border-gray-300 rounded-full focus:ring-green-500"
-                                  : "w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                              }
-                            />
-                            <div>
-                              <span className="font-medium text-gray-800">
-                                {extra.name}
-                              </span>
-                              <p className="text-sm text-gray-600">
-                                {isPromoApplied &&
-                                isSingleExtraProduct(selectedProduct.id) ? (
-                                  <span className="text-green-600 font-bold">
-                                    GRATIS con cupón
-                                  </span>
-                                ) : (
-                                  `+$${extra.price.toFixed(2)}`
-                                )}
-                              </p>
+                      .map((extra, index) => {
+                        const isProtein = isProteinExtra(extra.name);
+                        const isFreeWithPromo =
+                          isPromoApplied &&
+                          isProteinProduct(selectedProduct.id) &&
+                          isProtein;
+
+                        return (
+                          <label
+                            key={index}
+                            className={`flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                              selectedExtras[extra.name]
+                                ? isProtein
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-green-500 bg-green-50"
+                                : "border-gray-200 hover:border-gray-300"
+                            } ${isProtein ? "group" : ""}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={!!selectedExtras[extra.name]}
+                                onChange={() => handleExtraToggle(extra.name)}
+                                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                              />
+                              <div>
+                                <span className="font-medium text-gray-800">
+                                  {extra.name}
+                                  {isProtein &&
+                                    isProteinProduct(selectedProduct.id) && (
+                                      <span className="text-xs text-blue-600 ml-2">
+                                        (Proteína - solo 1)
+                                      </span>
+                                    )}
+                                </span>
+                                <p className="text-sm text-gray-600">
+                                  {isFreeWithPromo ? (
+                                    <span className="text-green-600 font-bold">
+                                      GRATIS con cupón
+                                    </span>
+                                  ) : (
+                                    `+$${extra.price.toFixed(2)}`
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          {selectedExtras[extra.name] && (
-                            <FaCheck className="text-green-600" />
-                          )}
-                        </label>
-                      ))}
+                            {selectedExtras[extra.name] && (
+                              <FaCheck
+                                className={
+                                  isProtein ? "text-blue-600" : "text-green-600"
+                                }
+                              />
+                            )}
+                          </label>
+                        );
+                      })}
                   </div>
 
                   {Object.keys(selectedExtras).filter(
@@ -2119,6 +2347,11 @@ export default function MenuPage() {
                         {Object.entries(selectedExtras)
                           .filter(([_, isSelected]) => isSelected)
                           .map(([extraName]) => {
+                            const isProtein = isProteinExtra(extraName);
+                            const isFreeWithPromo =
+                              isPromoApplied &&
+                              isProteinProduct(selectedProduct.id) &&
+                              isProtein;
                             const extra = selectedProduct.extras?.find(
                               (e) => e.name === extraName
                             );
@@ -2127,10 +2360,14 @@ export default function MenuPage() {
                                 key={extraName}
                                 className="flex justify-between"
                               >
-                                <span>• {extraName}</span>
                                 <span>
-                                  {isPromoApplied &&
-                                  isSingleExtraProduct(selectedProduct.id) ? (
+                                  • {extraName}
+                                  {isProtein &&
+                                    isProteinProduct(selectedProduct.id) &&
+                                    " (Proteína)"}
+                                </span>
+                                <span>
+                                  {isFreeWithPromo ? (
                                     <span className="text-green-600 font-bold">
                                       GRATIS
                                     </span>
@@ -2142,10 +2379,32 @@ export default function MenuPage() {
                             );
                           })}
                       </ul>
+
+                      {/* Mensaje de validación para proteínas */}
+                      {isProteinProduct(selectedProduct.id) &&
+                        (() => {
+                          const selectedProteinCount = Object.entries(
+                            selectedExtras
+                          ).filter(
+                            ([name, selected]) =>
+                              selected && isProteinExtra(name)
+                          ).length;
+
+                          if (selectedProteinCount > 1) {
+                            return (
+                              <p className="text-xs text-red-600 mt-2 font-semibold">
+                                ⚠️ Solo puedes seleccionar una proteína (huevo O
+                                pollo)
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
+
                       {isPromoApplied &&
-                        isSingleExtraProduct(selectedProduct.id) && (
+                        isProteinProduct(selectedProduct.id) && (
                           <p className="text-xs text-green-600 mt-2">
-                            ✅ Los extras son gratuitos con el cupón activado
+                            ✅ Chilaquiles $99 + proteína GRATIS con cupón
                           </p>
                         )}
                     </div>
@@ -2161,7 +2420,7 @@ export default function MenuPage() {
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ej: Sin tomate, extra queso, bien cocido, sin picante, sin sal, etc."
+                  placeholder="Ej: sin cilantro, sin crema, sin cebolla, etc."
                   className={`w-full h-24 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
                     (notes.trim().length > 0 && notes.trim().length < 2) ||
                     (notes.length > 0 && notes.trim().length === 0)
@@ -2194,16 +2453,19 @@ export default function MenuPage() {
                     ${calculateTotalWithExtras().toFixed(2)}
                   </span>
                 </div>
-                {isPromoApplied && isSingleExtraProduct(selectedProduct.id) ? (
+                {isPromoApplied && isProteinProduct(selectedProduct.id) ? (
                   <p className="text-sm text-gray-600 mt-1 text-right">
-                    ✅ Precio con cupón: $99 (extras incluidos)
+                    ✅ Chilaquiles $99 + proteína gratis, otros extras se cobran
                   </p>
                 ) : (
-                  calculateTotalWithExtras() > selectedProduct.price && (
+                  calculateTotalWithExtras() >
+                    getDiscountedPrice(selectedProduct) && (
                     <p className="text-sm text-gray-600 mt-1 text-right">
-                      (Base: ${selectedProduct.price.toFixed(2)} + Extras: $
+                      (Base: ${getDiscountedPrice(selectedProduct).toFixed(2)} +
+                      Extras: $
                       {(
-                        calculateTotalWithExtras() - selectedProduct.price
+                        calculateTotalWithExtras() -
+                        getDiscountedPrice(selectedProduct)
                       ).toFixed(2)}
                       )
                     </p>
@@ -2414,9 +2676,9 @@ export default function MenuPage() {
                           </p>
                           {hasDiscount(item.product_id) && (
                             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">
-                              {isSingleExtraProduct(item.product_id) &&
+                              {isProteinProduct(item.product_id) &&
                               isPromoApplied
-                                ? "$99 (extras incluidos)"
+                                ? "Chilaquiles $99 + proteína gratis"
                                 : "Descuento aplicado"}
                             </span>
                           )}
@@ -2464,57 +2726,7 @@ export default function MenuPage() {
                     {isPromoApplied &&
                       orderItems.some((item) =>
                         [54, 57, 59, 60, 42, 43, 44].includes(item.product_id)
-                      ) && (
-                        <div></div>
-                        // <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                        //   <div className="flex justify-between items-center mb-2">
-                        //     <span className="text-green-700 font-medium">
-                        //       🎓 Descuento de estudiante aplicado
-                        //     </span>
-                        //     <span className="text-green-700 font-bold">
-                        //       -$
-                        //       {orderItems
-                        //         .filter((item) =>
-                        //           [54, 57, 59, 60, 42, 43, 44].includes(
-                        //             item.product_id
-                        //           )
-                        //         )
-                        //         .reduce((total, item) => {
-                        //           const originalPrice =
-                        //             products.find(
-                        //               (p) => p.id === item.product_id
-                        //             )?.price || 0;
-                        //           const discountedPrice =
-                        //             isSingleExtraProduct(item.product_id) &&
-                        //             isPromoApplied
-                        //               ? 99
-                        //               : getDiscountedPrice(
-                        //                   products.find(
-                        //                     (p) => p.id === item.product_id
-                        //                   ) || (item as any)
-                        //                 );
-                        //           const discountPerItem =
-                        //             originalPrice - discountedPrice;
-                        //           return (
-                        //             total + discountPerItem * item.quantity
-                        //           );
-                        //         }, 0)
-                        //         .toFixed(2)}
-                        //     </span>
-                        //   </div>
-                        //   <p className="text-xs text-green-600">
-                        //     Productos con descuento:{" "}
-                        //     {[54, 57, 59, 60, 42, 43, 44]
-                        //       .filter((id) =>
-                        //         orderItems.some(
-                        //           (item) => item.product_id === id
-                        //         )
-                        //       )
-                        //       .map((id) => `ID ${id}`)
-                        //       .join(", ")}
-                        //   </p>
-                        // </div>
-                      )}
+                      ) && <div></div>}
 
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>

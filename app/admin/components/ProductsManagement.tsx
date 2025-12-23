@@ -33,6 +33,7 @@ export default function ProductsManagement({
     is_favorite: false,
     rating: "0",
     extras: [],
+    available_period: "both",
   });
 
   // Referencia para el formulario
@@ -76,6 +77,7 @@ export default function ProductsManagement({
         ...product,
         rating: parseFloat(product.rating) || 0,
         rating_count: product.rating_count || 0,
+        available_period: product.available_period || "both",
         created_at: product.created_at || new Date().toISOString(),
         updated_at: product.updated_at || new Date().toISOString(),
         extras: product.extras || [],
@@ -126,6 +128,7 @@ export default function ProductsManagement({
         rating: parseFloat(productForm.rating) || 0,
         rating_count: 0,
         extras: productForm.extras || [], // INCLUIR EXTRAS
+        available_period: productForm.available_period,
       };
 
       const { error } = await supabase
@@ -146,6 +149,7 @@ export default function ProductsManagement({
         is_favorite: false,
         rating: "0",
         extras: [],
+        available_period: "both",
       });
       await loadProducts();
       alert("✅ Producto creado con extras correctamente");
@@ -175,7 +179,8 @@ export default function ProductsManagement({
         is_available: productForm.is_available,
         is_favorite: productForm.is_favorite,
         rating: parseFloat(productForm.rating) || 0,
-        extras: productForm.extras || [], // INCLUIR EXTRAS
+        extras: productForm.extras || [],
+        available_period: productForm.available_period,
       };
 
       const { error } = await supabase
@@ -198,6 +203,7 @@ export default function ProductsManagement({
         is_favorite: false,
         rating: "0",
         extras: [],
+        available_period: "both",
       });
       await loadProducts();
       alert("✅ Producto actualizado con extras correctamente");
@@ -220,6 +226,7 @@ export default function ProductsManagement({
       is_favorite: product.is_favorite,
       rating: product.rating.toString(),
       extras: product.extras || [], // CARGAR EXTRAS EXISTENTES
+      available_period: product.available_period,
     });
 
     // Asegurar que el formulario se muestre (por si acaso)
@@ -327,6 +334,7 @@ export default function ProductsManagement({
               is_favorite: false,
               rating: "0",
               extras: [],
+              available_period: "both",
             });
             setShowProductForm(true);
           }}

@@ -17,6 +17,57 @@ export default function OrderItem({
 }: OrderItemProps) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelQuantity, setCancelQuantity] = useState(1);
+  console.log("OrderItem data:", {
+    product_name: item.product_name,
+    product: item.product,
+    product_category: item.product?.category,
+    has_product: !!item.product,
+    item_keys: Object.keys(item),
+  });
+  // Definir qué categorías van a COCINA y cuáles a BARRA
+  const getPreparationLocation = (category: string): "COCINA" | "BARRA" => {
+    const cocinaCategories = [
+      "Entradas",
+      "Burgers",
+      "Fuertes",
+      "Pizza",
+      // Añade aquí otras categorías que vayan a cocina
+    ];
+
+    const barraCategories = [
+      "Bebidas",
+      "Cerveza",
+      "Cerveza Artesanal",
+      "Coquetos",
+      "Coquetos Clasicos",
+      // Añade aquí otras categorías que vayan a barra
+    ];
+
+    // Si está en las categorías de cocina
+    if (cocinaCategories.includes(category)) {
+      return "COCINA";
+    }
+
+    // Si está en las categorías de barra
+    if (barraCategories.includes(category)) {
+      return "BARRA";
+    }
+
+    // Por defecto, si no está en ninguna lista, vamos a cocina
+    return "COCINA";
+  };
+
+  // Obtener el color según la ubicación de preparación
+  const getLocationColor = (location: "COCINA" | "BARRA"): string => {
+    return location === "COCINA"
+      ? "bg-orange-100 text-orange-800"
+      : "bg-blue-100 text-blue-800";
+  };
+
+  // Obtener el ícono según la ubicación de preparación
+  const getLocationIcon = (location: "COCINA" | "BARRA"): string => {
+    return location === "COCINA" ? "" : "";
+  };
 
   // Función para formatear notas y extras (VERSIÓN COMPACTA)
   const formatItemNotes = (notes: string | null) => {
@@ -168,6 +219,15 @@ export default function OrderItem({
   const availableToCancel = item.quantity - cancelledQty;
   const remainingQuantity = item.quantity - cancelledQty;
 
+  // Determinar ubicación de preparación
+  const productCategory = item.product?.category || "";
+  const preparationLocation = getPreparationLocation(productCategory);
+  const locationColor = getLocationColor(preparationLocation);
+  const locationIcon = getLocationIcon(preparationLocation);
+
+  // Si la categoría está vacía, no mostrar el indicador
+  const shouldShowLocationIndicator = !!productCategory;
+
   return (
     <>
       <div
@@ -180,12 +240,24 @@ export default function OrderItem({
         <div className="flex-1">
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <div
-                className={`font-medium ${
-                  isCancelled ? "text-red-700 line-through" : "text-gray-800"
-                }`}
-              >
-                {item.product_name}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`font-medium ${
+                    isCancelled ? "text-red-700 line-through" : "text-gray-800"
+                  }`}
+                >
+                  {item.product_name}
+                </div>
+
+                {/* Indicador de COCINA/BARRA */}
+                {shouldShowLocationIndicator && (
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-medium ${locationColor}`}
+                  >
+                    {locationIcon} {preparationLocation}
+                  </span>
+                )}
+
                 {isCancelled && (
                   <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
                     <FaBan className="inline mr-1" />
@@ -198,6 +270,7 @@ export default function OrderItem({
                   </span>
                 )}
               </div>
+
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className={`${

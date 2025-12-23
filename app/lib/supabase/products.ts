@@ -14,12 +14,13 @@ export interface Product {
   preparation_time: number | null
   rating: number
   extras?: ProductExtra[]
+  available_period: 'am' | 'pm' | 'both' // NUEVO CAMPO - no es opcional
 }
 
 export const productsService = {
-  // Obtener todos los productos disponibles
-  async getProducts(): Promise<Product[]> {
-    const { data, error } = await supabase
+  // Obtener todos los productos disponibles (CON FILTRO POR HORARIO)
+  async getProducts(timePeriod?: 'am' | 'pm'): Promise<Product[]> {
+    let query = supabase
       .from('products')
       .select('*')
       .eq('is_available', true)
@@ -27,6 +28,13 @@ export const productsService = {
       .order('category')
       .order('name')
     
+    // Filtrar por horario si se especifica
+    if (timePeriod) {
+      query = query.or(`available_period.eq.${timePeriod},available_period.eq.both`)
+    }
+    
+    const { data, error } = await query
+    
     if (error) throw error
     
     // Convertir el rating de string a number si es necesario
@@ -39,9 +47,9 @@ export const productsService = {
     return products
   },
 
-  // Obtener productos por categoría
-  async getProductsByCategory(category: string): Promise<Product[]> {
-    const { data, error } = await supabase
+  // Obtener productos por categoría (CON FILTRO POR HORARIO)
+  async getProductsByCategory(category: string, timePeriod?: 'am' | 'pm'): Promise<Product[]> {
+    let query = supabase
       .from('products')
       .select('*')
       .eq('category', category)
@@ -49,6 +57,13 @@ export const productsService = {
       .order('is_favorite', { ascending: false }) 
       .order('name')
     
+    // Filtrar por horario si se especifica
+    if (timePeriod) {
+      query = query.or(`available_period.eq.${timePeriod},available_period.eq.both`)
+    }
+    
+    const { data, error } = await query
+    
     if (error) throw error
     
     // Convertir el rating de string a number si es necesario
@@ -61,9 +76,9 @@ export const productsService = {
     return products
   },
 
-  // Obtener productos favoritos
-  async getFavoriteProducts(): Promise<Product[]> {
-    const { data, error } = await supabase
+  // Obtener productos favoritos (CON FILTRO POR HORARIO)
+  async getFavoriteProducts(timePeriod?: 'am' | 'pm'): Promise<Product[]> {
+    let query = supabase
       .from('products')
       .select('*')
       .eq('is_favorite', true)
@@ -71,6 +86,13 @@ export const productsService = {
       .order('rating', { ascending: false })
       .order('name')
     
+    // Filtrar por horario si se especifica
+    if (timePeriod) {
+      query = query.or(`available_period.eq.${timePeriod},available_period.eq.both`)
+    }
+    
+    const { data, error } = await query
+    
     if (error) throw error
     
     // Convertir el rating de string a number si es necesario
@@ -83,127 +105,136 @@ export const productsService = {
     return products
   },
 
+  // Crear producto con extras (INCLUYENDO available_period)
+  async createProductWithExtras(productData: any): Promise<Product> {
+    // Preparar datos del producto incluyendo extras
+    const productPayload = {
+      name: productData.name,
+      description: productData.description,
+      price: parseInt(productData.price) || 0,
+      category: productData.category,
+      image_url: typeof productData.image_url === 'string' ? productData.image_url : null,
+      is_available: productData.is_available,
+      is_favorite: productData.is_favorite,
+      preparation_time: parseInt(productData.preparation_time) || null,
+      rating: parseFloat(productData.rating) || 0,
+      rating_count: 0,
+      extras: productData.extras || [],
+      available_period: productData.available_period || 'both' // NUEVO CAMPO
+    }
 
-async createProductWithExtras(productData: any): Promise<Product> {
-  // Preparar datos del producto incluyendo extras
-  const productPayload = {
-    name: productData.name,
-    description: productData.description,
-    price: parseInt(productData.price) || 0,
-    category: productData.category,
-    image_url: typeof productData.image_url === 'string' ? productData.image_url : null,
-    is_available: productData.is_available,
-    is_favorite: productData.is_favorite,
-    preparation_time: parseInt(productData.preparation_time) || null,
-    rating: parseFloat(productData.rating) || 0,
-    rating_count: 0,
-    extras: productData.extras || [] 
-  }
+    // Crear producto (los extras se guardan automáticamente)
+    const { data: product, error } = await supabase
+      .from('products')
+      .insert(productPayload as never)
+      .select()
+      .single()
 
-  // Crear producto (los extras se guardan automáticamente)
-  const { data: product, error } = await supabase
-    .from('products')
-    .insert(productPayload as never)
-    .select()
-    .single()
+    if (error) throw error
 
-  if (error) throw error
+    return {
+      ...(product as any),
+      rating: parseFloat((product as any).rating) || 0,
+      extras: (product as any).extras || []
+    } as Product
+  },
 
-  return {
-    ...(product as any),
-    rating: parseFloat((product as any).rating) || 0,
-    extras: (product as any).extras || []
-  } as Product
-},
+  // Actualizar producto con extras (INCLUYENDO available_period)
+  async updateProductWithExtras(productId: number, productData: any): Promise<Product> {
+    // Preparar datos del producto incluyendo extras
+    const productPayload = {
+      name: productData.name,
+      description: productData.description,
+      price: parseInt(productData.price) || 0,
+      category: productData.category,
+      image_url: typeof productData.image_url === 'string' ? productData.image_url : undefined,
+      is_available: productData.is_available,
+      is_favorite: productData.is_favorite,
+      preparation_time: parseInt(productData.preparation_time) || null,
+      rating: parseFloat(productData.rating) || 0,
+      updated_at: new Date().toISOString(),
+      extras: productData.extras || [],
+      available_period: productData.available_period || 'both' // NUEVO CAMPO
+    }
 
-// Actualizar producto con extras
-async updateProductWithExtras(productId: number, productData: any): Promise<Product> {
-  // Preparar datos del producto incluyendo extras
-  const productPayload = {
-    name: productData.name,
-    description: productData.description,
-    price: parseInt(productData.price) || 0,
-    category: productData.category,
-    image_url: typeof productData.image_url === 'string' ? productData.image_url : undefined,
-    is_available: productData.is_available,
-    is_favorite: productData.is_favorite,
-    preparation_time: parseInt(productData.preparation_time) || null,
-    rating: parseFloat(productData.rating) || 0,
-    updated_at: new Date().toISOString(),
-    extras: productData.extras || [] // ← ESTA ES LA LÍNEA CLAVE
-  }
+    // Actualizar producto (los extras se actualizan automáticamente)
+    const { data: product, error } = await supabase
+      .from('products')
+      .update(productPayload as never)
+      .eq('id', productId)
+      .select()
+      .single()
 
-  // Actualizar producto (los extras se actualizan automáticamente)
-  const { data: product, error } = await supabase
-    .from('products')
-    .update(productPayload as never)
-    .eq('id', productId)
-    .select()
-    .single()
+    if (error) throw error
 
-  if (error) throw error
+    return {
+      ...(product as any),
+      rating: parseFloat((product as any).rating) || 0,
+      extras: (product as any).extras || []
+    } as Product
+  },
 
-  return {
-    ...(product as any),
-    rating: parseFloat((product as any).rating) || 0,
-    extras: (product as any).extras || []
-  } as Product
-},
-
-// Obtener producto por ID (para admin)
-async getProductById(productId: number): Promise<Product> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', productId)
-    .single()
-
-  if (error) throw error
-
-  return {
-    ...(data as any),
-    rating: parseFloat((data as any).rating) || 0,
-    extras: (data as any).extras || []
-  } as Product
-},
-
-// Eliminar producto
-async deleteProduct(productId: number): Promise<void> {
-  const { error } = await supabase
-    .from('products')
-    .delete()
-    .eq('id', productId)
-
-  if (error) throw error
-},
-
-// Subir imagen de producto
-async uploadProductImage(file: File): Promise<string> {
-  const fileExt = file.name.split('.').pop()
-  const fileName = `${Math.random()}.${fileExt}`
-  const filePath = `product-images/${fileName}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('product-images')
-    .upload(filePath, file)
-
-  if (uploadError) throw uploadError
-
-  // Obtener URL pública
-  const { data } = supabase.storage
-    .from('product-images')
-    .getPublicUrl(filePath)
-
-  return data.publicUrl
-}
-,
-  // Obtener categorías únicas
-  async getCategories(): Promise<string[]> {
+  // Obtener producto por ID (para admin)
+  async getProductById(productId: number): Promise<Product> {
     const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single()
+
+    if (error) throw error
+
+    return {
+      ...(data as any),
+      rating: parseFloat((data as any).rating) || 0,
+      extras: (data as any).extras || []
+    } as Product
+  },
+
+  // Eliminar producto
+  async deleteProduct(productId: number): Promise<void> {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId)
+
+    if (error) throw error
+  },
+
+  // Subir imagen de producto
+  async uploadProductImage(file: File): Promise<string> {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random()}.${fileExt}`
+    const filePath = `product-images/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file)
+
+    if (uploadError) throw uploadError
+
+    // Obtener URL pública
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath)
+
+    return data.publicUrl
+  },
+
+  // Obtener categorías únicas (CON FILTRO POR HORARIO)
+  async getCategories(timePeriod?: 'am' | 'pm'): Promise<string[]> {
+    let query = supabase
       .from('products')
       .select('category')
       .eq('is_available', true)
       .order('category')
+    
+    // Filtrar por horario si se especifica
+    if (timePeriod) {
+      query = query.or(`available_period.eq.${timePeriod},available_period.eq.both`)
+    }
+    
+    const { data, error } = await query
     
     if (error) throw error
     

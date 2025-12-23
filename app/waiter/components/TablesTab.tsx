@@ -159,7 +159,6 @@ export default function TablesTab({
                 onCobrarMesa={onCobrarMesa}
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
-                // Props adicionales
                 occupationTime={occupationTime}
                 hasNotifications={hasNotifications}
                 isHighlighted={isOldest}

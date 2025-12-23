@@ -1,6 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { FaPlus, FaEdit, FaStar, FaRegStar, FaTrash } from "react-icons/fa";
+import {
+  FaPlus,
+  FaEdit,
+  FaStar,
+  FaRegStar,
+  FaTrash,
+  FaSun,
+  FaMoon,
+} from "react-icons/fa"; // Agregado FaSun y FaMoon
 import { Product, ProductFormData, ProductExtra } from "../types";
 import StarRating from "./StarRating";
 import { useState } from "react";
@@ -62,7 +70,15 @@ export default function ProductForm({
 
   const handleChange = (
     field: keyof ProductFormData,
-    value: string | boolean | File | number | ProductExtra[]
+    value:
+      | string
+      | boolean
+      | File
+      | number
+      | ProductExtra[]
+      | "am"
+      | "pm"
+      | "both"
   ) => {
     // Validar el campo antes de actualizar
     const error = validateField(field, value);
@@ -250,6 +266,23 @@ export default function ProductForm({
     }
   };
 
+  // Función para renderizar el icono según el período
+  const getPeriodIcon = (period: "am" | "pm" | "both") => {
+    switch (period) {
+      case "am":
+        return <FaSun className="text-yellow-500" />;
+      case "pm":
+        return <FaMoon className="text-blue-500" />;
+      case "both":
+        return (
+          <div className="flex gap-1">
+            <FaSun className="text-yellow-500" />
+            <FaMoon className="text-blue-500" />
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -353,9 +386,9 @@ export default function ProductForm({
             )}
           </div>
 
-          {/* Línea con Calificación, Estado y Favorito */}
+          {/* Línea con Calificación, Estado, Favorito y Horario */}
           <div className="md:col-span-2">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Calificación */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -471,6 +504,37 @@ export default function ProductForm({
                 <p className="text-xs text-gray-500 mt-1">
                   Se muestra destacado
                 </p>
+              </div>
+
+              {/* NUEVO: Horario de Disponibilidad */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Horario
+                </label>
+                <select
+                  value={productForm.available_period || "both"}
+                  onChange={(e) =>
+                    handleChange(
+                      "available_period",
+                      e.target.value as "am" | "pm" | "both"
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="both">Todo el día</option>
+                  <option value="am">Solo mañana (AM)</option>
+                  <option value="pm">Solo tarde/noche (PM)</option>
+                </select>
+                <div className="flex items-center gap-2 mt-2">
+                  {getPeriodIcon(productForm.available_period || "both")}
+                  <p className="text-xs text-gray-500">
+                    {productForm.available_period === "am"
+                      ? "8:00 AM - 2:00 PM"
+                      : productForm.available_period === "pm"
+                      ? "2:00 PM - 10:00 PM"
+                      : "Todo el día"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -39,6 +39,7 @@ export interface WaiterNotification {
 
 export interface OrderItem {
   id: string
+  product_id: number
   product_name: string
   quantity: number
   status: OrderItemStatus
@@ -46,6 +47,10 @@ export interface OrderItem {
   notes?: string
   order_id?: string
   cancelled_quantity?: number
+  product?: {
+    id: number
+    category: string
+  }
 }
 
 export interface Order {
@@ -199,12 +204,17 @@ export const waiterService = {
           status,
           order_items (
             id,
+            product_id,
             product_name,
             quantity,
             status,
             price,
             notes,
-            cancelled_quantity
+            cancelled_quantity,
+          product:products!inner (
+              id,
+              category
+            )
           )
         )
       `
@@ -221,12 +231,17 @@ export const waiterService = {
               status: OrderStatus
               order_items?: {
                 id: string
+                product_id: number
                 product_name: string
                 quantity: number
                 status: OrderItemStatus
                 price: number
                 notes?: string | null
                 cancelled_quantity?: number
+                product?: {
+                  id: number
+                  category: string
+                }
               }[]
             }[]
           }
@@ -256,12 +271,14 @@ export const waiterService = {
             order_items:
               (order.order_items || []).map((it) => ({
                 id: it.id,
+                product_id: it.product_id,
                 product_name: it.product_name,
                 quantity: it.quantity,
                 status: it.status,
                 price: it.price,
                 notes: it.notes ?? undefined,
                 cancelled_quantity: it.cancelled_quantity || 0,
+                product: it.product,
                 order_id: undefined,
               })) || [],
           })) || [],
