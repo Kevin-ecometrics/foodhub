@@ -29,7 +29,7 @@ function PasswordModal({
   const [error, setError] = useState("");
 
   const handleConfirm = () => {
-    if (password === "restaurant") {
+    if (password === "casajardin2025") {
       setError("");
       setPassword("");
       onConfirm();
