@@ -7,6 +7,7 @@ export interface PrintItem {
   price: number;
   category_type: 'kitchen' | 'cold_bar';
   notes?: string;
+  customerName?: string;
 }
 
 export interface OrderDataForPrinting {
@@ -42,7 +43,6 @@ class BrowserPrintService {
   private formatDateTime(dateString: string): { date: string, time: string } {
     const date = new Date(dateString);
     
-    // Formato específico para impresora térmica
     const formattedDate = date.toLocaleDateString('es-MX', {
       day: '2-digit',
       month: '2-digit',
@@ -58,6 +58,52 @@ class BrowserPrintService {
     return { date: formattedDate, time: formattedTime };
   }
 
+  // Agrupar items por nombre Y por comensal (solo para tickets de cliente)
+  private groupItemsByCustomer(items: PrintItem[]): Array<{
+    customerName?: string;
+    items: Array<{name: string, quantity: number, notes?: string}>
+  }> {
+    const groupedByCustomer: Record<string, Array<{name: string, quantity: number, notes?: string}>> = {};
+    
+    items.forEach(item => {
+      const customerKey = item.customerName || 'Sin nombre';
+      
+      if (!groupedByCustomer[customerKey]) {
+        groupedByCustomer[customerKey] = [];
+      }
+      
+      const existingItem = groupedByCustomer[customerKey].find(i => i.name === item.name);
+      if (existingItem) {
+        existingItem.quantity += item.quantity;
+        if (item.notes && existingItem.notes !== item.notes) {
+          if (existingItem.notes) {
+            existingItem.notes += `, ${item.notes}`;
+          } else {
+            existingItem.notes = item.notes;
+          }
+        }
+      } else {
+        groupedByCustomer[customerKey].push({
+          name: item.name,
+          quantity: item.quantity,
+          notes: item.notes
+        });
+      }
+    });
+    
+    return Object.entries(groupedByCustomer)
+      .map(([customerName, items]) => ({
+        customerName: customerName === 'Sin nombre' ? undefined : customerName,
+        items
+      }))
+      .sort((a, b) => {
+        if (a.customerName && !b.customerName) return -1;
+        if (!a.customerName && b.customerName) return 1;
+        return 0;
+      });
+  }
+
+  // Método original para agrupar sin considerar comensal (para cocina/barra)
   private groupItems(items: PrintItem[]): Array<{name: string, quantity: number, notes?: string}> {
     const grouped: Record<string, {quantity: number, notes?: string}> = {};
     
@@ -84,6 +130,12 @@ class BrowserPrintService {
       quantity: data.quantity,
       notes: data.notes
     }));
+  }
+
+  // Método para ticket con nombres de comensales (SOLO PARA CLIENTE)
+  async printTicketWithCustomers(orderData: OrderDataForPrinting): Promise<boolean> {
+    const content = this.generateTicketWithCustomers(orderData);
+    return this.printInBrowser(content, `Ticket-Comensales-Mesa-${orderData.tableNumber}`, orderData.tableNumber);
   }
 
   async printRestaurantTicket(orderData: OrderDataForPrinting): Promise<boolean> {
@@ -171,7 +223,6 @@ class BrowserPrintService {
           return;
         }
 
-        // Configuración específica para impresora HCUBE-102D (58mm)
         const html = `
           <!DOCTYPE html>
           <html>
@@ -179,10 +230,9 @@ class BrowserPrintService {
               <title>${title}</title>
               <meta charset="UTF-8">
               <style>
-                /* Configuración para impresora térmica HCUBE-102D de 58mm */
                 @media print {
                   @page {
-                    size: 58mm auto; /* Ancho específico para HCUBE-102D */
+                    size: 58mm auto;
                     margin: 0;
                     margin-top: 5mm;
                     margin-bottom: 5mm;
@@ -192,7 +242,7 @@ class BrowserPrintService {
                     margin: 0 auto !important;
                     padding: 0 3mm !important;
                     font-family: 'Courier New', monospace !important;
-                    font-size: 11px !important; /* Tamaño reducido para 58mm */
+                    font-size: 11px !important;
                     line-height: 1.2 !important;
                     background: white !important;
                     text-align: left !important;
@@ -274,12 +324,6 @@ class BrowserPrintService {
                 button.secondary:hover {
                   background: #4b5563;
                 }
-                
-                /* Ajustes para impresión térmica */
-                .line-separator {
-                  text-align: center;
-                  letter-spacing: 2px;
-                }
               </style>
             </head>
             <body>
@@ -297,13 +341,11 @@ class BrowserPrintService {
                 <button onclick="window.close()" class="secondary">
                   Cerrar ventana
                 </button>
-                
               </div>
               
               <script>
                 window.focus();
                 
-                // Auto-impresión después de 1 segundo (opcional)
                 setTimeout(() => {
                   const urlParams = new URLSearchParams(window.location.search);
                   if (urlParams.get('autoPrint') === 'true') {
@@ -337,30 +379,88 @@ class BrowserPrintService {
     });
   }
 
+  // Método para ticket CON nombres de comensales (SOLO PARA CLIENTE)
+  private generateTicketWithCustomers(orderData: OrderDataForPrinting): string {
+    let ticket = '';
+    const { date, time } = this.formatDateTime(orderData.createdAt);
+    
+    // Encabezado
+    ticket += `           LA MAQUILA\n`;
+    ticket += `______\n\n`;
+    ticket += `FECHA: ${date}\n`;
+    ticket += `HORA: ${time}\n`;
+    ticket += `Mesa: ${orderData.tableNumber}\n`;
+    ticket += `Mesero: ${orderData.waiter || 'Sistema'}\n`;
+    ticket += `______\n\n`;
+    
+    if (orderData.orderType === 'take_away') {
+      ticket += `PARA LLEVAR\n\n`;
+    } else if (orderData.eatHere !== false) {
+      ticket += `COMER AQUÍ\n\n`;
+    }
+    
+    ticket += `______\n\n`;
+    
+    // Agrupar por comensal (SOLO para tickets de cliente)
+    const groupedByCustomer = this.groupItemsByCustomer(orderData.items);
+    
+    groupedByCustomer.forEach(({ customerName, items }) => {
+      if (customerName) {
+        ticket += `[ ${customerName} ]\n`;
+      } else {
+        ticket += `[ Sin nombre ]\n`;
+      }
+      
+      items.forEach(item => {
+        const itemTotal = item.quantity * (orderData.items.find(i => i.name === item.name)?.price || 0);
+        const maxNameLength = 14;
+        const nameDisplay = item.name.length > maxNameLength 
+          ? item.name.substring(0, maxNameLength - 3) + '...' 
+          : item.name;
+        
+        const quantityDisplay = `${item.quantity}x`;
+        const nameWithSpaces = nameDisplay.padEnd(maxNameLength);
+        const totalDisplay = `$${itemTotal.toFixed(2)}`;
+        
+        ticket += `  ${quantityDisplay} ${nameWithSpaces} ${totalDisplay}\n`;
+        
+        if (item.notes) {
+          ticket += `     Nota: ${item.notes}\n`;
+        }
+      });
+      
+      ticket += `\n`;
+    });
+    
+    ticket += `______\n\n`;
+    ticket += `TOTAL: $${orderData.total.toFixed(2)}\n`;
+    ticket += `______\n\n`;
+    ticket += `GRACIAS POR SU VISITA\n`;
+    ticket += `______\n`;
+    
+    return ticket;
+  }
+
   private generateRestaurantTicket(orderData: OrderDataForPrinting): string {
     let ticket = '';
     const { date, time } = this.formatDateTime(orderData.createdAt);
     
-    // Encabezado con fecha y hora en líneas separadas
-        ticket += `           LA MAQUILA\n`;
+    ticket += `           LA MAQUILA\n`;
     ticket += `______\n\n`;
     ticket += `FECHA: ${date}\n`;
     ticket += `HORA: ${time}\n\n`;
     ticket += `______\n\n`;
     
-    // Nombre del restaurante
     const restaurantName = orderData.area || 'LA MAQUILA';
     ticket += `${restaurantName}\n\n`;
     ticket += `______\n\n`;
     
-    // Información de la mesa
     ticket += `Mesa: ${orderData.tableNumber}\n`;
     ticket += `Personas: ${orderData.customerCount}\n`;
     ticket += `Mesero: ${orderData.waiter || 'Sistema'}\n\n`;
     ticket += `______\n\n`;
     
-    // Productos con precios (formato ajustado para 58mm)
-    const maxNameLength = 18; // Reducido para 58mm
+    const maxNameLength = 18;
     
     orderData.items.forEach(item => {
       const itemTotal = item.quantity * item.price;
@@ -388,24 +488,15 @@ class BrowserPrintService {
     let ticket = '';
     const { date, time } = this.formatDateTime(orderData.createdAt);
     
-    // FECHA y HORA en líneas separadas claramente
-    
     ticket += `           LA MAQUILA\n`;
     ticket += `______\n\n`;
     ticket += `FECHA: ${date}\n`;
     ticket += `HORA: ${time}\n`;
-    // ticket += `______\n\n`;
-    
-    // ticket += `LA MAQUILA\n\n`;
-    // ticket += `______\n\n`;
-    
     ticket += `Mesa: ${orderData.tableNumber}\n`;
-    // ticket += `Personas: ${orderData.customerCount}\n`;
     ticket += `Mesero: ${orderData.waiter || 'Sistema'}\n`;
     ticket += `______\n\n`;
     
-    // Productos con formato ajustado para impresora térmica
-    const maxNameLength = 16; // Más corto para 58mm
+    const maxNameLength = 16;
     const maxPriceLength = 8;
     
     orderData.items.forEach(item => {
@@ -430,20 +521,19 @@ class BrowserPrintService {
     return ticket;
   }
 
+  // MODIFICADO: Ticket de COCINA SIN nombres de comensales
   private generateKitchenTicket(orderData: OrderDataForPrinting, kitchenItems: PrintItem[]): string {
     let ticket = '';
     const { date, time } = this.formatDateTime(orderData.createdAt);
-    const groupedItems = this.groupItems(kitchenItems);
-        ticket += `           LA MAQUILA\n`;
+    
+    ticket += `           LA MAQUILA\n`;
     ticket += `______\n\n`;
     ticket += `FECHA: ${date}\n`;
     ticket += `HORA: ${time}\n`;
     ticket += `Mesa: ${orderData.tableNumber}\n`;
-    // ticket += `Personas: ${orderData.customerCount}\n`;
     if (orderData.waiter) {
       ticket += `Mesero: ${orderData.waiter}\n`;
     }
-    // ticket += `Pedido #: ${orderData.orderId}\n\n`;
     ticket += `______\n\n`;
     
     if (orderData.orderType === 'take_away') {
@@ -454,6 +544,12 @@ class BrowserPrintService {
     
     ticket += `______\n\n`;
     
+    // AGREGAR "COCINA" AL INICIO DE LA LISTA
+    ticket += `COCINA\n`;
+    ticket += `______\n\n`;
+    
+    // Agrupar normalmente SIN nombres de comensales
+    const groupedItems = this.groupItems(kitchenItems);
     groupedItems.forEach(item => {
       ticket += `[${item.quantity}x] ${item.name}\n`;
       if (item.notes) {
@@ -462,38 +558,33 @@ class BrowserPrintService {
     });
     
     ticket += `\n______\n\n`;
-    // ticket += `Total Items: ${kitchenItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
     
     if (kitchenItems.some(item => item.notes)) {
-      ticket += `\n⚠️ Notas especiales\n`;
+      ticket += `⚠️ Notas especiales\n`;
     }
-    
-    // ticket += `\n______\n\n`;
-    // ticket += `LISTO PARA COCINAR\n\n`;
-    // ticket += `______\n`;
     
     return ticket;
   }
 
+  // MODIFICADO: Ticket de BARRA FRÍA SIN nombres de comensales
   private generateColdBarTicket(orderData: OrderDataForPrinting, coldBarItems: PrintItem[]): string {
     let ticket = '';
     const { date, time } = this.formatDateTime(orderData.createdAt);
-    const groupedItems = this.groupItems(coldBarItems);
     
-        ticket += `           LA MAQUILA\n`;
+    ticket += `           LA MAQUILA\n`;
     ticket += `______\n\n`;
     ticket += `FECHA: ${date}\n`;
     ticket += `HORA: ${time}\n`;
     ticket += `Mesa: ${orderData.tableNumber}\n`;
     ticket += `______\n\n`;
-    ticket += `BARRA FRÍA\n\n`;
+    
+    // AGREGAR "BARRA FRÍA" AL INICIO DE LA LISTA
+    ticket += `BARRA FRÍA\n`;
     ticket += `______\n\n`;
-    ticket += `Mesa: ${orderData.tableNumber}\n`;
-    // ticket += `Personas: ${orderData.customerCount}\n`;
+    
     if (orderData.waiter) {
       ticket += `Mesero: ${orderData.waiter}\n`;
     }
-    // ticket += `Pedido #: ${orderData.orderId}\n\n`;
     ticket += `______\n\n`;
     
     if (orderData.orderType === 'take_away') {
@@ -504,6 +595,8 @@ class BrowserPrintService {
     
     ticket += `______\n\n`;
     
+    // Agrupar normalmente SIN nombres de comensales
+    const groupedItems = this.groupItems(coldBarItems);
     groupedItems.forEach(item => {
       ticket += `[${item.quantity}x] ${item.name}\n`;
       if (item.notes) {
@@ -512,15 +605,10 @@ class BrowserPrintService {
     });
     
     ticket += `\n______\n\n`;
-    // ticket += `Total Items: ${coldBarItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
     
     if (coldBarItems.some(item => item.notes)) {
-      ticket += `\n⚠️ Notas especiales\n`;
+      ticket += `⚠️ Notas especiales\n`;
     }
-    
-    // ticket += `\n______\n\n`;
-    // ticket += `LISTO PARA PREPARAR\n\n`;
-    // ticket += `______\n`;
     
     return ticket;
   }
@@ -528,7 +616,6 @@ class BrowserPrintService {
   private generateCustomTicket(orderData: OrderDataForPrinting): string {
     let ticket = '';
     const { date, time } = this.formatDateTime(orderData.createdAt);
-    const groupedItems = this.groupItems(orderData.items);
     
     ticket += `FECHA: ${date}\n`;
     ticket += `HORA: ${time}\n\n`;
@@ -539,7 +626,7 @@ class BrowserPrintService {
       ticket += `COMER AQUI\n\n`;
     }
     
-    groupedItems.forEach(item => {
+    this.groupItems(orderData.items).forEach(item => {
       ticket += `${item.quantity} ${item.name}\n`;
     });
     
@@ -645,7 +732,6 @@ class BrowserPrintService {
     }
     ticket += `______\n\n`;
     
-    // Formato ajustado para 58mm
     const maxNameLength = 16;
     const maxPriceLength = 8;
     
@@ -686,7 +772,6 @@ class BrowserPrintService {
     }
     ticket += `______\n\n`;
     
-    // Formato ajustado para 58mm
     const maxNameLength = 16;
     const maxPriceLength = 8;
     

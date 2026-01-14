@@ -14,7 +14,7 @@ import NotificationsTab from "./components/NotificationsTab";
 import TablesTab from "./components/TablesTab";
 import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
-import { browserPrintService } from "@/app/lib/printing/browserPrintService"; // IMPORTACIÓN NUEVA
+import { browserPrintService } from "@/app/lib/printing/browserPrintService";
 
 // Modal de confirmación con contraseña - SIMPLIFICADO
 function PasswordModal({
@@ -161,11 +161,10 @@ export default function WaiterDashboard() {
   const [attendedNotifications, setAttendedNotifications] = useState<
     Set<string>
   >(new Set());
-  const [printing, setPrinting] = useState<string | null>(null); // ESTADO NUEVO para controlar impresión
+  const [printing, setPrinting] = useState<string | null>(null);
 
   // Estado para el filtro FCFS (notificaciones)
   const [fcfsFilter, setFcfsFilter] = useState(() => {
-    // Cargar desde localStorage
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_fcfs_filter");
       return saved === "true";
@@ -175,7 +174,6 @@ export default function WaiterDashboard() {
 
   // Estado para ordenar mesas
   const [tablesOrder, setTablesOrder] = useState<string>(() => {
-    // Cargar desde localStorage
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_tables_order");
       return saved || "number";
@@ -295,7 +293,6 @@ export default function WaiterDashboard() {
     const newFcfsState = !fcfsFilter;
     setFcfsFilter(newFcfsState);
 
-    // Aplicar/remover filtro inmediatamente
     if (notifications.length > 0 && newFcfsState) {
       const filteredNotifications = applyFcfsFilter(notifications);
       setNotifications(filteredNotifications);
@@ -529,7 +526,7 @@ export default function WaiterDashboard() {
     }
   };
 
-  // FUNCIÓN 1: Preparar datos para productos ORDENADOS (solo status "ordered")
+  // FUNCIÓN MODIFICADA: Preparar datos para productos CON NOMBRES DE COMENSALES
   const prepareOrderForPrinting = async (
     table: TableWithOrder,
     onlyOrdered: boolean = true
@@ -537,14 +534,13 @@ export default function WaiterDashboard() {
     const orderItems: any[] = [];
     const productIds = new Set<number>();
 
+    // Recolectar todos los product_ids únicos
     table.orders.forEach((order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
         order.order_items.forEach((item: any) => {
           const cancelledQty = item.cancelled_quantity || 0;
           const activeQuantity = item.quantity - cancelledQty;
 
-          // FILTRO: Si onlyOrdered es true, solo procesar items "ordered"
-          // Si es false, procesar TODOS los items activos (no cancelled)
           const shouldInclude = onlyOrdered
             ? activeQuantity > 0 && item.status === "ordered" && item.product_id
             : activeQuantity > 0 &&
@@ -592,6 +588,7 @@ export default function WaiterDashboard() {
       console.error("Error obteniendo categorías de productos:", error);
     }
 
+    // Crear los items con información del comensal
     table.orders.forEach((order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
         order.order_items.forEach((item: any) => {
@@ -609,12 +606,18 @@ export default function WaiterDashboard() {
             const categoryType =
               browserPrintService.determineCategoryType(productCategory);
 
+            // Obtener el nombre del comensal
+            // Primero del item, luego de la orden, luego valor por defecto
+            const customerName =
+              item.customer_name || order.customer_name || "Cliente";
+
             orderItems.push({
               name: item.product_name || "Producto",
               quantity: activeQuantity,
               price: item.price || 0,
               category_type: categoryType,
               notes: item.notes || "",
+              customerName: customerName, // NOMBRE DEL COMENSAL
             });
           }
         });
@@ -656,10 +659,16 @@ export default function WaiterDashboard() {
     return orderData;
   };
 
-  // FUNCIÓN MODIFICADA: Manejar impresión de pedido
+  // FUNCIÓN MODIFICADA: Manejar impresión de pedido CON OPCIONES DE COMENSALES
   const handlePrintOrder = async (
     tableId: number,
-    printType: "all" | "kitchen" | "bar" | "ticket" | "final-ticket"
+    printType:
+      | "all"
+      | "kitchen"
+      | "bar"
+      | "ticket"
+      | "final-ticket"
+      | "comensales"
   ) => {
     const table = tables.find((t) => t.id === tableId);
     if (!table) {
@@ -675,33 +684,67 @@ export default function WaiterDashboard() {
 
       switch (printType) {
         case "all":
-          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          orderData = await prepareOrderForPrinting(table, true);
           result = await browserPrintService.printAllTickets(orderData);
           break;
 
         case "kitchen":
-          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          orderData = await prepareOrderForPrinting(table, true);
           result = await browserPrintService.printKitchenTicket(orderData);
           break;
 
         case "bar":
-          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          orderData = await prepareOrderForPrinting(table, true);
           result = await browserPrintService.printColdBarTicket(orderData);
           break;
 
         case "ticket":
-          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
-          result = await browserPrintService.printTicket(orderData);
+          orderData = await prepareOrderForPrinting(table, true);
+          // Verificar si hay nombres de comensales
+          const hasCustomerNames = orderData.items.some(
+            (item) => item.customerName && item.customerName !== "Cliente"
+          );
+
+          if (hasCustomerNames) {
+            // Usar el método que agrupa por comensal
+            result = await browserPrintService.printTicketWithCustomers(
+              orderData
+            );
+          } else {
+            // Usar el método normal
+            result = await browserPrintService.printTicket(orderData);
+          }
+          break;
+
+        case "comensales":
+          orderData = await prepareOrderForPrinting(table, true);
+          // Siempre usar el método que agrupa por comensal
+          result = await browserPrintService.printTicketWithCustomers(
+            orderData
+          );
           break;
 
         case "final-ticket":
-          orderData = await prepareOrderForPrinting(table, false); // TODOS activos
+          orderData = await prepareOrderForPrinting(table, false);
           if (orderData.items.length === 0) {
             alert("No hay productos activos para generar el ticket final");
             setPrinting(null);
             return;
           }
-          result = await browserPrintService.printFinalTicket(orderData);
+
+          // Verificar si hay nombres de comensales para ticket final
+          const hasCustomerNamesFinal = orderData.items.some(
+            (item) => item.customerName && item.customerName !== "Cliente"
+          );
+
+          if (hasCustomerNamesFinal) {
+            // Usar el método que agrupa por comensal para ticket final
+            result = await browserPrintService.printTicketWithCustomers(
+              orderData
+            );
+          } else {
+            result = await browserPrintService.printFinalTicket(orderData);
+          }
           break;
       }
 
@@ -757,7 +800,6 @@ export default function WaiterDashboard() {
       confirmationMessage += `\n\n${cancelledItemsCount} producto(s) cancelado(s) excluidos.`;
     }
 
-    // Agregar opción de imprimir ticket final
     const printTicket = confirm(
       confirmationMessage + `\n\n¿Desea imprimir el ticket final?`
     );
@@ -768,18 +810,25 @@ export default function WaiterDashboard() {
 
     setProcessing(`cobrar-${tableId}`);
     try {
-      // Primero cobrar la mesa
       await waiterService.freeTableAndClean(
         tableId,
         tableNumber,
         paymentMethod
       );
 
-      // Luego imprimir el ticket final si el usuario confirmó
       if (table) {
-        const orderData = await prepareOrderForPrinting(table, false); // TODOS los activos para ticket final
+        const orderData = await prepareOrderForPrinting(table, false);
         if (orderData.items.length > 0) {
-          await browserPrintService.printFinalTicket(orderData);
+          // Verificar si hay nombres de comensales para ticket final
+          const hasCustomerNames = orderData.items.some(
+            (item) => item.customerName && item.customerName !== "Cliente"
+          );
+
+          if (hasCustomerNames) {
+            await browserPrintService.printTicketWithCustomers(orderData);
+          } else {
+            await browserPrintService.printFinalTicket(orderData);
+          }
         }
       }
 
@@ -822,7 +871,6 @@ export default function WaiterDashboard() {
             const cancelledQty = item.cancelled_quantity || 0;
             const activeQuantity = item.quantity - cancelledQty;
 
-            // Solo sumar items con status "ordered" para coincidir con impresión
             if (activeQuantity > 0 && item.status === "ordered") {
               return orderSum + item.price * activeQuantity;
             }

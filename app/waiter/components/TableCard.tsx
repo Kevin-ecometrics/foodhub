@@ -16,7 +16,13 @@ interface TableCardProps {
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   onPrintOrder: (
     tableId: number,
-    printType: "all" | "kitchen" | "bar" | "ticket" | "final-ticket" // AGREGADO "final-ticket"
+    printType:
+      | "all"
+      | "kitchen"
+      | "bar"
+      | "ticket"
+      | "final-ticket"
+      | "comensales"
   ) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
@@ -42,17 +48,18 @@ export default function TableCard({
   const tableTotal = calculateTableTotal(table);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [productCategories, setProductCategories] = useState<{
-    // Para productos ORDENADOS (solo status "ordered")
     hasKitchenItems: boolean;
     hasColdBarItems: boolean;
     hasAnyItems: boolean;
     orderedItemsCount: number;
     orderedItemsTotal: number;
 
-    // Para productos ACTIVOS (todos los no cancelados)
     hasAnyActiveItems: boolean;
     activeItemsCount: number;
     activeItemsTotal: number;
+
+    // Nuevo: Verificar si hay nombres de comensales
+    hasCustomerNames: boolean;
   }>({
     hasKitchenItems: false,
     hasColdBarItems: false,
@@ -63,6 +70,8 @@ export default function TableCard({
     hasAnyActiveItems: false,
     activeItemsCount: 0,
     activeItemsTotal: 0,
+
+    hasCustomerNames: false,
   });
 
   // Analizar los productos para determinar qué botones mostrar
@@ -73,12 +82,13 @@ export default function TableCard({
     let orderedItemsCount = 0;
     let orderedItemsTotal = 0;
 
-    // Nuevas variables para productos activos (todos los status excepto cancelled)
     let hasAnyActive = false;
     let activeItemsCount = 0;
     let activeItemsTotal = 0;
 
-    // Función para determinar si una categoría es de cocina o barra
+    // Nuevo: Verificar si hay nombres de comensales
+    let hasCustomerNames = false;
+
     const isColdBarCategory = (category: string): boolean => {
       const coldBarCategories = [
         "bebidas",
@@ -90,9 +100,8 @@ export default function TableCard({
       return coldBarCategories.includes(category.trim().toLowerCase());
     };
 
-    // Recolectar todos los product_ids únicos
-    const productIdsForOrdered = new Set<number>(); // Solo "ordered"
-    const productIdsForActive = new Set<number>(); // Todos los activos (excepto cancelled)
+    const productIdsForOrdered = new Set<number>();
+    const productIdsForActive = new Set<number>();
 
     table.orders.forEach((order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
@@ -101,10 +110,16 @@ export default function TableCard({
           const activeQuantity = item.quantity - cancelledQty;
           const itemTotal = (item.price || 0) * activeQuantity;
 
-          // PARA PRODUCTOS ACTIVOS (todos los status excepto cancelled)
+          // Verificar si el item tiene nombre de comensal
+          const customerName = item.customer_name || order.customer_name;
+          if (customerName && customerName !== "Cliente") {
+            hasCustomerNames = true;
+          }
+
+          // PARA PRODUCTOS ACTIVOS
           if (
             activeQuantity > 0 &&
-            item.status !== "cancelled" && // <- Cualquier status excepto cancelled
+            item.status !== "cancelled" &&
             item.product_id
           ) {
             productIdsForActive.add(item.product_id);
@@ -113,10 +128,10 @@ export default function TableCard({
             activeItemsTotal += itemTotal;
           }
 
-          // PARA PRODUCTOS ORDENADOS (solo status "ordered")
+          // PARA PRODUCTOS ORDENADOS
           if (
             activeQuantity > 0 &&
-            item.status === "ordered" && // <- SOLO "ordered"
+            item.status === "ordered" &&
             item.product_id
           ) {
             productIdsForOrdered.add(item.product_id);
@@ -128,7 +143,6 @@ export default function TableCard({
       }
     });
 
-    // Función para consultar categorías de productos
     const checkProductCategories = async (
       productIds: Set<number>,
       isForOrdered: boolean
@@ -149,19 +163,16 @@ export default function TableCard({
             const isColdBar = isColdBarCategory(product.category || "");
 
             if (isForOrdered) {
-              // Solo para productos "ordered"
               if (isColdBar) {
                 hasColdBar = true;
               } else {
                 hasKitchen = true;
               }
             }
-            // Para productos activos no necesitamos diferenciar cocina/barra
           });
         }
       } catch (error) {
         console.error("Error verificando categorías:", error);
-        // Si hay error, asumimos que hay ambos tipos para seguridad
         if (isForOrdered) {
           hasKitchen = true;
           hasColdBar = true;
@@ -169,10 +180,9 @@ export default function TableCard({
       }
     };
 
-    // Consultar categorías para ambos conjuntos de productos
     const promises = [
-      checkProductCategories(productIdsForOrdered, true), // Para ordered
-      checkProductCategories(productIdsForActive, false), // Para active (sin diferenciar)
+      checkProductCategories(productIdsForOrdered, true),
+      checkProductCategories(productIdsForActive, false),
     ];
 
     Promise.all(promises).then(() => {
@@ -186,6 +196,8 @@ export default function TableCard({
         hasAnyActiveItems: hasAnyActive,
         activeItemsCount,
         activeItemsTotal,
+
+        hasCustomerNames,
       });
     });
   }, [table]);
@@ -234,7 +246,13 @@ export default function TableCard({
 
   // Función para manejar impresión
   const handlePrint = (
-    printType: "all" | "kitchen" | "bar" | "ticket" | "final-ticket"
+    printType:
+      | "all"
+      | "kitchen"
+      | "bar"
+      | "ticket"
+      | "final-ticket"
+      | "comensales"
   ) => {
     // Para ticket final (todos los productos activos)
     if (printType === "final-ticket") {
@@ -247,13 +265,32 @@ export default function TableCard({
       return;
     }
 
+    // Para tickets con nombres de comensales
+    if (printType === "comensales") {
+      if (!productCategories.hasAnyItems) {
+        alert("No hay productos ordenados para imprimir en esta mesa");
+        return;
+      }
+
+      if (!productCategories.hasCustomerNames) {
+        const confirmPrint = confirm(
+          "No se detectaron nombres específicos de comensales. " +
+            "Se mostrará 'Cliente' en el ticket. ¿Desea continuar?"
+        );
+        if (!confirmPrint) return;
+      }
+
+      onPrintOrder(table.id, "comensales");
+      setShowPrintOptions(false);
+      return;
+    }
+
     // Para los otros tipos (solo productos "ordered")
     if (!productCategories.hasAnyItems) {
       alert("No hay productos ordenados para imprimir en esta mesa");
       return;
     }
 
-    // Validar si hay productos del tipo solicitado
     if (printType === "kitchen" && !productCategories.hasKitchenItems) {
       alert("No hay productos de cocina ordenados para imprimir");
       return;
@@ -290,7 +327,6 @@ export default function TableCard({
           : "border-l-4 border-l-gray-300"
       }`}
     >
-      {/* Información adicional de tiempo de ocupación */}
       {occupationTime && (
         <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
           <div className="flex items-center justify-between text-sm">
@@ -337,119 +373,20 @@ export default function TableCard({
       {table.status === "occupied" && (
         <div className="mt-4 pt-4">
           <div className="flex flex-col gap-3">
-            {/* SECCIÓN 1: IMPRIMIR PRODUCTOS ORDENADOS (STATUS "ordered") */}
+            {/* SECCIÓN 1: IMPRIMIR PRODUCTOS ORDENADOS */}
             {productCategories.hasAnyItems && (
               <>
-                <div className="mb-1">
-                  {/* <h4 className="text-xs font-semibold text-gray-700 mb-2">
-                    📋 Productos Ordenados (para cocina/barra)
-                  </h4> */}
-
-                  {/* Indicadores de productos ordenados listos para imprimir */}
-                  {/* <div className="text-xs text-gray-600 mb-2 flex flex-wrap gap-2">
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                      {productCategories.orderedItemsCount} producto(s)
-                      ordenado(s)
-                    </span>
-
-                    {productCategories.hasKitchenItems && (
-                      <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                        🍽️ Comida para cocina
-                      </span>
-                    )}
-                    {productCategories.hasColdBarItems && (
-                      <span className="bg-cyan-100 text-cyan-800 px-2 py-1 rounded">
-                        🥤 Bebidas para barra
-                      </span>
-                    )}
-                  </div> */}
-
-                  {/* Botones de impresión para productos ordenados */}
-                  <div className="flex gap-2">
-                    {/* Botón Cocina */}
-                    {productCategories.hasKitchenItems && (
-                      <button
-                        onClick={() => handlePrint("kitchen")}
-                        disabled={isPrinting("kitchen")}
-                        className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
-                        title="Imprimir solo cocina (productos ordenados)"
-                      >
-                        {isPrinting("kitchen") ? (
-                          <svg
-                            className="animate-spin h-4 w-4 text-white"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                        ) : (
-                          <>
-                            <span>👨‍🍳</span>
-                            <span className="hidden sm:inline">Cocina</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Botón Barra Fría */}
-                    {productCategories.hasColdBarItems && (
-                      <button
-                        onClick={() => handlePrint("bar")}
-                        disabled={isPrinting("bar")}
-                        className="flex-1 px-3 py-2 bg-cyan-500 text-white rounded-md hover:bg-cyan-600 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
-                        title="Imprimir solo barra fría (productos ordenados)"
-                      >
-                        {isPrinting("bar") ? (
-                          <svg
-                            className="animate-spin h-4 w-4 text-white"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                        ) : (
-                          <>
-                            <span>🥤</span>
-                            <span className="hidden sm:inline">Barra</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Botón Ticket (productos ordenados) */}
-                    {/* <button
-                      onClick={() => handlePrint("ticket")}
-                      disabled={isPrinting("ticket")}
-                      className="flex-1 px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
-                      title="Imprimir ticket (solo productos ordenados)"
+                {/* Botones de impresión para productos ordenados */}
+                <div className="flex gap-2">
+                  {/* Botón Cocina */}
+                  {productCategories.hasKitchenItems && (
+                    <button
+                      onClick={() => handlePrint("kitchen")}
+                      disabled={isPrinting("kitchen")}
+                      className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                      title="Imprimir solo cocina (productos ordenados)"
                     >
-                      {isPrinting("ticket") ? (
+                      {isPrinting("kitchen") ? (
                         <svg
                           className="animate-spin h-4 w-4 text-white"
                           xmlns="http://www.w3.org/2000/svg"
@@ -472,59 +409,96 @@ export default function TableCard({
                         </svg>
                       ) : (
                         <>
-                          <span>🧾</span>
-                          <span className="hidden sm:inline">Ticket</span>
+                          <span>👨‍🍳</span>
+                          <span className="hidden sm:inline">Cocina</span>
                         </>
                       )}
-                    </button> */}
-                  </div>
+                    </button>
+                  )}
 
-                  {/* Botón Imprimir Todo (solo productos ordenados) */}
-                  {/* {productCategories.hasKitchenItems &&
-                    productCategories.hasColdBarItems && (
-                      <button
-                        onClick={() => handlePrint("all")}
-                        disabled={isPrinting("all")}
-                        className="w-full px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 text-sm flex items-center justify-center gap-1 mt-2"
-                        title="Imprimir todos los tickets (solo productos ordenados)"
-                      >
-                        {isPrinting("all") ? (
-                          <>
-                            <svg
-                              className="animate-spin h-4 w-4 text-white"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            <span>Generando todos los tickets...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>🖨️</span>
-                            <span>Imprimir Todo (Cocina + Barra + Ticket)</span>
-                          </>
-                        )}
-                      </button>
-                    )} */}
+                  {/* Botón Barra Fría */}
+                  {productCategories.hasColdBarItems && (
+                    <button
+                      onClick={() => handlePrint("bar")}
+                      disabled={isPrinting("bar")}
+                      className="flex-1 px-3 py-2 bg-cyan-500 text-white rounded-md hover:bg-cyan-600 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                      title="Imprimir solo barra fría (productos ordenados)"
+                    >
+                      {isPrinting("bar") ? (
+                        <svg
+                          className="animate-spin h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      ) : (
+                        <>
+                          <span>🥤</span>
+                          <span className="hidden sm:inline">Barra</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
+
+                {/* NUEVO: Botón para imprimir ticket con nombres de comensales */}
+                {/* {productCategories.hasCustomerNames && (
+                  <button
+                    onClick={() => handlePrint("comensales")}
+                    disabled={isPrinting("comensales")}
+                    className="w-full px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 mt-2"
+                    title="Imprimir ticket con nombres de comensales"
+                  >
+                    {isPrinting("comensales") ? (
+                      <>
+                        <svg
+                          className="animate-spin h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        <span>Generando ticket con comensales...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>👥</span>
+                        <span>Ticket con Nombres de Comensales</span>
+                      </>
+                    )}
+                  </button>
+                )} */}
               </>
             )}
 
-            {/* SECCIÓN 2: IMPRIMIR TICKET FINAL COMPLETO (TODOS LOS PRODUCTOS ACTIVOS) */}
+            {/* SECCIÓN 2: IMPRIMIR TICKET FINAL COMPLETO */}
             {productCategories.hasAnyActiveItems && (
               <div className="mt-2 pt-3 border-t border-gray-300">
                 {/* Botón para imprimir Ticket Final Completo */}
@@ -532,7 +506,7 @@ export default function TableCard({
                   onClick={() => handlePrint("final-ticket")}
                   disabled={isPrinting("final-ticket")}
                   className="w-full px-3 py-3 bg-blue-500 text-white rounded-xl disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 shadow-md"
-                  title="Imprimir ticket final completo (todos los productos activos, sin importar status)"
+                  title="Imprimir ticket final completo (todos los productos activos)"
                 >
                   {isPrinting("final-ticket") ? (
                     <>
@@ -562,9 +536,6 @@ export default function TableCard({
                     <>
                       <span className="text-lg">🧾</span>
                       <span>Imprimir Ticket</span>
-                      {/* <span className="text-xs bg-white/30 px-2 py-1 rounded-full">
-                        ${productCategories.activeItemsTotal.toFixed(2)}
-                      </span> */}
                     </>
                   )}
                 </button>

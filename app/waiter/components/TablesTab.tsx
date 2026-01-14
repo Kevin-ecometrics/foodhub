@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import TableCard from "./TableCard";
 import { useState } from "react";
@@ -6,7 +7,7 @@ import { FaDollarSign, FaSortNumericDown, FaClock } from "react-icons/fa";
 interface TablesTabProps {
   tables: TableWithOrder[];
   processing: string | null;
-  printing: string | null; // NUEVA PROP
+  printing: string | null;
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
@@ -15,21 +16,27 @@ interface TablesTabProps {
   tablesOrder: string;
   onPrintOrder: (
     tableId: number,
-    printType: "all" | "kitchen" | "bar" | "ticket" | "final-ticket" // AGREGADO "final-ticket"
-  ) => void; // NUEVA PROP
+    printType:
+      | "all"
+      | "kitchen"
+      | "bar"
+      | "ticket"
+      | "final-ticket"
+      | "comensales"
+  ) => void;
 }
 
 export default function TablesTab({
   tables,
   processing,
-  printing, // NUEVO
+  printing,
   onUpdateItemStatus,
   onCancelItem,
   onCobrarMesa,
   calculateTableTotal,
   notifications,
   tablesOrder,
-  onPrintOrder, // NUEVO
+  onPrintOrder,
 }: TablesTabProps) {
   const totalGeneral = tables.reduce(
     (sum, table) => sum + calculateTableTotal(table),
@@ -68,10 +75,9 @@ export default function TablesTab({
       if (!timeA) return 1;
       if (!timeB) return -1;
 
-      return timeA.getTime() - timeB.getTime(); // Más antiguas primero
+      return timeA.getTime() - timeB.getTime();
     });
   } else {
-    // Orden por número (default)
     sortedTables.sort((a, b) => a.number - b.number);
   }
 
@@ -91,7 +97,7 @@ export default function TablesTab({
     return `${diffHours} h`;
   };
 
-  // Encontrar la mesa más antigua para destacar (solo si ordenamos por ocupación)
+  // Encontrar la mesa más antigua para destacar
   const oldestTableIndex =
     tablesOrder === "occupation"
       ? sortedTables.findIndex(
@@ -109,7 +115,6 @@ export default function TablesTab({
         </h2>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {/* Estadísticas */}
           <div className="text-sm text-gray-600">
             <span className="bg-green-100 text-green-800 px-2 py-1 rounded mr-2">
               {occupiedTablesCount} mesas ocupadas
@@ -139,7 +144,6 @@ export default function TablesTab({
 
           return (
             <div key={table.id} className="relative">
-              {/* Badge de posición solo cuando ordenamos por ocupación */}
               {tablesOrder === "occupation" &&
                 table.status === "occupied" &&
                 index < 3 && (
@@ -161,11 +165,11 @@ export default function TablesTab({
               <TableCard
                 table={table}
                 processing={processing}
-                printing={printing} // Pasar prop de impresión
+                printing={printing}
                 onUpdateItemStatus={onUpdateItemStatus}
                 onCancelItem={onCancelItem}
                 onCobrarMesa={onCobrarMesa}
-                onPrintOrder={onPrintOrder} // Pasar función de impresión
+                onPrintOrder={onPrintOrder}
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
                 occupationTime={occupationTime}
