@@ -6,23 +6,30 @@ import { FaDollarSign, FaSortNumericDown, FaClock } from "react-icons/fa";
 interface TablesTabProps {
   tables: TableWithOrder[];
   processing: string | null;
+  printing: string | null; // NUEVA PROP
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
-  tablesOrder: string; // Nueva prop
+  tablesOrder: string;
+  onPrintOrder: (
+    tableId: number,
+    printType: "all" | "kitchen" | "bar" | "ticket" | "final-ticket" // AGREGADO "final-ticket"
+  ) => void; // NUEVA PROP
 }
 
 export default function TablesTab({
   tables,
   processing,
+  printing, // NUEVO
   onUpdateItemStatus,
   onCancelItem,
   onCobrarMesa,
   calculateTableTotal,
   notifications,
-  tablesOrder, // Recibir el orden
+  tablesOrder,
+  onPrintOrder, // NUEVO
 }: TablesTabProps) {
   const totalGeneral = tables.reduce(
     (sum, table) => sum + calculateTableTotal(table),
@@ -154,9 +161,11 @@ export default function TablesTab({
               <TableCard
                 table={table}
                 processing={processing}
+                printing={printing} // Pasar prop de impresión
                 onUpdateItemStatus={onUpdateItemStatus}
                 onCancelItem={onCancelItem}
                 onCobrarMesa={onCobrarMesa}
+                onPrintOrder={onPrintOrder} // Pasar función de impresión
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
                 occupationTime={occupationTime}

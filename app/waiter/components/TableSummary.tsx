@@ -31,7 +31,7 @@ export default function TableSummary({
             isHighlighted ? "text-red-700" : "text-green-600"
           }`}
         >
-          ${tableTotal.toFixed(2)}
+          ${tableTotal}
         </span>
       </div>
       <p className="text-xs text-gray-500 mt-1 text-center">

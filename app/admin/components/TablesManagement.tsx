@@ -467,11 +467,18 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
     tableNumber?: number
   ): boolean => {
     try {
+      const currentDate = new Date().toISOString().split("T")[0];
+
+      // Preparar variables para el script
+      const qrImageUrl = imageUrl;
+      const mesaNumero = tableNumber || "";
+      const fechaActual = currentDate;
+
       const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>QR Code - Mesa ${tableNumber || ""}</title>
+        <title>QR Code - Mesa ${mesaNumero}</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
@@ -492,23 +499,24 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
           .qr-container {
             text-align: center;
             background: white;
-            padding: 30px;
+            padding: 40px;
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            max-width: 400px;
+            max-width: 450px;
             width: 100%;
           }
           .header {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
           }
           .header h1 {
             color: #333;
-            font-size: 24px;
-            margin-bottom: 5px;
+            font-size: 28px;
+            margin-bottom: 8px;
           }
           .header p {
             color: #666;
             font-size: 16px;
+            margin-bottom: 5px;
           }
           .qr-image {
             width: 100%;
@@ -516,37 +524,49 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
             height: auto;
             border: 2px solid #f0f0f0;
             border-radius: 10px;
-            margin: 0 auto;
+            margin: 0 auto 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
           }
           .instruction {
             margin-top: 20px;
             color: #666;
             font-size: 14px;
             line-height: 1.5;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
           }
           .table-number {
             background: #4CAF50;
             color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
             font-weight: bold;
             display: inline-block;
             margin-bottom: 15px;
+            font-size: 18px;
           }
           .actions {
-            margin-top: 20px;
+            margin-top: 25px;
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: center;
+            flex-wrap: wrap;
           }
           .btn {
-            padding: 10px 20px;
+            padding: 12px 24px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 600;
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 140px;
           }
           .btn-download {
             background: #2196F3;
@@ -554,6 +574,15 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
           }
           .btn-download:hover {
             background: #1976D2;
+            transform: translateY(-2px);
+          }
+          .btn-download-complete {
+            background: #4CAF50;
+            color: white;
+          }
+          .btn-download-complete:hover {
+            background: #388E3C;
+            transform: translateY(-2px);
           }
           .btn-close {
             background: #f5f5f5;
@@ -561,6 +590,18 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
           }
           .btn-close:hover {
             background: #e0e0e0;
+            transform: translateY(-2px);
+          }
+          .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 20px 0;
+          }
+          .instructions-title {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
           }
         </style>
       </head>
@@ -568,44 +609,296 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         <div class="qr-container">
           <div class="header">
             ${
-              tableNumber
-                ? `<div class="table-number">Mesa ${tableNumber}</div>`
+              mesaNumero
+                ? `<div class="table-number">Mesa ${mesaNumero}</div>`
                 : ""
             }
             <h1>Código QR</h1>
             <p>Para pedir desde tu mesa</p>
           </div>
           
-          <img src="${imageUrl}" alt="QR Code" class="qr-image" />
+          <div class="divider"></div>
+          
+          <img src="${qrImageUrl}" alt="QR Code" class="qr-image" />
           
           <div class="instruction">
-            <strong>¿Cómo usar?</strong><br>
+            <div class="instructions-title">¿Cómo usar?</div>
             1. Abre la cámara de tu teléfono<br>
             2. Escanea el código QR<br>
             3. Realiza tu pedido directamente
           </div>
           
           <div class="actions">
-            <button class="btn btn-download" onclick="downloadQR()">Descargar QR</button>
-            <button class="btn btn-close" onclick="window.close()">Cerrar</button>
+            <button class="btn btn-download" onclick="downloadQR()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 5px;">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+              Solo QR
+            </button>
+            <button class="btn btn-download-complete" onclick="generate46Design()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 5px;">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+              4x6 Design
+            </button>
+            <button class="btn btn-close" onclick="window.close()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 5px;">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+              Cerrar
+            </button>
           </div>
         </div>
 
         <script>
+          // Variables disponibles para las funciones
+          const qrImageUrl = "${qrImageUrl}";
+          const mesaNumero = "${mesaNumero}";
+          const fechaActual = "${fechaActual}";
+          
           function downloadQR() {
-            const link = document.createElement('a');
-            link.href = '${imageUrl}';
-            link.download = 'qr-mesa-${tableNumber || "menu"}-${
-        new Date().toISOString().split("T")[0]
-      }.png';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            try {
+              console.log('Descargando QR:', qrImageUrl);
+              const link = document.createElement('a');
+              link.href = qrImageUrl;
+              link.download = 'qr-mesa-' + (mesaNumero || 'menu') + '-' + fechaActual + '.png';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            } catch (error) {
+              console.error('Error descargando QR:', error);
+              alert('Error al descargar. Intenta nuevamente.');
+            }
           }
+          
+          function generate46Design() {
+            try {
+              console.log('Generando diseño 4x6 para mesa:', mesaNumero);
+              
+              // Crear el HTML del diseño 4x6
+              const designHTML = \`<!DOCTYPE html>
+              <html>
+              <head>
+                <title>QR 4x6 - Mesa \${mesaNumero}</title>
+                <style>
+                  @page {
+                    size: 6in 5in;
+                    margin: 0.1in;
+                  }
+                  
+                  * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                  }
+                  
+                  body {
+                    font-family: 'Arial', sans-serif;
+                    width: 5.8in;
+                    height: 3.8in;
+                    margin: 0;
+                    padding: 0.05in;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: white;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    color-adjust: exact;
+                  }
+                  
+                  .container {
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: space-around;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                  }
+                  
+                  .header {
+                    text-align: center;
+                    width: 100%;
+                  }
+                  
+                  .restaurant-name {
+                    color: #000000;
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin-bottom: 2px;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                  }
+                  
+                  .table-number {
+                    color: white;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    display: inline-block;
+                    margin: 3px 0;
+                    background-color: #000000;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    border: 2px solid #000000;
+                  }
+                  
+                  .qr-section {
+                    text-align: center;
+                    flex-grow: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    width: 100%;
+                  }
+                  
+                  .qr-image {
+                    width: 3.1in;
+                    height: 3.1in;
+                    margin: 5px auto;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    padding: 3px;
+                    background: white;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                  }
+                  
+                  .instructions {
+                    text-align: center;
+                    width: 100%;
+                    margin-top: 5px;
+                  }
+                  
+                  .instructions-title {
+                    color: #000000;
+                    font-size: 14px;
+                    font-weight: bold;
+                    margin-bottom: 3px;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                  }
+                  
+                  .instructions-list {
+                    color: #000000;
+                    font-size: 14px;
+                    line-height: 1.2;
+                    list-style: none;
+                    padding: 0;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                  }
+                  
+                  .instructions-list li {
+                    margin: 1px 0;
+                  }
+
+                  
+                  @media print {
+                    html, body {
+                      height: 100%;
+                      overflow: hidden;
+                      -webkit-print-color-adjust: exact;
+                      print-color-adjust: exact;
+                    }
+                    
+                    body {
+                      page-break-before: avoid;
+                      page-break-after: avoid;
+                      page-break-inside: avoid;
+                    }
+                    
+                    .table-number {
+                      background-color: #74AD4E !important;
+                      color: white !important;
+                      -webkit-print-color-adjust: exact !important;
+                      print-color-adjust: exact !important;
+                    }
+                  }
+                  
+                  @media screen {
+                    body {
+                      border: 1px solid #ccc;
+                      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                      margin: 20px auto;
+                    }
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <div class="table-number">MESA \${mesaNumero}</div>
+                  </div>
+                  
+                  <div class="qr-section">
+                    <img src="\${qrImageUrl}" alt="QR Code" class="qr-image" />
+                  </div>
+                  
+                  <div class="instructions">
+                    <div class="instructions-title">INSTRUCCIONES</div>
+                    <ul class="instructions-list">
+                      <li>1. Abre la cámara del teléfono</li>
+                      <li>2. Escanea el código QR</li>
+                      <li>3. Navega por el menú digital</li>
+                      <li>4. Selecciona y ordena</li>
+                      <li>5. Tu pedido llegará pronto</li>
+                    </ul>
+                  </div>
+                  
+
+                </div>
+                
+                <script>
+                  setTimeout(() => {
+                    window.print();
+                  }, 300);
+                  
+                  window.onafterprint = function() {
+                    setTimeout(() => {
+                      window.close();
+                    }, 800);
+                  };
+                <\\/script>
+              </body>
+              </html>\`;
+              
+              // Abrir nueva ventana
+              const designWindow = window.open('', '_blank', 'width=700,height=500');
+              
+              if (designWindow) {
+                designWindow.document.write(designHTML);
+                designWindow.document.close();
+                
+                // Enfocar la ventana
+                setTimeout(() => {
+                  designWindow.focus();
+                }, 100);
+              } else {
+                alert('Por favor permite ventanas emergentes');
+              }
+              
+            } catch (error) {
+              console.error('Error en generate46Design:', error);
+              alert('Error al generar diseño 4x6');
+            }
+          }
+          
+          // Verificar que las funciones estén disponibles
+          console.log('Script cargado correctamente');
+          console.log('qrImageUrl:', qrImageUrl);
+          console.log('mesaNumero:', mesaNumero);
         </script>
       </body>
       </html>
-    `;
+      `;
 
       const newWindow = window.open(
         "",

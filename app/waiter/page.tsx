@@ -14,6 +14,7 @@ import NotificationsTab from "./components/NotificationsTab";
 import TablesTab from "./components/TablesTab";
 import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
+import { browserPrintService } from "@/app/lib/printing/browserPrintService"; // IMPORTACIÓN NUEVA
 
 // Modal de confirmación con contraseña - SIMPLIFICADO
 function PasswordModal({
@@ -29,7 +30,7 @@ function PasswordModal({
   const [error, setError] = useState("");
 
   const handleConfirm = () => {
-    if (password === "restaurant") {
+    if (password === "lamaquila2025") {
       setError("");
       setPassword("");
       onConfirm();
@@ -160,6 +161,7 @@ export default function WaiterDashboard() {
   const [attendedNotifications, setAttendedNotifications] = useState<
     Set<string>
   >(new Set());
+  const [printing, setPrinting] = useState<string | null>(null); // ESTADO NUEVO para controlar impresión
 
   // Estado para el filtro FCFS (notificaciones)
   const [fcfsFilter, setFcfsFilter] = useState(() => {
@@ -527,6 +529,195 @@ export default function WaiterDashboard() {
     }
   };
 
+  // FUNCIÓN 1: Preparar datos para productos ORDENADOS (solo status "ordered")
+  const prepareOrderForPrinting = async (
+    table: TableWithOrder,
+    onlyOrdered: boolean = true
+  ) => {
+    const orderItems: any[] = [];
+    const productIds = new Set<number>();
+
+    table.orders.forEach((order) => {
+      if (order.order_items && Array.isArray(order.order_items)) {
+        order.order_items.forEach((item: any) => {
+          const cancelledQty = item.cancelled_quantity || 0;
+          const activeQuantity = item.quantity - cancelledQty;
+
+          // FILTRO: Si onlyOrdered es true, solo procesar items "ordered"
+          // Si es false, procesar TODOS los items activos (no cancelled)
+          const shouldInclude = onlyOrdered
+            ? activeQuantity > 0 && item.status === "ordered" && item.product_id
+            : activeQuantity > 0 &&
+              item.status !== "cancelled" &&
+              item.product_id;
+
+          if (shouldInclude) {
+            productIds.add(item.product_id);
+          }
+        });
+      }
+    });
+
+    if (productIds.size === 0) {
+      return {
+        orderId: table.orders[0]?.id || `MESA-${table.number}`,
+        tableNumber: table.number,
+        customerCount: table.capacity || 1,
+        area: table.location || "Interior",
+        items: [],
+        total: 0,
+        createdAt: table.orders[0]?.created_at || new Date().toISOString(),
+        waiter: table.orders[0]?.waiter_name || "Sistema",
+      };
+    }
+
+    const productsMap = new Map<number, { category: string }>();
+
+    try {
+      const { data: products, error } = (await supabase
+        .from("products")
+        .select("id, category")
+        .in("id", Array.from(productIds))) as any;
+
+      if (!error && products) {
+        (products as Array<{ id: number; category: string }>).forEach(
+          (product) => {
+            productsMap.set(product.id, {
+              category: product.category,
+            });
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error obteniendo categorías de productos:", error);
+    }
+
+    table.orders.forEach((order) => {
+      if (order.order_items && Array.isArray(order.order_items)) {
+        order.order_items.forEach((item: any) => {
+          const cancelledQty = item.cancelled_quantity || 0;
+          const activeQuantity = item.quantity - cancelledQty;
+
+          const shouldInclude = onlyOrdered
+            ? activeQuantity > 0 && item.status === "ordered"
+            : activeQuantity > 0 && item.status !== "cancelled";
+
+          if (shouldInclude) {
+            const productInfo = productsMap.get(item.product_id);
+            const productCategory = productInfo?.category || "Entradas";
+
+            const categoryType =
+              browserPrintService.determineCategoryType(productCategory);
+
+            orderItems.push({
+              name: item.product_name || "Producto",
+              quantity: activeQuantity,
+              price: item.price || 0,
+              category_type: categoryType,
+              notes: item.notes || "",
+            });
+          }
+        });
+      }
+    });
+
+    const calculateTotal = () => {
+      let total = 0;
+      table.orders.forEach((order) => {
+        if (order.order_items && Array.isArray(order.order_items)) {
+          order.order_items.forEach((item: any) => {
+            const cancelledQty = item.cancelled_quantity || 0;
+            const activeQuantity = item.quantity - cancelledQty;
+
+            const shouldInclude = onlyOrdered
+              ? activeQuantity > 0 && item.status === "ordered"
+              : activeQuantity > 0 && item.status !== "cancelled";
+
+            if (shouldInclude) {
+              total += (item.price || 0) * activeQuantity;
+            }
+          });
+        }
+      });
+      return total;
+    };
+
+    const orderData = {
+      orderId: table.orders[0]?.id || `MESA-${table.number}`,
+      tableNumber: table.number,
+      customerCount: table.capacity || 1,
+      area: table.location || "Interior",
+      items: orderItems,
+      total: calculateTotal(),
+      createdAt: table.orders[0]?.created_at || new Date().toISOString(),
+      waiter: table.orders[0]?.waiter_name || "Sistema",
+    };
+
+    return orderData;
+  };
+
+  // FUNCIÓN MODIFICADA: Manejar impresión de pedido
+  const handlePrintOrder = async (
+    tableId: number,
+    printType: "all" | "kitchen" | "bar" | "ticket" | "final-ticket"
+  ) => {
+    const table = tables.find((t) => t.id === tableId);
+    if (!table) {
+      alert("Mesa no encontrada");
+      return;
+    }
+
+    setPrinting(`print-${tableId}-${printType}`);
+
+    try {
+      let orderData;
+      let result = false;
+
+      switch (printType) {
+        case "all":
+          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          result = await browserPrintService.printAllTickets(orderData);
+          break;
+
+        case "kitchen":
+          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          result = await browserPrintService.printKitchenTicket(orderData);
+          break;
+
+        case "bar":
+          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          result = await browserPrintService.printColdBarTicket(orderData);
+          break;
+
+        case "ticket":
+          orderData = await prepareOrderForPrinting(table, true); // Solo ordered
+          result = await browserPrintService.printTicket(orderData);
+          break;
+
+        case "final-ticket":
+          orderData = await prepareOrderForPrinting(table, false); // TODOS activos
+          if (orderData.items.length === 0) {
+            alert("No hay productos activos para generar el ticket final");
+            setPrinting(null);
+            return;
+          }
+          result = await browserPrintService.printFinalTicket(orderData);
+          break;
+      }
+
+      if (!result) {
+        alert(
+          "No se pudo abrir la ventana de impresión. Por favor, permite las ventanas emergentes."
+        );
+      }
+    } catch (error) {
+      console.error("Error en impresión:", error);
+      alert("Error al generar el ticket de impresión");
+    } finally {
+      setPrinting(null);
+    }
+  };
+
   const handleCobrarMesa = async (tableId: number, tableNumber: number) => {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
@@ -566,19 +757,31 @@ export default function WaiterDashboard() {
       confirmationMessage += `\n\n${cancelledItemsCount} producto(s) cancelado(s) excluidos.`;
     }
 
-    confirmationMessage += `\n\nSe guardará el historial y se liberará la mesa.`;
+    // Agregar opción de imprimir ticket final
+    const printTicket = confirm(
+      confirmationMessage + `\n\n¿Desea imprimir el ticket final?`
+    );
 
-    if (!confirm(confirmationMessage)) {
+    if (!printTicket) {
       return;
     }
 
     setProcessing(`cobrar-${tableId}`);
     try {
+      // Primero cobrar la mesa
       await waiterService.freeTableAndClean(
         tableId,
         tableNumber,
         paymentMethod
       );
+
+      // Luego imprimir el ticket final si el usuario confirmó
+      if (table) {
+        const orderData = await prepareOrderForPrinting(table, false); // TODOS los activos para ticket final
+        if (orderData.items.length > 0) {
+          await browserPrintService.printFinalTicket(orderData);
+        }
+      }
 
       let successMessage = `Mesa ${tableNumber} cobrada.\n\n`;
       if (paymentMethod === "cash") {
@@ -619,7 +822,8 @@ export default function WaiterDashboard() {
             const cancelledQty = item.cancelled_quantity || 0;
             const activeQuantity = item.quantity - cancelledQty;
 
-            if (activeQuantity > 0) {
+            // Solo sumar items con status "ordered" para coincidir con impresión
+            if (activeQuantity > 0 && item.status === "ordered") {
               return orderSum + item.price * activeQuantity;
             }
             return orderSum;
@@ -673,11 +877,13 @@ export default function WaiterDashboard() {
             <TablesTab
               tables={tables}
               processing={processing}
+              printing={printing}
               onUpdateItemStatus={handleUpdateItemStatus}
               onCobrarMesa={handleCobrarMesa}
               calculateTableTotal={calculateTableTotal}
               notifications={notifications}
               onCancelItem={handleCancelItem}
+              onPrintOrder={handlePrintOrder}
               tablesOrder={tablesOrder}
             />
           </>

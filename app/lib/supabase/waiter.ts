@@ -54,6 +54,8 @@ export interface OrderItem {
 }
 
 export interface Order {
+  customer_count: number
+  waiter_name: string
   id: string
   total_amount: number
   customer_name: string | null
@@ -268,6 +270,8 @@ export const waiterService = {
             customer_name: order.customer_name,
             created_at: order.created_at,
             status: order.status,
+            customer_count: 0,
+            waiter_name: '',
             order_items:
               (order.order_items || []).map((it) => ({
                 id: it.id,
