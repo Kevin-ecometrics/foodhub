@@ -37,6 +37,9 @@ export interface PrintResult {
 }
 
 export class PrintNodeApiService {
+  testConnection() {
+    throw new Error("Method not implemented.");
+  }
   private baseUrl: string;
   private PAPER_WIDTH = 58; // 58mm
   private internalApiKey: string;
