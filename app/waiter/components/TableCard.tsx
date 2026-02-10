@@ -22,7 +22,7 @@ interface TableCardProps {
       | "bar"
       | "ticket"
       | "final-ticket"
-      | "comensales"
+      | "comensales",
   ) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
@@ -58,7 +58,6 @@ export default function TableCard({
     activeItemsCount: number;
     activeItemsTotal: number;
 
-    // Nuevo: Verificar si hay nombres de comensales
     hasCustomerNames: boolean;
   }>({
     hasKitchenItems: false,
@@ -86,7 +85,6 @@ export default function TableCard({
     let activeItemsCount = 0;
     let activeItemsTotal = 0;
 
-    // Nuevo: Verificar si hay nombres de comensales
     let hasCustomerNames = false;
 
     const isColdBarCategory = (category: string): boolean => {
@@ -96,8 +94,12 @@ export default function TableCard({
         "cerveza artesanal",
         "coquetos",
         "coquetos clásicos",
+        "drink",
+        "beverage",
+        "bar",
       ];
-      return coldBarCategories.includes(category.trim().toLowerCase());
+      const categoryLower = category.toLowerCase();
+      return coldBarCategories.some((cat) => categoryLower.includes(cat));
     };
 
     const productIdsForOrdered = new Set<number>();
@@ -116,7 +118,7 @@ export default function TableCard({
             hasCustomerNames = true;
           }
 
-          // PARA PRODUCTOS ACTIVOS
+          // PARA PRODUCTOS ACTIVOS (todos menos cancelados)
           if (
             activeQuantity > 0 &&
             item.status !== "cancelled" &&
@@ -128,7 +130,7 @@ export default function TableCard({
             activeItemsTotal += itemTotal;
           }
 
-          // PARA PRODUCTOS ORDENADOS
+          // PARA PRODUCTOS ORDENADOS (solo status "ordered")
           if (
             activeQuantity > 0 &&
             item.status === "ordered" &&
@@ -145,7 +147,7 @@ export default function TableCard({
 
     const checkProductCategories = async (
       productIds: Set<number>,
-      isForOrdered: boolean
+      isForOrdered: boolean,
     ) => {
       if (productIds.size === 0) return;
 
@@ -225,7 +227,7 @@ export default function TableCard({
 
       const orderSubtotal = order.order_items.reduce(
         (sum: number, item: any) => sum + item.price * item.quantity,
-        0
+        0,
       );
 
       customerSummary.subtotal += orderSubtotal;
@@ -252,7 +254,7 @@ export default function TableCard({
       | "bar"
       | "ticket"
       | "final-ticket"
-      | "comensales"
+      | "comensales",
   ) => {
     // Para ticket final (todos los productos activos)
     if (printType === "final-ticket") {
@@ -275,7 +277,7 @@ export default function TableCard({
       if (!productCategories.hasCustomerNames) {
         const confirmPrint = confirm(
           "No se detectaron nombres específicos de comensales. " +
-            "Se mostrará 'Cliente' en el ticket. ¿Desea continuar?"
+            "Se mostrará 'Cliente' en el ticket. ¿Desea continuar?",
         );
         if (!confirmPrint) return;
       }
@@ -321,10 +323,10 @@ export default function TableCard({
         isHighlighted
           ? "border-2 border-red-500"
           : table.status === "occupied"
-          ? "border-l-4 border-l-green-500"
-          : table.status === "reserved"
-          ? "border-l-4 border-l-yellow-500"
-          : "border-l-4 border-l-gray-300"
+            ? "border-l-4 border-l-green-500"
+            : table.status === "reserved"
+              ? "border-l-4 border-l-yellow-500"
+              : "border-l-4 border-l-gray-300"
       }`}
     >
       {occupationTime && (
@@ -338,9 +340,9 @@ export default function TableCard({
                 occupationTime.includes("h")
                   ? "text-red-600"
                   : occupationTime.includes("min") &&
-                    parseInt(occupationTime) > 30
-                  ? "text-orange-600"
-                  : "text-green-600"
+                      parseInt(occupationTime) > 30
+                    ? "text-orange-600"
+                    : "text-green-600"
               }`}
             >
               {occupationTime}
@@ -455,46 +457,44 @@ export default function TableCard({
                   )}
                 </div>
 
-                {/* NUEVO: Botón para imprimir ticket con nombres de comensales */}
-                {/* {productCategories.hasCustomerNames && (
-                  <button
-                    onClick={() => handlePrint("comensales")}
-                    disabled={isPrinting("comensales")}
-                    className="w-full px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 mt-2"
-                    title="Imprimir ticket con nombres de comensales"
-                  >
-                    {isPrinting("comensales") ? (
-                      <>
-                        <svg
-                          className="animate-spin h-4 w-4 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        <span>Generando ticket con comensales...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>👥</span>
-                        <span>Ticket con Nombres de Comensales</span>
-                      </>
-                    )}
-                  </button>
-                )} */}
+                {/* Botón para imprimir todo */}
+                {/* <button
+                  onClick={() => handlePrint("all")}
+                  disabled={isPrinting("all")}
+                  className="w-full px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm flex items-center justify-center gap-2 font-medium"
+                  title="Imprimir en todas las áreas"
+                >
+                  {isPrinting("all") ? (
+                    <>
+                      <svg
+                        className="animate-spin h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      <span>Imprimiendo en todas las áreas...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🚀</span>
+                      <span>Imprimir Todo (Todas las áreas)</span>
+                    </>
+                  )}
+                </button> */}
               </>
             )}
 
@@ -505,7 +505,7 @@ export default function TableCard({
                 <button
                   onClick={() => handlePrint("final-ticket")}
                   disabled={isPrinting("final-ticket")}
-                  className="w-full px-3 py-3 bg-blue-500 text-white rounded-xl disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 shadow-md"
+                  className="w-full px-3 py-3 bg-blue-600 text-white rounded-xl disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 shadow-md"
                   title="Imprimir ticket final completo (todos los productos activos)"
                 >
                   {isPrinting("final-ticket") ? (
@@ -534,8 +534,8 @@ export default function TableCard({
                     </>
                   ) : (
                     <>
-                      <span className="text-lg">🧾</span>
-                      <span>Imprimir Ticket</span>
+                      <span className="text-lg">💰</span>
+                      <span>Ticket Final (Para cobrar)</span>
                     </>
                   )}
                 </button>
@@ -547,7 +547,7 @@ export default function TableCard({
               !productCategories.hasAnyItems &&
               !productCategories.hasAnyActiveItems &&
               table.orders.some(
-                (order) => order.order_items && order.order_items.length > 0
+                (order) => order.order_items && order.order_items.length > 0,
               ) && (
                 <div className="text-xs text-gray-500 italic text-center py-3 bg-gray-50 rounded">
                   ℹ️ No hay productos activos en esta mesa. Todos los productos

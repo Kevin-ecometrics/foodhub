@@ -18,6 +18,10 @@ import {
   FaCalendarDay,
   FaCalendarWeek,
   FaBan,
+  FaWallet,
+  FaMoneyBillWave,
+  FaCreditCard,
+  FaMoneyBillAlt,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -53,6 +57,27 @@ interface SalesItem {
   status?: string;
 }
 
+interface PaymentDetails {
+  methods: {
+    cash: number;
+    terminal: number;
+    dollars: number;
+  };
+  exchangeRate: number;
+  totalAmount: number;
+  totalPaid: number;
+  change: number;
+  timestamp: string;
+  summary: {
+    cash: number;
+    terminal: number;
+    dollars: {
+      amount: number;
+      exchangeRate: number;
+      equivalentMXN: number;
+    };
+  };
+}
 // Interfaz para el ticket
 interface TicketData {
   sale: SalesHistory;
@@ -112,14 +137,14 @@ export default function Dashboard({
 }: DashboardProps) {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateInput, setDateInput] = useState(
-    selectedDate.toISOString().split("T")[0]
+    selectedDate.toISOString().split("T")[0],
   );
   const [filterMode, setFilterMode] = useState<FilterMode>("single");
   const [startDateInput, setStartDateInput] = useState(
-    selectedDate.toISOString().split("T")[0]
+    selectedDate.toISOString().split("T")[0],
   );
   const [endDateInput, setEndDateInput] = useState(
-    selectedDate.toISOString().split("T")[0]
+    selectedDate.toISOString().split("T")[0],
   );
   const [salesItems, setSalesItems] = useState<SalesItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -127,7 +152,7 @@ export default function Dashboard({
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
   const [loadingTicket, setLoadingTicket] = useState(false);
   const [customerFeedback, setCustomerFeedback] = useState<CustomerFeedback[]>(
-    []
+    [],
   );
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -138,7 +163,7 @@ export default function Dashboard({
     const adjustForTimezone = (date: Date) => {
       const localDate = new Date(date);
       localDate.setMinutes(
-        localDate.getMinutes() + localDate.getTimezoneOffset()
+        localDate.getMinutes() + localDate.getTimezoneOffset(),
       );
       return localDate;
     };
@@ -151,7 +176,7 @@ export default function Dashboard({
     }
 
     return `${localStart.toLocaleDateString(
-      "es-MX"
+      "es-MX",
     )} - ${localEnd.toLocaleDateString("es-MX")}`;
   };
 
@@ -242,7 +267,7 @@ export default function Dashboard({
   // NUEVA FUNCIÓN: Cargar encuestas por rango de fechas
   const loadCustomerFeedbackForRange = async (
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ) => {
     setLoadingFeedback(true);
     try {
@@ -277,7 +302,7 @@ export default function Dashboard({
     setLoadingItems(true);
     try {
       const items = await fetchSalesItemsFromSupabase(
-        salesHistory.map((sale) => sale.id)
+        salesHistory.map((sale) => sale.id),
       );
       setSalesItems(items);
     } catch (error) {
@@ -289,7 +314,7 @@ export default function Dashboard({
 
   // Función REAL para cargar items desde Supabase
   const fetchSalesItemsFromSupabase = async (
-    saleIds: string[]
+    saleIds: string[],
   ): Promise<SalesItem[]> => {
     if (saleIds.length === 0) return [];
 
@@ -326,7 +351,7 @@ export default function Dashboard({
 
   // FUNCIÓN MEJORADA: Procesar extras desde las notas - CORREGIDA
   const processExtrasFromNotes = (
-    notes: string | null | undefined
+    notes: string | null | undefined,
   ): ProcessedExtras => {
     if (!notes) {
       return {
@@ -343,7 +368,7 @@ export default function Dashboard({
     if (hasPricedExtras) {
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
+        (part) => !part.includes("Extras:") && !part.includes("Total:"),
       );
       const extrasPart = parts.find((part) => part.includes("Extras:"));
       const totalPart = parts.find((part) => part.includes("Total:"));
@@ -441,7 +466,7 @@ export default function Dashboard({
   const formatLongDate = (date: Date): string => {
     const localDate = new Date(date);
     localDate.setMinutes(
-      localDate.getMinutes() + localDate.getTimezoneOffset()
+      localDate.getMinutes() + localDate.getTimezoneOffset(),
     );
 
     return localDate.toLocaleDateString("es-MX", {
@@ -561,7 +586,7 @@ export default function Dashboard({
     const products = getGroupedProducts();
     return products.reduce(
       (total, product) => total + product.activeSubtotal,
-      0
+      0,
     );
   };
 
@@ -680,7 +705,7 @@ export default function Dashboard({
   const getProductsWithOrderDatesCorrected = () => {
     const groupedProducts = getGroupedProducts();
     const activeProducts = groupedProducts.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
     const productsWithDates = [];
 
@@ -723,7 +748,7 @@ export default function Dashboard({
               item.sale_id === sale.id &&
               item.product_name === product.product_name &&
               Math.abs(item.price - product.price) < 0.01 &&
-              item.quantity - (item.cancelled_quantity || 0) > 0
+              item.quantity - (item.cancelled_quantity || 0) > 0,
           );
 
           if (hasProduct) {
@@ -772,7 +797,7 @@ export default function Dashboard({
               (item) =>
                 item.sale_id === sale.id &&
                 item.product_name === product.product_name &&
-                item.quantity - (item.cancelled_quantity || 0) > 0
+                item.quantity - (item.cancelled_quantity || 0) > 0,
             );
 
             if (hasExtra) {
@@ -828,7 +853,7 @@ export default function Dashboard({
 
     // Filtrar solo productos activos (sin cancelados)
     const activeProducts = products.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
 
     if (activeProducts.length === 0) {
@@ -839,12 +864,12 @@ export default function Dashboard({
     // Calcular totales solo de productos activos
     const totalQuantity = activeProducts.reduce(
       (sum, product) => sum + product.activeQuantity,
-      0
+      0,
     );
 
     const totalSales = activeProducts.reduce(
       (sum, product) => sum + product.activeSubtotal,
-      0
+      0,
     );
 
     // Obtener fecha para el reporte
@@ -869,8 +894,8 @@ export default function Dashboard({
       const tipo = product.isExtra
         ? "Extra"
         : product.hasExtras
-        ? "Con Extras"
-        : "Producto";
+          ? "Con Extras"
+          : "Producto";
 
       const formattedDate = orderDate ? formatDateTime(orderDate) : "N/A";
 
@@ -884,7 +909,7 @@ export default function Dashboard({
 
     // Agregar totales al final - SIN CANCELADOS
     csvContent += `\n"","","TOTALES","","${totalQuantity}","${formatCurrency(
-      totalSales
+      totalSales,
     )}",""`;
 
     // Generar nombre de archivo
@@ -911,7 +936,7 @@ export default function Dashboard({
 
     // Filtrar solo productos activos
     const activeProducts = groupedProducts.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
     const productsWithDates = [];
 
@@ -931,7 +956,7 @@ export default function Dashboard({
               item.sale_id === sale.id &&
               item.product_name === product.product_name &&
               Math.abs(item.price - product.price) < 0.01 &&
-              item.quantity - (item.cancelled_quantity || 0) > 0 // Solo items activos
+              item.quantity - (item.cancelled_quantity || 0) > 0, // Solo items activos
           );
 
           if (hasProduct) {
@@ -974,9 +999,9 @@ export default function Dashboard({
               (item) =>
                 item.sale_id === sale.id &&
                 item.product_name.includes(
-                  product.product_name.replace("+ ", "")
+                  product.product_name.replace("+ ", ""),
                 ) &&
-                item.quantity - (item.cancelled_quantity || 0) > 0
+                item.quantity - (item.cancelled_quantity || 0) > 0,
             );
 
             if (hasExtra) {
@@ -1024,7 +1049,7 @@ export default function Dashboard({
 
     // Filtrar solo productos activos
     const activeProducts = products.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
 
     if (activeProducts.length === 0) {
@@ -1035,12 +1060,12 @@ export default function Dashboard({
     // Calcular totales solo de productos activos
     const totalQuantity = activeProducts.reduce(
       (sum, product) => sum + product.activeQuantity,
-      0
+      0,
     );
 
     const totalSales = activeProducts.reduce(
       (sum, product) => sum + product.activeSubtotal,
-      0
+      0,
     );
 
     // Obtener fecha para el reporte
@@ -1048,7 +1073,7 @@ export default function Dashboard({
       filterMode === "single"
         ? formatLongDate(selectedDate)
         : `${formatLongDate(new Date(startDateInput))} a ${formatLongDate(
-            new Date(endDateInput)
+            new Date(endDateInput),
           )}`;
 
     // Obtener productos ordenados por fecha
@@ -1198,7 +1223,7 @@ export default function Dashboard({
       <div class="date-info">
         <div><strong>Fecha del Reporte:</strong> ${reportDate}</div>
         <div><strong>Generado:</strong> ${new Date().toLocaleString(
-          "es-MX"
+          "es-MX",
         )}</div>
       </div>
     </div>
@@ -1255,8 +1280,8 @@ export default function Dashboard({
               product.isExtra
                 ? "extra-row"
                 : product.hasExtras
-                ? "product-with-extras"
-                : ""
+                  ? "product-with-extras"
+                  : ""
             }">
               <td class="text-center">${index + 1}</td>
               <td class="date-column">${formattedDate}</td>
@@ -1264,14 +1289,14 @@ export default function Dashboard({
               <td class="text-right">${formatCurrency(product.price)}</td>
               <td class="text-center">${product.activeQuantity}</td>
               <td class="text-right">${formatCurrency(
-                product.activeSubtotal
+                product.activeSubtotal,
               )}</td>
               <td>${
                 product.isExtra
                   ? "Extra"
                   : product.hasExtras
-                  ? "Con Extras"
-                  : "Producto"
+                    ? "Con Extras"
+                    : "Producto"
               }</td>
             </tr>
           `;
@@ -1462,15 +1487,15 @@ export default function Dashboard({
                 item.isExtra
                   ? "extra-item"
                   : item.isBaseProduct
-                  ? "base-product"
-                  : ""
+                    ? "base-product"
+                    : ""
               }">
                 <td>${item.product_name}</td>
                 <td class="text-right">${item.quantity}</td>
                 <td class="text-right">${formatCurrency(item.price)}</td>
                 <td class="text-right">${formatCurrency(item.subtotal)}</td>
               </tr>
-            `
+            `,
             )
             .join("")}
         </tbody>
@@ -1536,15 +1561,15 @@ export default function Dashboard({
   const cancelledStats = {
     totalCancelledQuantity: salesItems.reduce(
       (sum, item) => sum + (item.cancelled_quantity || 0),
-      0
+      0,
     ),
     totalCancelledAmount: salesItems.reduce(
       (sum, item) => sum + item.price * (item.cancelled_quantity || 0),
-      0
+      0,
     ),
     totalActiveQuantity: salesItems.reduce(
       (sum, item) => sum + (item.quantity - (item.cancelled_quantity || 0)),
-      0
+      0,
     ),
   };
 
@@ -1570,11 +1595,172 @@ export default function Dashboard({
     cancelledAmount: cancelledStats.totalCancelledAmount,
   };
 
-  // Calcular estadísticas de métodos de pago
-  const paymentMethodStats = {
-    ticket: salesHistory.filter((sale) => sale.payment_method === "ticket")
-      .length,
-    unspecified: salesHistory.filter((sale) => !sale.payment_method).length,
+  // Y también necesitas agregar esta función auxiliar para parsear el JSON:
+  const parsePaymentMethod = (
+    paymentMethod: string | null,
+  ): PaymentDetails | null => {
+    if (!paymentMethod) return null;
+
+    try {
+      // Intentar parsear como JSON
+      const parsed = JSON.parse(paymentMethod);
+      return parsed;
+    } catch (error) {
+      console.error("Error parsing payment method JSON:", error);
+      return null;
+    }
+  };
+
+  const calculatePaymentMethodStats = () => {
+    const stats = {
+      cash: 0,
+      terminal: 0,
+      dollars: 0,
+      mixed: 0,
+      unspecified: 0,
+      totalCashAmount: 0,
+      totalTerminalAmount: 0,
+      totalDollarsAmount: 0,
+      totalDollarsUSD: 0,
+      totalTransactions: salesHistory.length,
+    };
+
+    salesHistory.forEach((sale) => {
+      const parsed = parsePaymentMethod(sale.payment_method);
+
+      if (!parsed) {
+        stats.unspecified++;
+        return;
+      }
+
+      const { methods } = parsed;
+      const methodCount =
+        (methods.cash > 0 ? 1 : 0) +
+        (methods.terminal > 0 ? 1 : 0) +
+        (methods.dollars > 0 ? 1 : 0);
+
+      if (methodCount > 1) {
+        stats.mixed++;
+      } else if (methods.cash > 0) {
+        stats.cash++;
+      } else if (methods.terminal > 0) {
+        stats.terminal++;
+      } else if (methods.dollars > 0) {
+        stats.dollars++;
+      }
+
+      // Acumular montos
+      stats.totalCashAmount += methods.cash;
+      stats.totalTerminalAmount += methods.terminal;
+      stats.totalDollarsUSD += methods.dollars;
+      stats.totalDollarsAmount += parsed.summary?.dollars?.equivalentMXN || 0;
+    });
+
+    return stats;
+  };
+  // Luego usa la función:
+  const paymentMethodStats = calculatePaymentMethodStats();
+
+  // Y también necesitas agregar esta interfaz al principio del componente:
+  interface PaymentDetails {
+    methods: {
+      cash: number;
+      terminal: number;
+      dollars: number;
+    };
+    exchangeRate: number;
+    totalAmount: number;
+    totalPaid: number;
+    change: number;
+    timestamp: string;
+    summary: {
+      cash: number;
+      terminal: number;
+      dollars: {
+        amount: number;
+        exchangeRate: number;
+        equivalentMXN: number;
+      };
+    };
+  }
+
+  const getPaymentMethodTextFromJSON = (
+    paymentMethod: string | null,
+  ): string => {
+    const parsed = parsePaymentMethod(paymentMethod);
+
+    if (!parsed) {
+      return "NO ESPECIFICADO";
+    }
+
+    const { methods } = parsed;
+    const methodsUsed = [];
+
+    if (methods.cash > 0) {
+      methodsUsed.push(`Efectivo: $${methods.cash.toFixed(2)} MXN`);
+    }
+    if (methods.terminal > 0) {
+      methodsUsed.push(`Tarjeta: $${methods.terminal.toFixed(2)} MXN`);
+    }
+    if (methods.dollars > 0) {
+      methodsUsed.push(`Dólares: $${methods.dollars.toFixed(2)} USD`);
+    }
+
+    return methodsUsed.join(" + ");
+  };
+
+  const getPaymentMethodIconFromJSON = (paymentMethod: string | null) => {
+    const parsed = parsePaymentMethod(paymentMethod);
+
+    if (!parsed) {
+      return <FaDollarSign className="text-gray-600" />;
+    }
+
+    const { methods } = parsed;
+    const hasMultipleMethods =
+      (methods.cash > 0 ? 1 : 0) +
+      (methods.terminal > 0 ? 1 : 0) +
+      (methods.dollars > 0 ? 1 : 0);
+
+    if (hasMultipleMethods > 1) {
+      return <FaWallet className="text-purple-600" />;
+    } else if (methods.cash > 0) {
+      return <FaMoneyBillAlt className="text-green-600" />;
+    } else if (methods.terminal > 0) {
+      return <FaCreditCard className="text-blue-600" />;
+    } else if (methods.dollars > 0) {
+      return <FaMoneyBillWave className="text-yellow-600" />;
+    }
+
+    return <FaDollarSign className="text-gray-600" />;
+  };
+
+  const getPaymentMethodColorFromJSON = (
+    paymentMethod: string | null,
+  ): string => {
+    const parsed = parsePaymentMethod(paymentMethod);
+
+    if (!parsed) {
+      return "bg-gray-100 text-gray-800 border-gray-300";
+    }
+
+    const { methods } = parsed;
+    const hasMultipleMethods =
+      (methods.cash > 0 ? 1 : 0) +
+      (methods.terminal > 0 ? 1 : 0) +
+      (methods.dollars > 0 ? 1 : 0);
+
+    if (hasMultipleMethods > 1) {
+      return "bg-purple-100 text-purple-800 border-purple-300";
+    } else if (methods.cash > 0) {
+      return "bg-green-100 text-green-800 border-green-300";
+    } else if (methods.terminal > 0) {
+      return "bg-blue-100 text-blue-800 border-blue-300";
+    } else if (methods.dollars > 0) {
+      return "bg-yellow-100 text-yellow-800 border-yellow-300";
+    }
+
+    return "bg-gray-100 text-gray-800 border-gray-300";
   };
 
   return (
@@ -1599,7 +1785,7 @@ export default function Dashboard({
                     : formatLongDate(selectedDate)
                   : formatDateRange(
                       new Date(startDateInput),
-                      new Date(endDateInput)
+                      new Date(endDateInput),
                     )}
               </p>
               {combinedStats.cancelledItems > 0 && (
@@ -1890,7 +2076,7 @@ export default function Dashboard({
                         {count} ({percentage.toFixed(0)}%)
                       </div>
                     </div>
-                  )
+                  ),
                 )}
               </div>
             </div>
@@ -1928,7 +2114,7 @@ export default function Dashboard({
                     <div className="text-right">
                       <div
                         className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${getRatingColor(
-                          feedback.rating
+                          feedback.rating,
                         )}`}
                       >
                         <FaStar className="text-sm" />
@@ -1957,28 +2143,113 @@ export default function Dashboard({
       {salesSummary && salesSummary.saleCount > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <FaDollarSign className="text-green-600" />
+            <FaWallet className="text-purple-600" />
             Métodos de Pago Utilizados
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <FaReceipt className="text-blue-600 text-xl" />
-                <p className="font-semibold text-blue-800">Ticket</p>
+                <FaMoneyBillAlt className="text-green-600 text-xl" />
+                <p className="font-semibold text-green-800">Efectivo MXN</p>
               </div>
-              <p className="text-2xl font-bold text-blue-600">
-                {paymentMethodStats.ticket}
+              <p className="text-2xl font-bold text-green-600">
+                {paymentMethodStats.cash}
               </p>
-              <p className="text-sm text-blue-700">
-                {salesSummary.saleCount > 0
+              <p className="text-sm text-green-700">
+                {paymentMethodStats.totalTransactions > 0
                   ? Math.round(
-                      (paymentMethodStats.ticket / salesSummary.saleCount) * 100
+                      (paymentMethodStats.cash /
+                        paymentMethodStats.totalTransactions) *
+                        100,
                     )
                   : 0}
                 %
               </p>
+              <p className="text-xs text-green-600 mt-1">
+                Total: {formatCurrency(paymentMethodStats.totalCashAmount)}
+              </p>
+            </div>
+
+            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaCreditCard className="text-blue-600 text-xl" />
+                <p className="font-semibold text-blue-800">Tarjeta</p>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">
+                {paymentMethodStats.terminal}
+              </p>
+              <p className="text-sm text-blue-700">
+                {paymentMethodStats.totalTransactions > 0
+                  ? Math.round(
+                      (paymentMethodStats.terminal /
+                        paymentMethodStats.totalTransactions) *
+                        100,
+                    )
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Total: {formatCurrency(paymentMethodStats.totalTerminalAmount)}
+              </p>
+            </div>
+
+            <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaMoneyBillWave className="text-yellow-600 text-xl" />
+                <p className="font-semibold text-yellow-800">Dólares USD</p>
+              </div>
+              <p className="text-2xl font-bold text-yellow-600">
+                {paymentMethodStats.dollars}
+              </p>
+              <p className="text-sm text-yellow-700">
+                {paymentMethodStats.totalTransactions > 0
+                  ? Math.round(
+                      (paymentMethodStats.dollars /
+                        paymentMethodStats.totalTransactions) *
+                        100,
+                    )
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-yellow-600 mt-1">
+                ${paymentMethodStats.totalDollarsUSD.toFixed(2)} USD /{" "}
+                {formatCurrency(paymentMethodStats.totalDollarsAmount)}
+              </p>
+            </div>
+
+            <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaWallet className="text-purple-600 text-xl" />
+                <p className="font-semibold text-purple-800">Combinados</p>
+              </div>
+              <p className="text-2xl font-bold text-purple-600">
+                {paymentMethodStats.mixed}
+              </p>
+              <p className="text-sm text-purple-700">
+                {paymentMethodStats.totalTransactions > 0
+                  ? Math.round(
+                      (paymentMethodStats.mixed /
+                        paymentMethodStats.totalTransactions) *
+                        100,
+                    )
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-purple-600 mt-1">Múltiples métodos</p>
             </div>
           </div>
+
+          {paymentMethodStats.unspecified > 0 && (
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-300">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Sin método especificado:</span>
+                <span className="font-semibold text-gray-800">
+                  {paymentMethodStats.unspecified} transacciones
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2046,8 +2317,8 @@ export default function Dashboard({
                         product.isExtra
                           ? "bg-blue-50"
                           : product.hasExtras
-                          ? "bg-green-50"
-                          : ""
+                            ? "bg-green-50"
+                            : ""
                       }`}
                     >
                       <td className="px-4 py-3 text-gray-800">
@@ -2073,15 +2344,15 @@ export default function Dashboard({
                             product.isExtra
                               ? "bg-blue-100 text-blue-800"
                               : product.hasExtras
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {product.isExtra
                             ? "Extra"
                             : product.hasExtras
-                            ? "Con Extras"
-                            : "Producto"}
+                              ? "Con Extras"
+                              : "Producto"}
                         </span>
                       </td>
                     </tr>
@@ -2146,41 +2417,64 @@ export default function Dashboard({
               Detalle de Ventas (Click para ver ticket):
             </h4>
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {salesHistory.map((sale) => (
-                <button
-                  key={sale.id}
-                  onClick={() => loadTicketItems(sale)}
-                  disabled={loadingTicket}
-                  className="w-full text-left flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${getPaymentMethodColor(
-                        sale.payment_method
-                      )}`}
-                    >
-                      {getPaymentMethodIcon(sale.payment_method)}
+              {salesHistory.map((sale) => {
+                const parsedPayment = parsePaymentMethod(sale.payment_method);
+
+                return (
+                  <button
+                    key={sale.id}
+                    onClick={() => loadTicketItems(sale)}
+                    disabled={loadingTicket}
+                    className="w-full text-left flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${getPaymentMethodColorFromJSON(
+                          sale.payment_method,
+                        )}`}
+                      >
+                        {getPaymentMethodIconFromJSON(sale.payment_method)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          Mesa {sale.table_number}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {sale.customer_name || "Invitado"} •{" "}
+                          {sale.order_count} órdenes • {sale.item_count} items
+                        </p>
+                        {parsedPayment && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            {parsedPayment.methods.cash > 0 && (
+                              <span className="mr-2">
+                                💰${parsedPayment.methods.cash.toFixed(2)}
+                              </span>
+                            )}
+                            {parsedPayment.methods.terminal > 0 && (
+                              <span className="mr-2">
+                                💳${parsedPayment.methods.terminal.toFixed(2)}
+                              </span>
+                            )}
+                            {parsedPayment.methods.dollars > 0 && (
+                              <span className="mr-2">
+                                💵${parsedPayment.methods.dollars.toFixed(2)}USD
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        Mesa {sale.table_number}
+                    <div className="text-right">
+                      <p className="font-semibold text-green-600">
+                        {formatCurrency(sale.total_amount)}
                       </p>
-                      <p className="text-sm text-gray-500">
-                        {sale.customer_name || "Invitado"} • {sale.order_count}{" "}
-                        órdenes • {sale.item_count} items
+                      <p className="text-xs text-gray-500">
+                        {new Date(sale.closed_at).toLocaleTimeString("es-MX")}
                       </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-green-600">
-                      {formatCurrency(sale.total_amount)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(sale.closed_at).toLocaleTimeString("es-MX")}
-                    </p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -2221,7 +2515,7 @@ export default function Dashboard({
 
                 <div
                   className={`p-4 rounded-lg border ${getRatingColor(
-                    selectedFeedback.rating
+                    selectedFeedback.rating,
                   )}`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -2331,15 +2625,19 @@ export default function Dashboard({
 
               {/* MÉTODO DE PAGO EN EL MODAL */}
               <div
-                className={`mt-3 p-3 rounded-lg border ${getPaymentMethodColor(
-                  selectedTicket.sale.payment_method
+                className={`mt-3 p-3 rounded-lg border ${getPaymentMethodColorFromJSON(
+                  selectedTicket.sale.payment_method,
                 )}`}
               >
                 <div className="flex items-center gap-2">
-                  {getPaymentMethodIcon(selectedTicket.sale.payment_method)}
+                  {getPaymentMethodIconFromJSON(
+                    selectedTicket.sale.payment_method,
+                  )}
                   <span className="font-semibold">Método de Pago:</span>
                   <span>
-                    {getPaymentMethodText(selectedTicket.sale.payment_method)}
+                    {getPaymentMethodTextFromJSON(
+                      selectedTicket.sale.payment_method,
+                    )}
                   </span>
                 </div>
               </div>
@@ -2429,7 +2727,7 @@ export default function Dashboard({
                     <span>IVA (8%):</span>
                     <span>
                       {formatCurrency(
-                        (selectedTicket.sale.total_amount * 0.08) / 1.08
+                        (selectedTicket.sale.total_amount * 0.08) / 1.08,
                       )}
                     </span>
                   </div>

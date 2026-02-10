@@ -424,12 +424,12 @@ async saveSalesHistory(
   async freeTableAndClean(
     tableId: number,
     tableNumber: number,
-    paymentMethod: PaymentMethod = null
+    paymentMethod?: string
   ): Promise<void> {
     try {
       console.log(`🔄 Iniciando proceso completo para mesa ${tableNumber}, método: ${paymentMethod}`)
 
-      await this.saveSalesHistory(tableId, tableNumber, paymentMethod)
+      await this.saveSalesHistory(tableId, tableNumber, paymentMethod as PaymentMethod)
 
       console.log(`🗑️ Eliminando notificaciones para mesa ${tableId}`)
       const { error: notificationsError } = await supabase

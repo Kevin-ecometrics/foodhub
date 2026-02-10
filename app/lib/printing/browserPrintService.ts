@@ -132,7 +132,6 @@ class BrowserPrintService {
     }));
   }
 
-  // Método para ticket con nombres de comensales (SOLO PARA CLIENTE)
   async printTicketWithCustomers(orderData: OrderDataForPrinting): Promise<boolean> {
     const content = this.generateTicketWithCustomers(orderData);
     return this.printInBrowser(content, `Ticket-Comensales-Mesa-${orderData.tableNumber}`, orderData.tableNumber);
