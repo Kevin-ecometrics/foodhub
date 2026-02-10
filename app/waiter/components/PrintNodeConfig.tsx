@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -40,9 +41,9 @@ export default function PrintNodeConfig() {
     setConnectionStatus("checking");
 
     try {
-      const result = await printNodeService.testConnection();
+      const result = (await printNodeService.testConnection()) as any;
 
-      if (result.success) {
+      if (result?.success) {
         setConnectionStatus("connected");
         setMessage({
           type: "success",
