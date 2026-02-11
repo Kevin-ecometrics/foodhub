@@ -16,7 +16,7 @@ import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
 import { getPrintNodeApiService } from "@/app/lib/printing/printnodeApiService";
 
-// Modal de confirmación con contraseña (se mantiene igual)
+// Modal de confirmación con contraseña
 function PasswordModal({
   isOpen,
   onClose,
@@ -54,11 +54,9 @@ function PasswordModal({
         <h3 className="text-lg font-semibold text-gray-800 mb-2">
           Confirmar Cancelación
         </h3>
-
         <p className="text-gray-600 mb-4">
           Ingrese la contraseña para confirmar la cancelación del producto.
         </p>
-
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Contraseña:
@@ -77,7 +75,6 @@ function PasswordModal({
           />
           {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
         </div>
-
         <div className="flex justify-end space-x-3">
           <button
             onClick={handleClose}
@@ -98,7 +95,7 @@ function PasswordModal({
   );
 }
 
-// Modal para calculadora de pago (se mantiene igual)
+// Modal para calculadora de pago - MODIFICADO para recibir totalItemsCount
 function PaymentCalculatorModal({
   isOpen,
   onClose,
@@ -106,6 +103,7 @@ function PaymentCalculatorModal({
   tableNumber,
   totalAmount,
   cancelledItemsCount,
+  totalItemsCount,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -113,6 +111,7 @@ function PaymentCalculatorModal({
   tableNumber: number;
   totalAmount: number;
   cancelledItemsCount: number;
+  totalItemsCount: number;
 }) {
   const [cash, setCash] = useState(0);
   const [terminal, setTerminal] = useState(0);
@@ -120,12 +119,10 @@ function PaymentCalculatorModal({
   const [exchangeRate, setExchangeRate] = useState(17.5);
   const [showExchangeInput, setShowExchangeInput] = useState(false);
 
-  // Calcular total pagado
   const totalPaid = cash + terminal + dollars * exchangeRate;
   const change = Math.max(0, totalPaid - totalAmount);
   const pendingAmount = Math.max(0, totalAmount - totalPaid);
 
-  // Manejar confirmación
   const handleConfirm = () => {
     if (totalPaid < totalAmount) {
       alert(`Falta por pagar: $${pendingAmount.toFixed(2)} MXN`);
@@ -146,7 +143,6 @@ function PaymentCalculatorModal({
     onConfirm(paymentData);
   };
 
-  // Formatear moneda
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
@@ -163,24 +159,34 @@ function PaymentCalculatorModal({
           Calculadora de Pago - Mesa {tableNumber}
         </h3>
 
-        {/* Monto total */}
+        {/* Resumen de la cuenta - MODIFICADO */}
+        <div className="mb-4 p-3 bg-gray-100 rounded-lg text-sm">
+          <div className="flex justify-between mb-1">
+            <span className="text-gray-600">Productos activos:</span>
+            <span className="font-semibold">{totalItemsCount}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Productos cancelados:</span>
+            <span className="font-semibold text-red-600">
+              {cancelledItemsCount}
+            </span>
+          </div>
+        </div>
+
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <div className="text-center">
             <p className="text-sm text-gray-600 mb-1">Total a pagar</p>
             <p className="text-3xl font-bold text-blue-700">
               {formatCurrency(totalAmount)}
             </p>
-            {cancelledItemsCount > 0 && (
-              <p className="text-xs text-red-600 mt-1">
-                {cancelledItemsCount} producto(s) cancelado(s) excluidos
-              </p>
-            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Incluye productos en todos los estados (ordered, preparing, ready,
+              served)
+            </p>
           </div>
         </div>
 
-        {/* Métodos de pago */}
         <div className="space-y-4 mb-6">
-          {/* Efectivo MXN */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
               Efectivo (MXN)
@@ -205,7 +211,6 @@ function PaymentCalculatorModal({
             </div>
           </div>
 
-          {/* Terminal */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
               Terminal (MXN)
@@ -221,7 +226,6 @@ function PaymentCalculatorModal({
             />
           </div>
 
-          {/* Dólares */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-700">
@@ -235,7 +239,6 @@ function PaymentCalculatorModal({
                 {showExchangeInput ? "Ocultar tasa" : "Cambiar tasa"}
               </button>
             </div>
-
             <div className="flex gap-2">
               <input
                 type="number"
@@ -250,8 +253,6 @@ function PaymentCalculatorModal({
                 = {formatCurrency((dollars || 0) * exchangeRate)}
               </div>
             </div>
-
-            {/* Input para tasa de cambio */}
             {showExchangeInput && (
               <div className="mt-2 pt-2 border-t border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -275,7 +276,6 @@ function PaymentCalculatorModal({
           </div>
         </div>
 
-        {/* Resumen */}
         <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Efectivo:</span>
@@ -304,7 +304,6 @@ function PaymentCalculatorModal({
                 {formatCurrency(totalPaid)}
               </span>
             </div>
-
             {totalPaid > totalAmount && (
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-600">Cambio:</span>
@@ -313,7 +312,6 @@ function PaymentCalculatorModal({
                 </span>
               </div>
             )}
-
             {totalPaid < totalAmount && (
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-600">Falta por pagar:</span>
@@ -325,7 +323,6 @@ function PaymentCalculatorModal({
           </div>
         </div>
 
-        {/* Botones */}
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -346,7 +343,7 @@ function PaymentCalculatorModal({
   );
 }
 
-// Componente simple para ordenar mesas (se mantiene igual)
+// Componente para ordenar mesas
 function TablesOrderSelect({
   value,
   onChange,
@@ -360,7 +357,6 @@ function TablesOrderSelect({
         <span className="text-sm font-medium text-gray-700">
           Ordenar mesas:
         </span>
-
         <div className="flex bg-gray-100 rounded-lg">
           <button
             onClick={() => onChange("number")}
@@ -411,7 +407,6 @@ export default function WaiterDashboard() {
   >(new Set());
   const [printing, setPrinting] = useState<string | null>(null);
 
-  // Estado para el filtro FCFS (notificaciones)
   const [fcfsFilter, setFcfsFilter] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_fcfs_filter");
@@ -420,7 +415,6 @@ export default function WaiterDashboard() {
     return false;
   });
 
-  // Estado para ordenar mesas
   const [tablesOrder, setTablesOrder] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_tables_order");
@@ -429,27 +423,24 @@ export default function WaiterDashboard() {
     return "number";
   });
 
-  // Estados para el modal de contraseña
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingCancelAction, setPendingCancelAction] = useState<{
     itemId: string;
     cancelQuantity: number;
   } | null>(null);
 
-  // Estados para el modal de calculadora de pago
   const [showPaymentCalculator, setShowPaymentCalculator] = useState(false);
   const [pendingPaymentAction, setPendingPaymentAction] = useState<{
     tableId: number;
     tableNumber: number;
     totalAmount: number;
     cancelledItemsCount: number;
+    totalItemsCount: number; // NUEVO
   } | null>(null);
 
-  // Referencia para guardar la posición del scroll
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
 
-  // Servicio de impresión - MODIFICADO
   const printService = getPrintNodeApiService();
 
   useEffect(() => {
@@ -458,11 +449,9 @@ export default function WaiterDashboard() {
 
     const interval = setInterval(() => {
       if (isUpdatingRef.current) return;
-
       isUpdatingRef.current = true;
       scrollPositionRef.current =
         window.scrollY || document.documentElement.scrollTop;
-
       loadData().finally(() => {
         setTimeout(() => {
           window.scrollTo(0, scrollPositionRef.current);
@@ -477,7 +466,6 @@ export default function WaiterDashboard() {
     };
   }, []);
 
-  // Guardar estados en localStorage cuando cambian
   useEffect(() => {
     localStorage.setItem("waiter_fcfs_filter", fcfsFilter.toString());
   }, [fcfsFilter]);
@@ -494,13 +482,11 @@ export default function WaiterDashboard() {
         waiterService.getTablesWithOrders(),
       ]);
 
-      // Aplicar filtro FCFS si está activo
       let processedNotifications = [...notifsData];
       if (fcfsFilter) {
         processedNotifications = applyFcfsFilter(processedNotifications);
       }
 
-      // Procesar los datos
       const processedTables = tablesData.map((table) => ({
         ...table,
         orders: table.orders.map((order) => ({
@@ -511,7 +497,6 @@ export default function WaiterDashboard() {
               item.status === "cancelled" && cancelledQty === 0
                 ? item.quantity
                 : cancelledQty;
-
             return {
               ...item,
               cancelled_quantity: finalCancelledQty,
@@ -520,7 +505,6 @@ export default function WaiterDashboard() {
         })),
       }));
 
-      // Actualizar estados
       setNotifications((prev) =>
         JSON.stringify(prev) === JSON.stringify(processedNotifications)
           ? prev
@@ -539,7 +523,6 @@ export default function WaiterDashboard() {
     }
   };
 
-  // Función para aplicar el filtro FCFS
   const applyFcfsFilter = (notificationsList: WaiterNotification[]) => {
     return [...notificationsList].sort((a, b) => {
       const dateA = new Date(a.created_at).getTime();
@@ -548,11 +531,9 @@ export default function WaiterDashboard() {
     });
   };
 
-  // Función para alternar el filtro FCFS
   const toggleFcfsFilter = () => {
     const newFcfsState = !fcfsFilter;
     setFcfsFilter(newFcfsState);
-
     if (notifications.length > 0 && newFcfsState) {
       const filteredNotifications = applyFcfsFilter(notifications);
       setNotifications(filteredNotifications);
@@ -561,7 +542,6 @@ export default function WaiterDashboard() {
     }
   };
 
-  // Función para cambiar el orden de mesas
   const handleTablesOrderChange = (order: string) => {
     setTablesOrder(order);
   };
@@ -578,11 +558,9 @@ export default function WaiterDashboard() {
         },
         () => {
           if (isUpdatingRef.current) return;
-
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
-
           loadData().finally(() => {
             setTimeout(() => {
               window.scrollTo(0, scrollPositionRef.current);
@@ -604,11 +582,9 @@ export default function WaiterDashboard() {
         },
         () => {
           if (isUpdatingRef.current) return;
-
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
-
           loadData().finally(() => {
             setTimeout(() => {
               window.scrollTo(0, scrollPositionRef.current);
@@ -630,11 +606,9 @@ export default function WaiterDashboard() {
         },
         () => {
           if (isUpdatingRef.current) return;
-
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
-
           loadData().finally(() => {
             setTimeout(() => {
               window.scrollTo(0, scrollPositionRef.current);
@@ -656,11 +630,9 @@ export default function WaiterDashboard() {
         },
         () => {
           if (isUpdatingRef.current) return;
-
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
-
           loadData().finally(() => {
             setTimeout(() => {
               window.scrollTo(0, scrollPositionRef.current);
@@ -717,13 +689,10 @@ export default function WaiterDashboard() {
 
   const executeCancelItem = async () => {
     if (!pendingCancelAction) return;
-
     const { itemId, cancelQuantity } = pendingCancelAction;
     setProcessing(itemId);
-
     try {
       await waiterService.cancelOrderItem(itemId, cancelQuantity);
-
       setTables((prevTables) =>
         prevTables.map((table) => ({
           ...table,
@@ -737,7 +706,6 @@ export default function WaiterDashboard() {
                   item.quantity - newCancelledQty === 0
                     ? "cancelled"
                     : item.status;
-
                 return {
                   ...item,
                   cancelled_quantity: newCancelledQty,
@@ -763,7 +731,6 @@ export default function WaiterDashboard() {
     setProcessing(itemId);
     try {
       await waiterService.updateItemStatus(itemId, newStatus as never);
-
       setTables((prevTables) =>
         prevTables.map((table) => ({
           ...table,
@@ -794,19 +761,16 @@ export default function WaiterDashboard() {
     const orderItems: any[] = [];
     const productIds = new Set<number>();
 
-    // Recolectar todos los product_ids únicos
     table.orders.forEach((order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
         order.order_items.forEach((item: any) => {
           const cancelledQty = item.cancelled_quantity || 0;
           const activeQuantity = item.quantity - cancelledQty;
-
           const shouldInclude = onlyOrdered
             ? activeQuantity > 0 && item.status === "ordered" && item.product_id
             : activeQuantity > 0 &&
               item.status !== "cancelled" &&
               item.product_id;
-
           if (shouldInclude) {
             productIds.add(item.product_id);
           }
@@ -848,13 +812,30 @@ export default function WaiterDashboard() {
       console.error("Error obteniendo categorías de productos:", error);
     }
 
-    // Crear los items con información del comensal
+    const isColdBarCategory = (category: string): boolean => {
+      const coldBarCategories = [
+        "bebidas",
+        "cerveza",
+        "cerveza artesanal",
+        "coquetos",
+        "coquetos clásicos",
+        "drink",
+        "beverage",
+        "bar",
+        "refresco",
+        "agua",
+        "vino",
+        "licor",
+      ];
+      const categoryLower = category.toLowerCase();
+      return coldBarCategories.some((cat) => categoryLower.includes(cat));
+    };
+
     table.orders.forEach((order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
         order.order_items.forEach((item: any) => {
           const cancelledQty = item.cancelled_quantity || 0;
           const activeQuantity = item.quantity - cancelledQty;
-
           const shouldInclude = onlyOrdered
             ? activeQuantity > 0 && item.status === "ordered"
             : activeQuantity > 0 && item.status !== "cancelled";
@@ -863,20 +844,13 @@ export default function WaiterDashboard() {
             const productInfo = productsMap.get(item.product_id);
             const productCategory = productInfo?.category || "Entradas";
 
-            // Determinar categoría para impresión
             let categoryType = "other";
-            if (
-              productCategory.toLowerCase().includes("bebida") ||
-              productCategory.toLowerCase().includes("cerveza") ||
-              productCategory.toLowerCase().includes("coquetos") ||
-              productCategory.toLowerCase().includes("bar")
-            ) {
+            if (isColdBarCategory(productCategory)) {
               categoryType = "cold_bar";
             } else {
               categoryType = "kitchen";
             }
 
-            // Obtener el nombre del comensal
             const customerName =
               item.customer_name || order.customer_name || "Cliente";
 
@@ -887,6 +861,11 @@ export default function WaiterDashboard() {
               category_type: categoryType,
               notes: item.notes || "",
               customerName: customerName,
+              _originalItem: {
+                ...item,
+                category_type: categoryType,
+                status: item.status,
+              },
             });
           }
         });
@@ -900,11 +879,9 @@ export default function WaiterDashboard() {
           order.order_items.forEach((item: any) => {
             const cancelledQty = item.cancelled_quantity || 0;
             const activeQuantity = item.quantity - cancelledQty;
-
             const shouldInclude = onlyOrdered
               ? activeQuantity > 0 && item.status === "ordered"
               : activeQuantity > 0 && item.status !== "cancelled";
-
             if (shouldInclude) {
               total += (item.price || 0) * activeQuantity;
             }
@@ -928,7 +905,7 @@ export default function WaiterDashboard() {
     return orderData;
   };
 
-  // FUNCIÓN MODIFICADA: Manejar impresión con PrintNode
+  // FUNCIÓN PRINCIPAL: Primero imprime, solo si tiene éxito actualiza estados
   const handlePrintOrder = async (
     tableId: number,
     printType:
@@ -954,41 +931,42 @@ export default function WaiterDashboard() {
       );
 
       let result;
+      let printSuccess = false;
 
+      // PASO 1: PRIMERO INTENTAR IMPRIMIR
       switch (printType) {
         case "all":
-          // Intentar usar el servicio PrintNode para 'all'
           try {
-            // Primero cocina
             if (
               orderData.items.some((item) => item.category_type === "kitchen")
             ) {
               await printService.printKitchenTicket(orderData);
             }
-            // Luego barra
             if (
               orderData.items.some((item) => item.category_type === "cold_bar")
             ) {
               await printService.printColdBarTicket(orderData);
             }
-            // Finalmente ticket
             const hasCustomerNames = orderData.items.some(
               (item) => item.customerName && item.customerName !== "Cliente",
             );
             await printService.printTicket(orderData, hasCustomerNames, false);
             result = { success: true };
+            printSuccess = true;
           } catch (error) {
             console.error("Error en impresión 'all':", error);
-            // Fallback al servicio browser si PrintNode falla
             const browserService = (
               await import("@/app/lib/printing/browserPrintService")
             ).browserPrintService;
             result = await browserService.printAllTickets(orderData);
+            printSuccess =
+              typeof result === "object" &&
+              result !== null &&
+              (result as any).success === true;
           }
           break;
 
         case "kitchen":
-          // Filtrar solo items de cocina
           const kitchenItems = orderData.items.filter(
             (item) => item.category_type === "kitchen",
           );
@@ -999,17 +977,21 @@ export default function WaiterDashboard() {
           }
           try {
             result = await printService.printKitchenTicket(orderData);
+            printSuccess = true;
           } catch (error) {
             console.error("Error en impresión cocina:", error);
             const browserService = (
               await import("@/app/lib/printing/browserPrintService")
             ).browserPrintService;
             result = await browserService.printKitchenTicket(orderData);
+            printSuccess =
+              typeof result === "object" &&
+              result !== null &&
+              (result as any).success === true;
           }
           break;
 
         case "bar":
-          // Filtrar solo items de barra fría
           const coldBarItems = orderData.items.filter(
             (item) => item.category_type === "cold_bar",
           );
@@ -1020,12 +1002,17 @@ export default function WaiterDashboard() {
           }
           try {
             result = await printService.printColdBarTicket(orderData);
+            printSuccess = true;
           } catch (error) {
             console.error("Error en impresión barra:", error);
             const browserService = (
               await import("@/app/lib/printing/browserPrintService")
             ).browserPrintService;
             result = await browserService.printColdBarTicket(orderData);
+            printSuccess =
+              typeof result === "object" &&
+              result !== null &&
+              (result as any).success === true;
           }
           break;
 
@@ -1040,12 +1027,17 @@ export default function WaiterDashboard() {
               hasCustomerNames,
               false,
             );
+            printSuccess = true;
           } catch (error) {
             console.error("Error en impresión ticket:", error);
             const browserService = (
               await import("@/app/lib/printing/browserPrintService")
             ).browserPrintService;
             result = await browserService.printTicket(orderData);
+            printSuccess =
+              typeof result === "object" &&
+              result !== null &&
+              (result as any).success === true;
           }
           break;
 
@@ -1064,21 +1056,120 @@ export default function WaiterDashboard() {
               hasCustomerNamesFinal,
               true,
             );
+            printSuccess = true;
           } catch (error) {
             console.error("Error en impresión ticket final:", error);
             const browserService = (
               await import("@/app/lib/printing/browserPrintService")
             ).browserPrintService;
             result = await browserService.printFinalTicket(orderData);
+            printSuccess =
+              typeof result === "object" &&
+              result !== null &&
+              (result as any).success === true;
           }
           break;
       }
 
+      // Verificar si la impresión fue exitosa
       if (typeof result === "object" && !result.success) {
         const errorMessage = result.error ? result.error : "Error desconocido";
-        alert(`Error al imprimir: ${errorMessage}`);
-      } else if (typeof result === "object") {
-        // Mostrar mensaje de éxito
+        alert(
+          `❌ Error al imprimir: ${errorMessage}\n\nLos productos NO han sido enviados a preparación.`,
+        );
+        setPrinting(null);
+        return;
+      }
+
+      // PASO 2: SOLO SI LA IMPRESIÓN FUE EXITOSA, ACTUALIZAR ESTADOS
+      if (
+        printSuccess &&
+        (printType === "kitchen" || printType === "bar" || printType === "all")
+      ) {
+        const itemsToUpdate: any[] = [];
+
+        orderData.items.forEach((item: any) => {
+          if (item._originalItem) {
+            const originalItem = item._originalItem;
+            if (originalItem.status === "ordered") {
+              if (printType === "kitchen" && item.category_type === "kitchen") {
+                itemsToUpdate.push(originalItem);
+              } else if (
+                printType === "bar" &&
+                item.category_type === "cold_bar"
+              ) {
+                itemsToUpdate.push(originalItem);
+              } else if (printType === "all") {
+                itemsToUpdate.push(originalItem);
+              }
+            }
+          }
+        });
+
+        if (itemsToUpdate.length > 0) {
+          const itemIds = itemsToUpdate.map((item) => item.id);
+          console.log(
+            `🔄 Actualizando ${itemsToUpdate.length} items a preparing:`,
+            itemIds,
+          );
+
+          const { error: updateError } = await supabase
+            .from("order_items")
+            .update({ status: "preparing" } as never)
+            .in("id", itemIds);
+
+          if (updateError) {
+            console.error("Error actualizando estados:", updateError);
+            alert(
+              `⚠️ La impresión fue exitosa pero hubo un error al actualizar los estados.\nError: ${updateError.message}`,
+            );
+          } else {
+            console.log(
+              `✅ ${itemsToUpdate.length} item(s) actualizados a "preparing"`,
+            );
+
+            setTables((prevTables) =>
+              prevTables.map((t) => {
+                if (t.id === tableId) {
+                  return {
+                    ...t,
+                    orders: t.orders.map((order) => ({
+                      ...order,
+                      order_items: order.order_items.map((item: any) => {
+                        if (itemIds.includes(item.id)) {
+                          return { ...item, status: "preparing" };
+                        }
+                        return item;
+                      }),
+                    })),
+                  };
+                }
+                return t;
+              }),
+            );
+
+            let tipoMensaje = "";
+            if (printType === "kitchen") tipoMensaje = "cocina";
+            else if (printType === "bar") tipoMensaje = "barra";
+            else tipoMensaje = "todas las áreas";
+
+            alert(
+              `✅ ${itemsToUpdate.length} producto(s) de ${tipoMensaje} enviado(s) a preparación`,
+            );
+          }
+        } else {
+          console.log("⚠️ No se encontraron items para actualizar");
+          let tipoMensaje = "";
+          if (printType === "kitchen") tipoMensaje = "cocina";
+          else if (printType === "bar") tipoMensaje = "barra";
+          else tipoMensaje = "ninguna categoría";
+          alert(
+            `❌ No se encontraron productos de ${tipoMensaje} en estado "ordered" para actualizar`,
+          );
+        }
+      }
+
+      if (typeof result === "object" && result.success) {
         let successMessage = `✅ Impresión enviada correctamente\n`;
         if (result.results) {
           result.results.forEach((r: any) => {
@@ -1089,13 +1180,38 @@ export default function WaiterDashboard() {
       }
     } catch (error: any) {
       console.error("Error en impresión:", error);
-      alert(`Error al imprimir: ${error.message || "Error desconocido"}`);
+      alert(
+        `❌ Error al imprimir: ${error.message || "Error desconocido"}\n\nLos productos NO han sido enviados a preparación.`,
+      );
     } finally {
       setPrinting(null);
     }
   };
 
-  // NUEVA FUNCIÓN: Manejar cobro de mesa con calculadora
+  // CORREGIDO: Calcular el total de TODOS los productos activos (no solo "ordered")
+  const calculateTableTotal = (table: TableWithOrder) => {
+    return table.orders.reduce((total, order) => {
+      if (order.order_items && Array.isArray(order.order_items)) {
+        const orderTotal = order.order_items.reduce(
+          (orderSum: number, item: any) => {
+            const cancelledQty = item.cancelled_quantity || 0;
+            const activeQuantity = item.quantity - cancelledQty;
+
+            // ✅ Incluir TODOS los productos con cantidad activa > 0 y que NO estén cancelados
+            if (activeQuantity > 0 && item.status !== "cancelled") {
+              return orderSum + item.price * activeQuantity;
+            }
+            return orderSum;
+          },
+          0,
+        );
+        return total + orderTotal;
+      }
+      return total + order.total_amount;
+    }, 0);
+  };
+
+  // MODIFICADO: Ahora incluye totalItemsCount
   const handleCobrarMesa = (tableId: number, tableNumber: number) => {
     const table = tables.find((t) => t.id === tableId);
     if (!table) {
@@ -1103,8 +1219,10 @@ export default function WaiterDashboard() {
       return;
     }
 
+    // ✅ Total de TODOS los productos activos
     const tableTotal = calculateTableTotal(table);
 
+    // Contar productos cancelados
     const cancelledItemsCount = table.orders.reduce((count, order) => {
       return (
         count +
@@ -1113,30 +1231,94 @@ export default function WaiterDashboard() {
       );
     }, 0);
 
-    // Guardar la información en el estado pendiente
+    // ✅ Contar productos activos totales (todos los estados NO cancelados)
+    const totalItemsCount = table.orders.reduce((count, order) => {
+      return (
+        count +
+        order.order_items.filter((item: any) => {
+          const activeQuantity = item.quantity - (item.cancelled_quantity || 0);
+          return activeQuantity > 0 && item.status !== "cancelled";
+        }).length
+      );
+    }, 0);
+
+    // Debug: Mostrar desglose por estado
+    const orderedCount = table.orders.reduce((count, order) => {
+      return (
+        count +
+        order.order_items.filter(
+          (item: any) =>
+            item.status === "ordered" &&
+            item.quantity - (item.cancelled_quantity || 0) > 0,
+        ).length
+      );
+    }, 0);
+
+    const preparingCount = table.orders.reduce((count, order) => {
+      return (
+        count +
+        order.order_items.filter(
+          (item: any) =>
+            item.status === "preparing" &&
+            item.quantity - (item.cancelled_quantity || 0) > 0,
+        ).length
+      );
+    }, 0);
+
+    const readyCount = table.orders.reduce((count, order) => {
+      return (
+        count +
+        order.order_items.filter(
+          (item: any) =>
+            item.status === "ready" &&
+            item.quantity - (item.cancelled_quantity || 0) > 0,
+        ).length
+      );
+    }, 0);
+
+    const servedCount = table.orders.reduce((count, order) => {
+      return (
+        count +
+        order.order_items.filter(
+          (item: any) =>
+            item.status === "served" &&
+            item.quantity - (item.cancelled_quantity || 0) > 0,
+        ).length
+      );
+    }, 0);
+
+    console.log(`💰 Mesa ${tableNumber} - Total a cobrar: $${tableTotal}`);
+    console.log(`   Productos activos totales: ${totalItemsCount}`);
+    console.log(
+      `   Desglose: Ordered: ${orderedCount}, Preparing: ${preparingCount}, Ready: ${readyCount}, Served: ${servedCount}`,
+    );
+    console.log(`   Cancelados: ${cancelledItemsCount}`);
+
     setPendingPaymentAction({
       tableId,
       tableNumber,
       totalAmount: tableTotal,
       cancelledItemsCount,
+      totalItemsCount, // ✅ NUEVO: Pasamos el total de productos activos
     });
 
-    // Mostrar el modal de calculadora de pago
     setShowPaymentCalculator(true);
   };
 
-  // NUEVA FUNCIÓN: Confirmar cobro con JSON de métodos de pago
+  // MODIFICADO: Ahora recibe totalItemsCount
   const confirmPayment = async (paymentData: any) => {
     if (!pendingPaymentAction) return;
-
-    const { tableId, tableNumber, totalAmount, cancelledItemsCount } =
-      pendingPaymentAction;
-
+    const {
+      tableId,
+      tableNumber,
+      totalAmount,
+      cancelledItemsCount,
+      totalItemsCount,
+    } = pendingPaymentAction;
     setProcessing(`cobrar-${tableId}`);
     setShowPaymentCalculator(false);
 
     try {
-      // Crear un objeto JSON con los detalles del pago
       const paymentDetails = {
         methods: paymentData.methods,
         exchangeRate: paymentData.exchangeRate,
@@ -1156,34 +1338,26 @@ export default function WaiterDashboard() {
         },
       };
 
-      // Convertir a JSON string para guardar en la base de datos
       const paymentMethodString = JSON.stringify(paymentDetails);
-
-      // Llamar al servicio para liberar la mesa y guardar el JSON
       await waiterService.freeTableAndClean(
         tableId,
         tableNumber,
         paymentMethodString,
       );
 
-      // Obtener datos de la mesa para imprimir ticket final
       const table = tables.find((t) => t.id === tableId);
       if (table) {
         const orderData = await prepareOrderForPrinting(table, false);
         if (orderData.items.length > 0) {
-          // Verificar si hay nombres de comensales para ticket final
           const hasCustomerNames = orderData.items.some(
             (item) => item.customerName && item.customerName !== "Cliente",
           );
-
-          // Imprimir ticket final
           try {
             const printResult = await printService.printTicket(
               orderData,
               hasCustomerNames,
               true,
             );
-
             if (!printResult.success) {
               console.warn(
                 "Ticket final no se pudo imprimir:",
@@ -1196,9 +1370,12 @@ export default function WaiterDashboard() {
         }
       }
 
-      // Mostrar mensaje de éxito
+      // Mensaje de éxito mejorado
       let successMessage = `✅ Mesa ${tableNumber} cobrada exitosamente\n\n`;
-      successMessage += `Detalles del pago:\n`;
+      successMessage += `📊 RESUMEN DE LA CUENTA:\n`;
+      successMessage += `• Productos activos cobrados: ${totalItemsCount}\n`;
+      successMessage += `• Productos cancelados: ${cancelledItemsCount}\n\n`;
+      successMessage += `💰 DETALLES DEL PAGO:\n`;
 
       if (paymentData.methods.cash > 0) {
         successMessage += `• Efectivo: $${paymentData.methods.cash.toFixed(2)} MXN\n`;
@@ -1207,24 +1384,20 @@ export default function WaiterDashboard() {
         successMessage += `• Tarjeta: $${paymentData.methods.terminal.toFixed(2)} MXN\n`;
       }
       if (paymentData.methods.dollars > 0) {
-        successMessage += `• Dólares: $${paymentData.methods.dollars.toFixed(2)} USD (Tasa: ${paymentData.exchangeRate})\n`;
+        successMessage += `• Dólares: $${paymentData.methods.dollars.toFixed(2)} USD\n`;
+        successMessage += `  Tasa: ${paymentData.exchangeRate} MXN/USD\n`;
         successMessage += `  Equivalente: $${(paymentData.methods.dollars * paymentData.exchangeRate).toFixed(2)} MXN\n`;
       }
 
-      successMessage += `\nTotal a pagar: $${totalAmount.toFixed(2)} MXN\n`;
-      successMessage += `Total pagado: $${paymentData.totalPaid.toFixed(2)} MXN\n`;
+      successMessage += `\n💵 TOTALES:\n`;
+      successMessage += `• Total a pagar: $${totalAmount.toFixed(2)} MXN\n`;
+      successMessage += `• Total pagado: $${paymentData.totalPaid.toFixed(2)} MXN\n`;
 
       if (paymentData.change > 0) {
-        successMessage += `Cambio: $${paymentData.change.toFixed(2)} MXN\n`;
-      }
-
-      if (cancelledItemsCount > 0) {
-        successMessage += `\n${cancelledItemsCount} producto(s) cancelado(s) excluidos\n`;
+        successMessage += `• Cambio: $${paymentData.change.toFixed(2)} MXN\n`;
       }
 
       alert(successMessage);
-
-      // Recargar datos
       await loadData();
     } catch (error: any) {
       console.error("Error cobrando mesa:", error);
@@ -1241,27 +1414,6 @@ export default function WaiterDashboard() {
 
   const handleError = (error: string) => {
     alert(error);
-  };
-
-  const calculateTableTotal = (table: TableWithOrder) => {
-    return table.orders.reduce((total, order) => {
-      if (order.order_items && Array.isArray(order.order_items)) {
-        const orderTotal = order.order_items.reduce(
-          (orderSum: number, item: any) => {
-            const cancelledQty = item.cancelled_quantity || 0;
-            const activeQuantity = item.quantity - cancelledQty;
-
-            if (activeQuantity > 0 && item.status === "ordered") {
-              return orderSum + item.price * activeQuantity;
-            }
-            return orderSum;
-          },
-          0,
-        );
-        return total + orderTotal;
-      }
-      return total + order.total_amount;
-    }, 0);
   };
 
   if (loading) {
@@ -1339,6 +1491,7 @@ export default function WaiterDashboard() {
           tableNumber={pendingPaymentAction.tableNumber}
           totalAmount={pendingPaymentAction.totalAmount}
           cancelledItemsCount={pendingPaymentAction.cancelledItemsCount}
+          totalItemsCount={pendingPaymentAction.totalItemsCount} // NUEVO
         />
       )}
     </div>

@@ -72,12 +72,13 @@ export class PrintNodeApiService {
 
   // ================= HELPERS =================
   private line(char = '-') {
-    return char.repeat(this.PAPER_WIDTH) + '\n';
+    // FIX: Usar repetición de caracteres sin salto de línea extra
+    return char.repeat(this.PAPER_WIDTH);
   }
 
   private center(text: string) {
     const pad = Math.floor((this.PAPER_WIDTH - text.length) / 2);
-    return ' '.repeat(Math.max(0, pad)) + text + '\n';
+    return ' '.repeat(Math.max(0, pad)) + text;
   }
 
   private money(v: number) {
@@ -120,19 +121,18 @@ export class PrintNodeApiService {
 
     let c = '';
     c += '\x1B\x40'; // reset
-    c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252) o
-    c += '\x1B\x74\x12'; // UTF-8 (puede variar según impresora)
+    c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252)
     c += '\x1B\x61\x00'; // left align
 
     // HEADER
-    c += this.center('LA MAQUILA');
-    c += this.center('ESTACION CULTURAL');
-    c += this.center('R.F.C. GADG-840229-MY6');
-    c += this.center('JUAN RUIZ DE ALARCON #1570');
-    c += this.center('ZONA URBANA RIO C.P. 22010');
+    c += this.center('LA MAQUILA') + '\n';
+    c += this.center('ESTACION CULTURAL') + '\n';
+    c += this.center('R.F.C. GADG-840229-MY6') + '\n';
+    c += this.center('JUAN RUIZ DE ALARCON #1570') + '\n';
+    c += this.center('ZONA URBANA RIO C.P. 22010') + '\n';
     c += '\n';
 
-    c += this.line();
+    c += this.line('=') + '\n';
 
     // INFO
     c += `FOLIO: ${folio}\n`;
@@ -141,11 +141,11 @@ export class PrintNodeApiService {
     c += `MESERO: ${printData.waiter}\n`;
     c += '\n';
 
-    c += this.line();
+    c += this.line('=') + '\n';
 
     // ITEMS header
     c += 'CANT DESCRIPCION                  IMPORTE\n';
-    c += this.line();
+    c += this.line('-') + '\n';
 
     // ITEMS
     printData.items.forEach(item => {
@@ -160,7 +160,7 @@ export class PrintNodeApiService {
       }
     });
 
-    c += this.line();
+    c += this.line('-') + '\n';
 
     // TOTAL numeric
     const totalLabel = 'TOTAL';
@@ -168,15 +168,9 @@ export class PrintNodeApiService {
     const left = totalLabel.padEnd(this.PAPER_WIDTH - totalAmount.length - 1, ' ');
     c += `${left} ${totalAmount}\n\n`;
 
-    // if (isFinalTicket) {
-    //   // TOTAL in words (without currency suffix as requested)
-    //   const words = this.numberToWordsMX(printData.total);
-    //   c += words + '\n\n';
-    // }
-
     // FOOTER
-    c += this.center('GRACIAS POR SU VISITA');
-    c += this.center('VUELVA PRONTO');
+    c += this.center('GRACIAS POR SU VISITA') + '\n';
+    c += this.center('VUELVA PRONTO') + '\n';
     c += '\n';
 
     // CORTE
@@ -192,25 +186,24 @@ export class PrintNodeApiService {
 
     let c = '';
     c += '\x1B\x40'; // reset
-      c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252) o
-    c += '\x1B\x74\x12'; // UTF-8 (puede variar según impresora)
+    c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252)
     c += '\x1B\x61\x01'; // center align
 
     // HEADER
-    c += this.center('LA MAQUILA');
-    c += this.center('COCINA');
-    c += '\n';
+    // c += this.center('LA MAQUILA') + '\n';
+    // c += this.center('COCINA') + '\n';
+    // c += '\n';
 
-    c += this.line('=');
+    c += this.line('=') + '\n';
 
     c += '\x1B\x61\x00'; // left align
     c += `FECHA: ${fecha.toLocaleDateString('es-MX')}\n`;
     c += `HORA: ${horaStr}\n`;
     c += `MESA: ${printData.tableNumber}\n`;
-    c += `MESERO: ${printData.waiter}\n`;
+    // c += `MESERO: ${printData.waiter}\n`;
     c += '\n';
 
-    c += this.line();
+    c += this.line('-') + '\n';
 
     c += '\x1B\x61\x01'; // center align
     c += 'PRODUCTOS DE COCINA\n';
@@ -238,7 +231,7 @@ export class PrintNodeApiService {
     }
 
     c += '\n';
-    c += this.line('=');
+    c += this.line('=') + '\n';
     c += '\x1B\x61\x01'; // center align
     c += 'PREPARAR INMEDIATAMENTE\n';
     c += '\n';
@@ -256,25 +249,24 @@ export class PrintNodeApiService {
 
     let c = '';
     c += '\x1B\x40'; // reset
-      c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252) o
-    c += '\x1B\x74\x12'; // UTF-8 (puede variar según impresora)
+    c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252)
     c += '\x1B\x61\x01'; // center align
 
     // HEADER
-    c += this.center('LA MAQUILA');
-    c += this.center('BARRA FRÍA');
-    c += '\n';
+    // c += this.center('LA MAQUILA') + '\n';
+    // c += this.center('BARRA FRÍA') + '\n';
+    // c += '\n';
 
-    c += this.line('=');
+    c += this.line('=') + '\n';
 
     c += '\x1B\x61\x00'; // left align
     c += `FECHA: ${fecha.toLocaleDateString('es-MX')}\n`;
     c += `HORA: ${horaStr}\n`;
     c += `MESA: ${printData.tableNumber}\n`;
-    c += `MESERO: ${printData.waiter}\n`;
+    // c += `MESERO: ${printData.waiter}\n`;
     c += '\n';
 
-    c += this.line();
+    c += this.line('-') + '\n';
 
     c += '\x1B\x61\x01'; // center align
     c += 'PRODUCTOS DE BARRA FRÍA\n';
@@ -302,7 +294,7 @@ export class PrintNodeApiService {
     }
 
     c += '\n';
-    c += this.line('=');
+    c += this.line('=') + '\n';
     c += '\x1B\x61\x01'; // center align
     c += 'PREPARAR INMEDIATAMENTE\n';
     c += '\n';
@@ -324,19 +316,18 @@ export class PrintNodeApiService {
     c += '\x1B\x61\x01'; // center align
 
     // HEADER
-    c += this.center('LA MAQUILA');
+    c += this.center('LA MAQUILA') + '\n';
     c += '\n';
 
-    c += this.line();
+    c += this.line('=') + '\n';
 
     c += '\x1B\x61\x00'; // left align
     c += `FECHA: ${fechaStr}\n`;
     c += `HORA: ${horaStr}\n`;
     c += `MESA: ${printData.tableNumber}\n`;
-    c += `MESERO: ${printData.waiter}\n`;
     c += '\n';
 
-    c += this.line();
+    c += this.line('-') + '\n';
 
     // Agrupar por comensal
     const groupedByCustomer: Record<string, Array<typeof printData.items[0]>> = {};
@@ -363,7 +354,7 @@ export class PrintNodeApiService {
       c += '\n';
     });
 
-    c += this.line();
+    c += this.line('-') + '\n';
 
     // TOTAL
     const totalLabel = 'TOTAL';
@@ -373,7 +364,7 @@ export class PrintNodeApiService {
 
     // FOOTER
     c += '\x1B\x61\x01'; // center align
-    c += this.center('GRACIAS POR SU VISITA');
+    c += this.center('GRACIAS POR SU VISITA') + '\n';
     c += '\n';
 
     // CORTE

@@ -97,9 +97,9 @@ export default function TableHeader({
         total +
         order.order_items.reduce(
           (sum: number, item: any) => sum + item.quantity,
-          0
+          0,
         ),
-      0
+      0,
     );
   };
 
@@ -109,16 +109,16 @@ export default function TableHeader({
         total +
         order.order_items.filter(
           (item: any) =>
-            item.status === "ordered" || item.status === "preparing"
+            item.status === "ordered" || item.status === "preparing",
         ).length,
-      0
+      0,
     );
 
     const ready = table.orders.reduce(
       (total, order) =>
         total +
         order.order_items.filter((item: any) => item.status === "ready").length,
-      0
+      0,
     );
 
     const served = table.orders.reduce(
@@ -126,7 +126,7 @@ export default function TableHeader({
         total +
         order.order_items.filter((item: any) => item.status === "served")
           .length,
-      0
+      0,
     );
 
     return { pending, ready, served };
@@ -135,7 +135,8 @@ export default function TableHeader({
   // Obtener notificaciones de "Solicita la cuenta" para esta mesa
   const billRequestNotifications = notifications.filter(
     (notification: any) =>
-      notification.table_id === table.id && notification.type === "bill_request"
+      notification.table_id === table.id &&
+      notification.type === "bill_request",
   );
 
   // Obtener la notificación más reciente de cuenta
@@ -214,7 +215,7 @@ export default function TableHeader({
       // CALCULAR EL TOTAL
       const orderTotal = selectedItems.reduce(
         (total, item) => total + item.price * item.quantity,
-        0
+        0,
       );
 
       // CREAR LA ORDEN EN LA TABLA ORDERS
@@ -277,12 +278,12 @@ export default function TableHeader({
 
       // Mostrar mensaje de éxito
       alert(
-        `✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`
+        `✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`,
       );
     } catch (error) {
       console.error("Error completo adding order:", error);
       setError(
-        `Error: ${error instanceof Error ? error.message : "Error desconocido"}`
+        `Error: ${error instanceof Error ? error.message : "Error desconocido"}`,
       );
     } finally {
       setAddingOrder(false);
@@ -299,7 +300,7 @@ export default function TableHeader({
         const product = products.find((p) => p.id === parseInt(productId));
         return sum + (product?.price || 0) * quantity;
       },
-      0
+      0,
     );
   };
 
@@ -359,7 +360,7 @@ export default function TableHeader({
                       {
                         hour: "2-digit",
                         minute: "2-digit",
-                      }
+                      },
                     )
                   : "Sin registro"}
               </span>
@@ -373,15 +374,15 @@ export default function TableHeader({
                 table.status === "occupied"
                   ? "bg-green-100 text-green-800"
                   : table.status === "reserved"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-gray-100 text-gray-800"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-gray-100 text-gray-800"
               }`}
             >
               {table.status === "occupied"
                 ? "Ocupada"
                 : table.status === "reserved"
-                ? "Reservada"
-                : "Disponible"}
+                  ? "Reservada"
+                  : "Disponible"}
             </span>
 
             {/* NOTIFICACIÓN DE CUENTA CON MÉTODO DE PAGO */}
@@ -399,7 +400,7 @@ export default function TableHeader({
               >
                 {(() => {
                   const IconComponent = getPaymentMethodInfo(
-                    latestBillRequest.payment_method
+                    latestBillRequest.payment_method,
                   ).icon;
                   return <IconComponent className="text-xs" />;
                 })()}
@@ -548,8 +549,8 @@ export default function TableHeader({
                                 product.id,
                                 Math.max(
                                   0,
-                                  (selectedProducts[product.id] || 0) - 1
-                                )
+                                  (selectedProducts[product.id] || 0) - 1,
+                                ),
                               )
                             }
                             disabled={(selectedProducts[product.id] || 0) <= 0}
@@ -566,7 +567,7 @@ export default function TableHeader({
                             onClick={() =>
                               handleProductQuantityChange(
                                 product.id,
-                                (selectedProducts[product.id] || 0) + 1
+                                (selectedProducts[product.id] || 0) + 1,
                               )
                             }
                             className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300"
