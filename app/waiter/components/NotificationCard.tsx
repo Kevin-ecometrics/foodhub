@@ -1,6 +1,10 @@
 import { WaiterNotification } from "@/app/lib/supabase/waiter";
 import { FaEye, FaCheck, FaSpinner, FaClock, FaUser } from "react-icons/fa";
-import { HiOutlineCheckCircle, HiOutlineExclamation } from "react-icons/hi";
+import {
+  HiOutlineCheckCircle,
+  HiOutlineExclamation,
+  HiOutlineEyeOff,
+} from "react-icons/hi";
 import NotificationIcon from "./NotificationIcon";
 
 interface NotificationCardProps {
@@ -79,9 +83,9 @@ export default function NotificationCard({
     <div
       className={`
         rounded-lg shadow-md border-l-4 transition-all duration-200
-        hover:shadow-lg hover:-translate-y-0.5
+        hover:shadow-lg
         ${notificationType.color}
-        ${isAttended ? "opacity-80 scale-[0.98]" : ""}
+        ${isAttended ? "opacity-75 bg-opacity-50" : ""}
         ${isProcessing ? "animate-pulse" : ""}
         ${isUrgent && !isAttended ? "ring-2 ring-opacity-30 ring-red-300" : ""}
       `}
@@ -113,24 +117,24 @@ export default function NotificationCard({
                     <span
                       className={`
                       text-xs font-semibold px-2 py-1 rounded-full
-                      ${isUrgent ? "animate-pulse" : ""}
+                      ${isUrgent ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}
                     `}
                     >
                       {notificationType.label}
                     </span>
                   </div>
 
-                  {/* Estado */}
+                  {/* Estado - MEJORADO */}
                   <div className="flex items-center gap-2 ml-auto sm:ml-0">
                     {isAttended ? (
-                      <span className="flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                        <HiOutlineCheckCircle />
-                        Atendida
+                      <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                        <HiOutlineEyeOff />
+                        Visto
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                      <span className="flex items-center gap-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full animate-pulse">
                         <HiOutlineExclamation />
-                        Pendiente
+                        Nuevo
                       </span>
                     )}
                   </div>
@@ -168,8 +172,9 @@ export default function NotificationCard({
             </div>
           </div>
 
-          {/* Acciones */}
+          {/* Acciones - MEJORADO */}
           <div className="flex sm:flex-col gap-2 sm:gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+            {/* Botón ATENDER - Solo visible si NO está atendida */}
             {!isAttended && (
               <button
                 onClick={onAcknowledge}
@@ -199,6 +204,7 @@ export default function NotificationCard({
               </button>
             )}
 
+            {/* Botón COMPLETAR - Siempre visible, pero diferente texto si está atendida */}
             <button
               onClick={onComplete}
               disabled={isProcessing}
@@ -208,8 +214,10 @@ export default function NotificationCard({
                 transition-colors duration-200
                 ${
                   isProcessing
-                    ? "bg-green-400 cursor-not-allowed"
-                    : "bg-green-500 hover:bg-green-600 active:bg-green-700"
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : isAttended
+                      ? "bg-green-500 hover:bg-green-600 active:bg-green-700"
+                      : "bg-yellow-500 hover:bg-yellow-600 active:bg-yellow-700"
                 }
                 text-white shadow-sm
                 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
@@ -223,17 +231,29 @@ export default function NotificationCard({
               ) : (
                 <FaCheck />
               )}
-              <span className="hidden sm:inline">Completar</span>
+              <span className="hidden sm:inline">
+                {isAttended ? "Completar" : "Resolver"}
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Indicador de urgencia */}
+        {/* Indicador de urgencia - Solo si no está atendida */}
         {isUrgent && !isAttended && (
           <div className="mt-3 pt-3 border-t border-gray-200">
             <div className="flex items-center gap-1 text-sm text-red-600 font-medium">
-              <HiOutlineExclamation className="text-red-500" />
-              <span>Atención requerida</span>
+              <HiOutlineExclamation className="text-red-500 animate-pulse" />
+              <span>Atención requerida inmediata</span>
+            </div>
+          </div>
+        )}
+
+        {/* Mensaje de "Visto" - Solo si está atendida */}
+        {isAttended && (
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="flex items-center gap-1 text-sm text-blue-600">
+              <HiOutlineEyeOff className="text-blue-500" />
+              <span>Notificación vista - Pendiente de completar</span>
             </div>
           </div>
         )}

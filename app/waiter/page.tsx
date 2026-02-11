@@ -95,7 +95,7 @@ function PasswordModal({
   );
 }
 
-// Modal para calculadora de pago - MODIFICADO para recibir totalItemsCount
+// Modal para calculadora de pago - CORREGIDO con manejo de decimales
 function PaymentCalculatorModal({
   isOpen,
   onClose,
@@ -119,28 +119,61 @@ function PaymentCalculatorModal({
   const [exchangeRate, setExchangeRate] = useState(17.5);
   const [showExchangeInput, setShowExchangeInput] = useState(false);
 
-  const totalPaid = cash + terminal + dollars * exchangeRate;
-  const change = Math.max(0, totalPaid - totalAmount);
-  const pendingAmount = Math.max(0, totalAmount - totalPaid);
+  // ✅ Función para redondear a 2 decimales de forma segura
+  const roundToTwoDecimals = (num: number): number => {
+    return Math.round((num + Number.EPSILON) * 100) / 100;
+  };
+
+  // ✅ Calcular valores con redondeo
+  const dollarsToMXN = roundToTwoDecimals(dollars * exchangeRate);
+  const totalPaid = roundToTwoDecimals(cash + terminal + dollarsToMXN);
+  const totalAmountRounded = roundToTwoDecimals(totalAmount);
+
+  // ✅ Comparación con tolerancia de 0.01 (1 centavo)
+  const TOLERANCE = 0.01;
+  const isPaymentComplete = totalPaid >= totalAmountRounded - TOLERANCE;
+  const change = roundToTwoDecimals(
+    Math.max(0, totalPaid - totalAmountRounded),
+  );
+  const pendingAmount = roundToTwoDecimals(
+    Math.max(0, totalAmountRounded - totalPaid),
+  );
 
   const handleConfirm = () => {
-    if (totalPaid < totalAmount) {
-      alert(`Falta por pagar: $${pendingAmount.toFixed(2)} MXN`);
+    // ✅ Usar tolerancia en la validación
+    if (totalPaid < totalAmountRounded - TOLERANCE) {
+      alert(`❌ Falta por pagar: $${pendingAmount.toFixed(2)} MXN`);
       return;
     }
 
+    // ✅ Redondear todos los valores antes de enviar
     const paymentData = {
       methods: {
-        cash,
-        terminal,
-        dollars,
+        cash: roundToTwoDecimals(cash),
+        terminal: roundToTwoDecimals(terminal),
+        dollars: roundToTwoDecimals(dollars),
       },
-      exchangeRate,
-      totalPaid,
-      change,
+      exchangeRate: roundToTwoDecimals(exchangeRate),
+      totalPaid: roundToTwoDecimals(totalPaid),
+      change: roundToTwoDecimals(change),
     };
 
+    // ✅ Si el cambio es negativo o muy pequeño, establecerlo a 0
+    if (paymentData.change < 0.01) {
+      paymentData.change = 0;
+    }
+
     onConfirm(paymentData);
+  };
+
+  // ✅ Limpiar campos al cerrar
+  const handleClose = () => {
+    setCash(0);
+    setTerminal(0);
+    setDollars(0);
+    setExchangeRate(17.5);
+    setShowExchangeInput(false);
+    onClose();
   };
 
   const formatCurrency = (amount: number) => {
@@ -159,7 +192,7 @@ function PaymentCalculatorModal({
           Calculadora de Pago - Mesa {tableNumber}
         </h3>
 
-        {/* Resumen de la cuenta - MODIFICADO */}
+        {/* Resumen de la cuenta */}
         <div className="mb-4 p-3 bg-gray-100 rounded-lg text-sm">
           <div className="flex justify-between mb-1">
             <span className="text-gray-600">Productos activos:</span>
@@ -177,11 +210,10 @@ function PaymentCalculatorModal({
           <div className="text-center">
             <p className="text-sm text-gray-600 mb-1">Total a pagar</p>
             <p className="text-3xl font-bold text-blue-700">
-              {formatCurrency(totalAmount)}
+              {formatCurrency(totalAmountRounded)}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              Incluye productos en todos los estados (ordered, preparing, ready,
-              served)
+              Incluye productos en todos los estados
             </p>
           </div>
         </div>
@@ -197,13 +229,16 @@ function PaymentCalculatorModal({
                 min="0"
                 step="0.01"
                 value={cash || ""}
-                onChange={(e) => setCash(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setCash(isNaN(value) ? 0 : roundToTwoDecimals(value));
+                }}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
               <button
                 type="button"
-                onClick={() => setCash(totalAmount)}
+                onClick={() => setCash(totalAmountRounded)}
                 className="px-4 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 text-sm"
               >
                 Llenar
@@ -220,7 +255,10 @@ function PaymentCalculatorModal({
               min="0"
               step="0.01"
               value={terminal || ""}
-              onChange={(e) => setTerminal(parseFloat(e.target.value) || 0)}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                setTerminal(isNaN(value) ? 0 : roundToTwoDecimals(value));
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
@@ -245,12 +283,15 @@ function PaymentCalculatorModal({
                 min="0"
                 step="0.01"
                 value={dollars || ""}
-                onChange={(e) => setDollars(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setDollars(isNaN(value) ? 0 : roundToTwoDecimals(value));
+                }}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
               <div className="flex items-center px-3 bg-gray-100 rounded-md text-sm">
-                = {formatCurrency((dollars || 0) * exchangeRate)}
+                = {formatCurrency(dollarsToMXN)}
               </div>
             </div>
             {showExchangeInput && (
@@ -263,9 +304,12 @@ function PaymentCalculatorModal({
                   min="0"
                   step="0.01"
                   value={exchangeRate}
-                  onChange={(e) =>
-                    setExchangeRate(parseFloat(e.target.value) || 17.5)
-                  }
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    setExchangeRate(
+                      isNaN(value) ? 17.5 : roundToTwoDecimals(value),
+                    );
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -279,17 +323,21 @@ function PaymentCalculatorModal({
         <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Efectivo:</span>
-            <span className="font-medium">{formatCurrency(cash)}</span>
+            <span className="font-medium">
+              {formatCurrency(roundToTwoDecimals(cash))}
+            </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Terminal:</span>
-            <span className="font-medium">{formatCurrency(terminal)}</span>
+            <span className="font-medium">
+              {formatCurrency(roundToTwoDecimals(terminal))}
+            </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Dólares:</span>
             <span className="font-medium">
-              ${(dollars || 0).toFixed(2)} USD ={" "}
-              {formatCurrency((dollars || 0) * exchangeRate)}
+              ${roundToTwoDecimals(dollars).toFixed(2)} USD ={" "}
+              {formatCurrency(dollarsToMXN)}
             </span>
           </div>
 
@@ -298,13 +346,13 @@ function PaymentCalculatorModal({
               <span>Total pagado:</span>
               <span
                 className={
-                  totalPaid >= totalAmount ? "text-green-600" : "text-red-600"
+                  isPaymentComplete ? "text-green-600" : "text-red-600"
                 }
               >
                 {formatCurrency(totalPaid)}
               </span>
             </div>
-            {totalPaid > totalAmount && (
+            {change > TOLERANCE && (
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-600">Cambio:</span>
                 <span className="text-green-600 font-medium">
@@ -312,7 +360,7 @@ function PaymentCalculatorModal({
                 </span>
               </div>
             )}
-            {totalPaid < totalAmount && (
+            {!isPaymentComplete && (
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-600">Falta por pagar:</span>
                 <span className="text-red-600 font-medium">
@@ -325,7 +373,7 @@ function PaymentCalculatorModal({
 
         <div className="flex gap-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
           >
             Cancelar
@@ -333,7 +381,7 @@ function PaymentCalculatorModal({
           <button
             onClick={handleConfirm}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            disabled={totalPaid < totalAmount}
+            disabled={!isPaymentComplete}
           >
             Confirmar Pago
           </button>
@@ -435,7 +483,7 @@ export default function WaiterDashboard() {
     tableNumber: number;
     totalAmount: number;
     cancelledItemsCount: number;
-    totalItemsCount: number; // NUEVO
+    totalItemsCount: number;
   } | null>(null);
 
   const scrollPositionRef = useRef(0);
@@ -654,7 +702,13 @@ export default function WaiterDashboard() {
   const handleAcknowledgeNotification = async (notificationId: string) => {
     setProcessing(notificationId);
     try {
+      // ✅ SOLO marcar como atendida en el estado local, NO eliminar
       setAttendedNotifications((prev) => new Set(prev).add(notificationId));
+
+      // ✅ NO llamar a waiterService.completeNotification
+      // Solo marcamos como atendida visualmente
+
+      console.log(`👁️ Notificación ${notificationId} marcada como atendida`);
     } catch (error) {
       console.error("Error marcando notificación como atendida:", error);
     } finally {
@@ -665,13 +719,20 @@ export default function WaiterDashboard() {
   const handleCompleteNotification = async (notificationId: string) => {
     setProcessing(notificationId);
     try {
+      // ✅ Eliminar de Supabase
       await waiterService.completeNotification(notificationId);
+
+      // ✅ Eliminar del estado de notificaciones
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+
+      // ✅ Eliminar del Set de atendidas
       setAttendedNotifications((prev) => {
         const newSet = new Set(prev);
         newSet.delete(notificationId);
         return newSet;
       });
+
+      console.log(`✅ Notificación ${notificationId} completada y eliminada`);
     } catch (error) {
       console.error("Error completando notificación:", error);
     } finally {
@@ -1188,7 +1249,7 @@ export default function WaiterDashboard() {
     }
   };
 
-  // CORREGIDO: Calcular el total de TODOS los productos activos (no solo "ordered")
+  // CORREGIDO: Calcular el total de TODOS los productos activos
   const calculateTableTotal = (table: TableWithOrder) => {
     return table.orders.reduce((total, order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
@@ -1299,13 +1360,13 @@ export default function WaiterDashboard() {
       tableNumber,
       totalAmount: tableTotal,
       cancelledItemsCount,
-      totalItemsCount, // ✅ NUEVO: Pasamos el total de productos activos
+      totalItemsCount,
     });
 
     setShowPaymentCalculator(true);
   };
 
-  // MODIFICADO: Ahora recibe totalItemsCount
+  // MODIFICADO: Confirmar pago con manejo de decimales
   const confirmPayment = async (paymentData: any) => {
     if (!pendingPaymentAction) return;
     const {
@@ -1315,25 +1376,41 @@ export default function WaiterDashboard() {
       cancelledItemsCount,
       totalItemsCount,
     } = pendingPaymentAction;
+
     setProcessing(`cobrar-${tableId}`);
     setShowPaymentCalculator(false);
 
     try {
+      // ✅ Redondear todos los valores
+      const roundToTwoDecimals = (num: number) =>
+        Math.round((num + Number.EPSILON) * 100) / 100;
+
+      const cash = roundToTwoDecimals(paymentData.methods.cash);
+      const terminal = roundToTwoDecimals(paymentData.methods.terminal);
+      const dollars = roundToTwoDecimals(paymentData.methods.dollars);
+      const exchangeRate = roundToTwoDecimals(paymentData.exchangeRate);
+      const totalPaid = roundToTwoDecimals(paymentData.totalPaid);
+      const change = roundToTwoDecimals(paymentData.change);
+      const totalAmountRounded = roundToTwoDecimals(totalAmount);
+
       const paymentDetails = {
-        methods: paymentData.methods,
-        exchangeRate: paymentData.exchangeRate,
-        totalAmount: totalAmount,
-        totalPaid: paymentData.totalPaid,
-        change: paymentData.change,
+        methods: {
+          cash,
+          terminal,
+          dollars,
+        },
+        exchangeRate,
+        totalAmount: totalAmountRounded,
+        totalPaid,
+        change,
         timestamp: new Date().toISOString(),
         summary: {
-          cash: paymentData.methods.cash,
-          terminal: paymentData.methods.terminal,
+          cash,
+          terminal,
           dollars: {
-            amount: paymentData.methods.dollars,
-            exchangeRate: paymentData.exchangeRate,
-            equivalentMXN:
-              paymentData.methods.dollars * paymentData.exchangeRate,
+            amount: dollars,
+            exchangeRate,
+            equivalentMXN: roundToTwoDecimals(dollars * exchangeRate),
           },
         },
       };
@@ -1377,24 +1454,24 @@ export default function WaiterDashboard() {
       successMessage += `• Productos cancelados: ${cancelledItemsCount}\n\n`;
       successMessage += `💰 DETALLES DEL PAGO:\n`;
 
-      if (paymentData.methods.cash > 0) {
-        successMessage += `• Efectivo: $${paymentData.methods.cash.toFixed(2)} MXN\n`;
+      if (cash > 0) {
+        successMessage += `• Efectivo: $${cash.toFixed(2)} MXN\n`;
       }
-      if (paymentData.methods.terminal > 0) {
-        successMessage += `• Tarjeta: $${paymentData.methods.terminal.toFixed(2)} MXN\n`;
+      if (terminal > 0) {
+        successMessage += `• Tarjeta: $${terminal.toFixed(2)} MXN\n`;
       }
-      if (paymentData.methods.dollars > 0) {
-        successMessage += `• Dólares: $${paymentData.methods.dollars.toFixed(2)} USD\n`;
-        successMessage += `  Tasa: ${paymentData.exchangeRate} MXN/USD\n`;
-        successMessage += `  Equivalente: $${(paymentData.methods.dollars * paymentData.exchangeRate).toFixed(2)} MXN\n`;
+      if (dollars > 0) {
+        successMessage += `• Dólares: $${dollars.toFixed(2)} USD\n`;
+        successMessage += `  Tasa: ${exchangeRate.toFixed(2)} MXN/USD\n`;
+        successMessage += `  Equivalente: $${roundToTwoDecimals(dollars * exchangeRate).toFixed(2)} MXN\n`;
       }
 
       successMessage += `\n💵 TOTALES:\n`;
-      successMessage += `• Total a pagar: $${totalAmount.toFixed(2)} MXN\n`;
-      successMessage += `• Total pagado: $${paymentData.totalPaid.toFixed(2)} MXN\n`;
+      successMessage += `• Total a pagar: $${totalAmountRounded.toFixed(2)} MXN\n`;
+      successMessage += `• Total pagado: $${totalPaid.toFixed(2)} MXN\n`;
 
-      if (paymentData.change > 0) {
-        successMessage += `• Cambio: $${paymentData.change.toFixed(2)} MXN\n`;
+      if (change > 0.01) {
+        successMessage += `• Cambio: $${change.toFixed(2)} MXN\n`;
       }
 
       alert(successMessage);
@@ -1491,7 +1568,7 @@ export default function WaiterDashboard() {
           tableNumber={pendingPaymentAction.tableNumber}
           totalAmount={pendingPaymentAction.totalAmount}
           cancelledItemsCount={pendingPaymentAction.cancelledItemsCount}
-          totalItemsCount={pendingPaymentAction.totalItemsCount} // NUEVO
+          totalItemsCount={pendingPaymentAction.totalItemsCount}
         />
       )}
     </div>
