@@ -41,7 +41,7 @@ export class PrintNodeApiService {
     throw new Error("Method not implemented.");
   }
   private baseUrl: string;
-  private PAPER_WIDTH = 58; // 58mm
+  private PAPER_WIDTH = 46; // 58mm
   private internalApiKey: string;
 
   constructor() {
@@ -233,7 +233,6 @@ export class PrintNodeApiService {
     c += '\n';
     c += this.line('=') + '\n';
     c += '\x1B\x61\x01'; // center align
-    c += 'PREPARAR INMEDIATAMENTE\n';
     c += '\n';
 
     // CORTE
@@ -296,7 +295,6 @@ export class PrintNodeApiService {
     c += '\n';
     c += this.line('=') + '\n';
     c += '\x1B\x61\x01'; // center align
-    c += 'PREPARAR INMEDIATAMENTE\n';
     c += '\n';
 
     // CORTE
