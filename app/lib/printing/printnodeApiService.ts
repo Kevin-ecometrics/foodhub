@@ -206,7 +206,7 @@ export class PrintNodeApiService {
     c += this.line('-') + '\n';
 
     c += '\x1B\x61\x01'; // center align
-    c += 'PRODUCTOS DE COCINA\n';
+    c += 'COCINA\n';
     c += '\n';
 
     c += '\x1B\x61\x00'; // left align
@@ -223,7 +223,7 @@ export class PrintNodeApiService {
       c += 'No hay productos de cocina\n';
     } else {
       kitchenItems.forEach(item => {
-        c += `[${item.quantity}x] ${item.name}\n`;
+        c += `[${item.quantity}] ${item.name}\n`;
         if (item.notes) {
           c += `  Nota: ${item.notes}\n`;
         }
@@ -269,7 +269,7 @@ export class PrintNodeApiService {
     c += this.line('-') + '\n';
 
     c += '\x1B\x61\x01'; // center align
-    c += 'PRODUCTOS DE BARRA FRÍA\n';
+    c += 'BARRA FRIA\n';
     c += '\n';
 
     c += '\x1B\x61\x00'; // left align
@@ -286,7 +286,7 @@ export class PrintNodeApiService {
       c += 'No hay productos de barra fría\n';
     } else {
       coldBarItems.forEach(item => {
-        c += `[${item.quantity}x] ${item.name}\n`;
+        c += `[${item.quantity}] ${item.name}\n`;
         if (item.notes) {
           c += `  Nota: ${item.notes}\n`;
         }
