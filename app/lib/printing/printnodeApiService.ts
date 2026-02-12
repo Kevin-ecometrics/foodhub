@@ -72,7 +72,6 @@ export class PrintNodeApiService {
 
   // ================= HELPERS =================
   private line(char = '-') {
-    // FIX: Usar repetición de caracteres sin salto de línea extra
     return char.repeat(this.PAPER_WIDTH);
   }
 
@@ -91,6 +90,15 @@ export class PrintNodeApiService {
 
   private totalItems(items: PrintData['items']) {
     return items.reduce((s, i) => s + i.quantity, 0);
+  }
+
+  private getCurrentDateTime() {
+    const now = new Date();
+    return {
+      fecha: now.toLocaleDateString('es-MX'),
+      hora: now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
+      fechaHoraCompleta: now.toLocaleString('es-MX')
+    };
   }
 
   private numberToWordsMX(amount: number): string {
@@ -112,12 +120,10 @@ export class PrintNodeApiService {
     return `${d[dec]}${uni ? ' Y ' + u[uni] : ''}`;
   }
 
-  // ================= TICKET FINAL =================
+  // ================= TICKET PRINCIPAL =================
   private generateTicketContent(printData: PrintData, isFinalTicket: boolean = false): string {
     const folio = this.generateFolio();
-    const fecha = new Date(printData.createdAt);
-    const fechaStr = fecha.toLocaleDateString('es-MX');
-    const horaStr = fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const { fecha, hora } = this.getCurrentDateTime();
 
     let c = '';
     c += '\x1B\x40'; // reset
@@ -136,11 +142,16 @@ export class PrintNodeApiService {
 
     // INFO
     c += `FOLIO: ${folio}\n`;
-    c += `FECHA: ${fechaStr} ${horaStr}\n`;
+    c += `FECHA: ${fecha} ${hora}\n`;
     c += `MESA: ${printData.tableNumber}  COMENSALES: ${printData.customerCount}\n`;
     c += `MESERO: ${printData.waiter}\n`;
+    
+    if (isFinalTicket) {
+      const { hora: horaReimpresion } = this.getCurrentDateTime();
+      c += `*** REIMPRESION - ${horaReimpresion} ***\n`;
+    }
+    
     c += '\n';
-
     c += this.line('=') + '\n';
 
     // ITEMS header
@@ -162,7 +173,7 @@ export class PrintNodeApiService {
 
     c += this.line('-') + '\n';
 
-    // TOTAL numeric
+    // TOTAL
     const totalLabel = 'TOTAL';
     const totalAmount = this.money(printData.total);
     const left = totalLabel.padEnd(this.PAPER_WIDTH - totalAmount.length - 1, ' ');
@@ -179,28 +190,21 @@ export class PrintNodeApiService {
     return c;
   }
 
-  // ================= TICKET COCINA =================
+  // ================= TICKET COCINA CON NOMBRE COMENSAL =================
   private generateKitchenContent(printData: PrintData): string {
-    const fecha = new Date(printData.createdAt);
-    const horaStr = fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const { fecha, hora } = this.getCurrentDateTime();
 
     let c = '';
     c += '\x1B\x40'; // reset
     c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252)
     c += '\x1B\x61\x01'; // center align
 
-    // HEADER
-    // c += this.center('LA MAQUILA') + '\n';
-    // c += this.center('COCINA') + '\n';
-    // c += '\n';
-
     c += this.line('=') + '\n';
 
     c += '\x1B\x61\x00'; // left align
-    c += `FECHA: ${fecha.toLocaleDateString('es-MX')}\n`;
-    c += `HORA: ${horaStr}\n`;
+    c += `FECHA: ${fecha}\n`;
+    c += `HORA: ${hora}\n`;
     c += `MESA: ${printData.tableNumber}\n`;
-    // c += `MESERO: ${printData.waiter}\n`;
     c += '\n';
 
     c += this.line('-') + '\n';
@@ -222,15 +226,35 @@ export class PrintNodeApiService {
     if (kitchenItems.length === 0) {
       c += 'No hay productos de cocina\n';
     } else {
+      // Agrupar por comensal
+      const groupedByCustomer: Record<string, Array<typeof printData.items[0]>> = {};
+      
       kitchenItems.forEach(item => {
-        c += `[${item.quantity}] ${item.name}\n`;
-        if (item.notes) {
-          c += `  Nota: ${item.notes}\n`;
+        let customerName = item.customerName || 'CLIENTE';
+        customerName = customerName.trim();
+        if (customerName === '' || customerName.toLowerCase() === 'cliente') {
+          customerName = 'CLIENTE';
         }
+        
+        if (!groupedByCustomer[customerName]) {
+          groupedByCustomer[customerName] = [];
+        }
+        groupedByCustomer[customerName].push(item);
+      });
+
+      // Mostrar items agrupados por comensal
+      Object.entries(groupedByCustomer).forEach(([customerName, items]) => {
+        c += `[ ${customerName} ]\n`;
+        items.forEach(item => {
+          c += `  ${item.quantity} ${item.name}\n`;
+          if (item.notes) {
+            c += `    Nota: ${item.notes}\n`;
+          }
+        });
+        c += '\n';
       });
     }
 
-    c += '\n';
     c += this.line('=') + '\n';
     c += '\x1B\x61\x01'; // center align
     c += '\n';
@@ -241,28 +265,21 @@ export class PrintNodeApiService {
     return c;
   }
 
-  // ================= TICKET BARRA FRÍA =================
+  // ================= TICKET BARRA FRÍA CON NOMBRE COMENSAL =================
   private generateColdBarContent(printData: PrintData): string {
-    const fecha = new Date(printData.createdAt);
-    const horaStr = fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const { fecha, hora } = this.getCurrentDateTime();
 
     let c = '';
     c += '\x1B\x40'; // reset
     c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252)
     c += '\x1B\x61\x01'; // center align
 
-    // HEADER
-    // c += this.center('LA MAQUILA') + '\n';
-    // c += this.center('BARRA FRÍA') + '\n';
-    // c += '\n';
-
     c += this.line('=') + '\n';
 
     c += '\x1B\x61\x00'; // left align
-    c += `FECHA: ${fecha.toLocaleDateString('es-MX')}\n`;
-    c += `HORA: ${horaStr}\n`;
+    c += `FECHA: ${fecha}\n`;
+    c += `HORA: ${hora}\n`;
     c += `MESA: ${printData.tableNumber}\n`;
-    // c += `MESERO: ${printData.waiter}\n`;
     c += '\n';
 
     c += this.line('-') + '\n';
@@ -284,15 +301,35 @@ export class PrintNodeApiService {
     if (coldBarItems.length === 0) {
       c += 'No hay productos de barra fría\n';
     } else {
+      // Agrupar por comensal
+      const groupedByCustomer: Record<string, Array<typeof printData.items[0]>> = {};
+      
       coldBarItems.forEach(item => {
-        c += `[${item.quantity}] ${item.name}\n`;
-        if (item.notes) {
-          c += `  Nota: ${item.notes}\n`;
+        let customerName = item.customerName || 'CLIENTE';
+        customerName = customerName.trim();
+        if (customerName === '' || customerName.toLowerCase() === 'cliente') {
+          customerName = 'CLIENTE';
         }
+        
+        if (!groupedByCustomer[customerName]) {
+          groupedByCustomer[customerName] = [];
+        }
+        groupedByCustomer[customerName].push(item);
+      });
+
+      // Mostrar items agrupados por comensal
+      Object.entries(groupedByCustomer).forEach(([customerName, items]) => {
+        c += `[ ${customerName} ]\n`;
+        items.forEach(item => {
+          c += `  ${item.quantity} ${item.name}\n`;
+          if (item.notes) {
+            c += `    Nota: ${item.notes}\n`;
+          }
+        });
+        c += '\n';
       });
     }
 
-    c += '\n';
     c += this.line('=') + '\n';
     c += '\x1B\x61\x01'; // center align
     c += '\n';
@@ -303,35 +340,50 @@ export class PrintNodeApiService {
     return c;
   }
 
-  // ================= TICKET CON COMENSALES =================
-  private generateTicketWithCustomersContent(printData: PrintData): string {
-    const fecha = new Date(printData.createdAt);
-    const fechaStr = fecha.toLocaleDateString('es-MX');
-    const horaStr = fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  // ================= TICKET FINAL CON NOMBRE COMENSAL =================
+  private generateTicketWithCustomersContent(printData: PrintData, isFinalTicket: boolean = false): string {
+    const folio = this.generateFolio();
+    const { fecha, hora } = this.getCurrentDateTime();
 
     let c = '';
     c += '\x1B\x40'; // reset
-    c += '\x1B\x61\x01'; // center align
+    c += '\x1B\x74\x08'; // Seleccionar página de códigos 8 (Windows-1252)
+    c += '\x1B\x61\x00'; // left align
 
     // HEADER
     c += this.center('LA MAQUILA') + '\n';
+    c += this.center('ESTACION CULTURAL') + '\n';
+    c += this.center('R.F.C. GADG-840229-MY6') + '\n';
+    c += this.center('JUAN RUIZ DE ALARCON #1570') + '\n';
+    c += this.center('ZONA URBANA RIO C.P. 22010') + '\n';
     c += '\n';
 
     c += this.line('=') + '\n';
 
-    c += '\x1B\x61\x00'; // left align
-    c += `FECHA: ${fechaStr}\n`;
-    c += `HORA: ${horaStr}\n`;
-    c += `MESA: ${printData.tableNumber}\n`;
+    // INFO
+    c += `FOLIO: ${folio}\n`;
+    c += `FECHA: ${fecha} ${hora}\n`;
+    c += `MESA: ${printData.tableNumber}  COMENSALES: ${printData.customerCount}\n`;
+    c += `MESERO: ${printData.waiter}\n`;
+    
+    if (isFinalTicket) {
+      const { hora: horaReimpresion } = this.getCurrentDateTime();
+      c += `*** REIMPRESION - ${horaReimpresion} ***\n`;
+    }
+    
     c += '\n';
-
-    c += this.line('-') + '\n';
+    c += this.line('=') + '\n';
 
     // Agrupar por comensal
     const groupedByCustomer: Record<string, Array<typeof printData.items[0]>> = {};
     
     printData.items.forEach(item => {
-      const customerName = item.customerName || 'Cliente';
+      let customerName = item.customerName || 'CLIENTE';
+      customerName = customerName.trim();
+      if (customerName === '' || customerName.toLowerCase() === 'cliente') {
+        customerName = 'CLIENTE';
+      }
+      
       if (!groupedByCustomer[customerName]) {
         groupedByCustomer[customerName] = [];
       }
@@ -340,29 +392,40 @@ export class PrintNodeApiService {
 
     // Mostrar items por comensal
     Object.entries(groupedByCustomer).forEach(([customerName, items]) => {
-      c += `[ ${customerName} ]\n`;
+      const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      
+      c += `* ${customerName} *\n`;
+      c += this.line('-') + '\n';
       
       items.forEach(item => {
         const itemTotal = item.price * item.quantity;
-        c += `  ${item.quantity}x ${item.name.substring(0, 20).padEnd(20, ' ')} ${this.money(itemTotal)}\n`;
+        const qty = item.quantity.toString().padStart(4, ' ');
+        const name = item.name.substring(0, 20).padEnd(20, ' ');
+        const total = this.money(itemTotal).padStart(10, ' ');
+        c += `${qty} ${name} ${total}\n`;
         if (item.notes) {
-          c += `    Nota: ${item.notes}\n`;
+          c += `      Nota: ${item.notes}\n`;
         }
       });
-      c += '\n';
+      
+      c += this.line('-') + '\n';
+      const subtotalLabel = 'SUBTOTAL';
+      const subtotalAmount = this.money(subtotal);
+      const leftSubtotal = subtotalLabel.padEnd(this.PAPER_WIDTH - subtotalAmount.length - 1, ' ');
+      c += `${leftSubtotal} ${subtotalAmount}\n\n`;
     });
 
-    c += this.line('-') + '\n';
+    c += this.line('=') + '\n';
 
-    // TOTAL
-    const totalLabel = 'TOTAL';
+    // TOTAL GENERAL
+    const totalLabel = 'TOTAL GENERAL';
     const totalAmount = this.money(printData.total);
-    const left = totalLabel.padEnd(this.PAPER_WIDTH - totalAmount.length - 1, ' ');
-    c += `${left} ${totalAmount}\n\n`;
+    const leftTotal = totalLabel.padEnd(this.PAPER_WIDTH - totalAmount.length - 1, ' ');
+    c += `${leftTotal} ${totalAmount}\n\n`;
 
     // FOOTER
-    c += '\x1B\x61\x01'; // center align
     c += this.center('GRACIAS POR SU VISITA') + '\n';
+    c += this.center('VUELVA PRONTO') + '\n';
     c += '\n';
 
     // CORTE
@@ -376,18 +439,16 @@ export class PrintNodeApiService {
     try {
       let content: string;
       
-      if (isFinalTicket) {
-        content = this.generateTicketContent(printData, true);
-      } else if (hasCustomerNames) {
-        content = this.generateTicketWithCustomersContent(printData);
+      if (hasCustomerNames) {
+        content = this.generateTicketWithCustomersContent(printData, isFinalTicket);
       } else {
-        content = this.generateTicketContent(printData, false);
+        content = this.generateTicketContent(printData, isFinalTicket);
       }
 
       return await this.callApi('POST', {
         printer: 'ticket',
         content: content,
-        title: isFinalTicket ? 'Ticket Final' : 'Ticket Cliente',
+        title: isFinalTicket ? '*** TICKET FINAL (REIMPRESION) ***' : 'Ticket Cliente',
         printType: isFinalTicket ? 'final-ticket' : 'ticket',
         orderData: printData,
       });
@@ -455,10 +516,11 @@ export class PrintNodeApiService {
       );
 
       const hasCustomerNames = printData.items.some(
-        (item) => item.customerName && item.customerName !== "Cliente",
+        (item) => item.customerName && 
+                 item.customerName.trim() !== "" && 
+                 item.customerName.trim().toLowerCase() !== "cliente"
       );
 
-      // Enviar a todas las áreas necesarias
       const results = [];
 
       if (hasKitchenItems) {
@@ -477,7 +539,7 @@ export class PrintNodeApiService {
         });
       }
 
-      // Siempre imprimir ticket para cliente
+      // Ticket para cliente
       const ticketResult = await this.printTicket(printData, hasCustomerNames, false);
       results.push({
         printer: 'ticket',
@@ -502,7 +564,23 @@ export class PrintNodeApiService {
     }
   }
 
-  // Verificar estado de las impresoras
+  async printFinalTicket(printData: PrintData): Promise<PrintResult> {
+    try {
+      const hasCustomerNames = printData.items.some(
+        (item) => item.customerName && 
+                 item.customerName.trim() !== "" && 
+                 item.customerName.trim().toLowerCase() !== "cliente"
+      );
+      
+      return await this.printTicket(printData, hasCustomerNames, true);
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Error desconocido'
+      };
+    }
+  }
+
   async checkPrinters(): Promise<PrintResult> {
     try {
       const result = await this.callApi('GET');
