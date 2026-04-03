@@ -17,6 +17,8 @@ export default function QRSharePage() {
   const { session, isLoading, clearSession } = useSession();
   const [copied, setCopied] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [checkingLogo, setCheckingLogo] = useState(true);
 
   // Estados para verificar estado de la mesa
   const [tableStatus, setTableStatus] = useState<string | null>(null);
@@ -59,6 +61,52 @@ export default function QRSharePage() {
     });
   };
 
+  // Función para obtener el logo desde Supabase
+  const checkExistingLogo = async () => {
+    setCheckingLogo(true);
+    try {
+      const { data: files, error } = await supabase.storage
+        .from("logo")
+        .list("", {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+
+      if (error) {
+        setLogoUrl(null);
+        return;
+      }
+
+      if (files && files.length > 0) {
+        const latestLogo = files.find((file) => file.name.startsWith("logo_"));
+
+        if (latestLogo) {
+          const { data: urlData } = supabase.storage
+            .from("logo")
+            .getPublicUrl(latestLogo.name);
+
+          if (urlData?.publicUrl) {
+            const timestamp = new Date().getTime();
+            const urlWithTimestamp = `${urlData.publicUrl}?t=${timestamp}`;
+            setLogoUrl(urlWithTimestamp);
+          } else {
+            setLogoUrl(null);
+          }
+        } else {
+          setLogoUrl(null);
+        }
+      } else {
+        setLogoUrl(null);
+      }
+    } catch (error) {
+      console.error("Error cargando logo:", error);
+      setLogoUrl(null);
+    } finally {
+      setCheckingLogo(false);
+    }
+  };
+
   // Efecto para verificar el estado de la mesa
   useEffect(() => {
     const checkTableStatus = async () => {
@@ -82,13 +130,10 @@ export default function QRSharePage() {
         if (tableDataTyped?.status) {
           setTableStatus(tableDataTyped.status);
 
-          // Si la mesa está disponible, redirigir
           if (tableDataTyped.status === "available") {
             console.log("Mesa está disponible, redirigiendo...");
-
             clearLocalStorage();
             clearSession();
-
             setTimeout(() => {
               router.push("/customer");
             }, 500);
@@ -124,19 +169,16 @@ export default function QRSharePage() {
           console.log("Cambio en estado de mesa:", payload.new.status);
           setTableStatus(payload.new.status);
 
-          // Si la mesa cambia a disponible, redirigir
           if (payload.new.status === "available") {
             console.log("Mesa liberada, redirigiendo desde QR page...");
-
             clearLocalStorage();
             clearSession();
-
             setTimeout(() => {
               alert("👋 La mesa ha sido liberada. Gracias por su visita!");
               router.push("/customer");
             }, 300);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -154,6 +196,11 @@ export default function QRSharePage() {
     }
   }, [tableId, tableNumber, userId, orderId]);
 
+  // Efecto para cargar el logo
+  useEffect(() => {
+    checkExistingLogo();
+  }, []);
+
   const handleCopyLink = async () => {
     if (!currentUrl) return;
 
@@ -163,7 +210,6 @@ export default function QRSharePage() {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Error al copiar:", err);
-      // Fallback para navegadores que no soportan clipboard API
       const textArea = document.createElement("textarea");
       textArea.value = currentUrl;
       document.body.appendChild(textArea);
@@ -196,7 +242,7 @@ export default function QRSharePage() {
 
   // Generar QR usando un servicio externo
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-    currentUrl
+    currentUrl,
   )}`;
 
   // Loading mientras verifica estado de mesa
@@ -290,7 +336,7 @@ export default function QRSharePage() {
     <div className="min-h-screen bg-white text-black pb-20">
       {/* Header */}
       <header className="bg-white/10 backdrop-blur-sm sticky top-0 z-30 border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <div>
             <h1 className="text-xl font-bold">Compartir Mesa</h1>
             <p className="text-sm">
@@ -323,31 +369,46 @@ export default function QRSharePage() {
             a la misma orden
           </p>
 
-          {/* Código QR */}
+          {/* Código QR con Logo Centrado Cuadrado */}
           <div className="bg-gray-50 p-6 rounded-2xl mb-8 border-2 border-dashed border-gray-200">
-            <div className="bg-white p-4 rounded-xl inline-block">
+            <div className="relative inline-block">
               {currentUrl ? (
-                <img
-                  src={qrCodeUrl}
-                  alt="Código QR para unirse a la mesa"
-                  className="w-64 h-64 mx-auto"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                    const parent = e.currentTarget.parentElement;
-                    if (parent) {
-                      const fallbackDiv = document.createElement("div");
-                      fallbackDiv.className =
-                        "w-64 h-64 bg-gray-200 flex items-center justify-center rounded-xl";
-                      fallbackDiv.innerHTML = `
-                        <div class="text-center">
-                          <FaQrcode class="text-4xl text-gray-400 mx-auto mb-2" />
-                          <p class="text-sm text-gray-500">Error cargando QR</p>
-                        </div>
-                      `;
-                      parent.appendChild(fallbackDiv);
-                    }
-                  }}
-                />
+                <>
+                  <img
+                    src={qrCodeUrl}
+                    alt="Código QR para unirse a la mesa"
+                    className="w-64 h-64 mx-auto"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const fallbackDiv = document.createElement("div");
+                        fallbackDiv.className =
+                          "w-64 h-64 bg-gray-200 flex items-center justify-center rounded-xl";
+                        fallbackDiv.innerHTML = `
+                          <div class="text-center">
+                            <FaQrcode class="text-4xl text-gray-400 mx-auto mb-2" />
+                            <p class="text-sm text-gray-500">Error cargando QR</p>
+                          </div>
+                        `;
+                        parent.appendChild(fallbackDiv);
+                      }
+                    }}
+                  />
+                  {/* Logo centrado sobre el QR - VERSIÓN CUADRADA */}
+                  {!checkingLogo && logoUrl && (
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                      <div className="w-16 h-16 bg-white p-1 shadow-lg border-1 border-blue-100">
+                        <img
+                          src={logoUrl}
+                          alt="Logo del restaurante"
+                          className="w-full h-full object-cover"
+                          onError={() => setLogoUrl(null)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="w-64 h-64 bg-gray-100 flex items-center justify-center rounded-xl">
                   <div className="text-center">
