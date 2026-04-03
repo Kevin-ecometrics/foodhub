@@ -22,6 +22,9 @@ import {
   FaTimes,
 } from "react-icons/fa";
 
+// Clave para localStorage
+const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
+
 // Modal de confirmación con contraseña - SIMPLIFICADO
 function PasswordModal({
   isOpen,
@@ -126,10 +129,24 @@ function PaymentCalculator({
   totalAmount: number;
   tableNumber: number;
 }) {
+  // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
+  const getInitialUsdRate = (): number => {
+    if (typeof window !== "undefined") {
+      const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
+      if (savedRate) {
+        const parsedRate = parseFloat(savedRate);
+        if (!isNaN(parsedRate) && parsedRate > 0) {
+          return parsedRate;
+        }
+      }
+    }
+    return 18.5; // Valor por defecto
+  };
+
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [terminalAmount, setTerminalAmount] = useState<number>(0);
   const [usdAmount, setUsdAmount] = useState<number>(0);
-  const [usdRate, setUsdRate] = useState<number>(20.5);
+  const [usdRate, setUsdRate] = useState<number>(getInitialUsdRate);
   const [showRateInput, setShowRateInput] = useState<boolean>(false);
   const [tempRate, setTempRate] = useState<string>(usdRate.toString());
 
@@ -139,13 +156,22 @@ function PaymentCalculator({
   const change = totalPaid > totalAmount ? totalPaid - totalAmount : 0;
   const needsChange = totalPaid > totalAmount;
 
+  // Guardar la tasa de cambio en localStorage cuando cambie
+  useEffect(() => {
+    if (typeof window !== "undefined" && usdRate > 0) {
+      localStorage.setItem(USD_RATE_STORAGE_KEY, usdRate.toString());
+    }
+  }, [usdRate]);
+
   useEffect(() => {
     if (isOpen) {
       setCashAmount(0);
       setTerminalAmount(0);
       setUsdAmount(0);
-      setUsdRate(20.5);
-      setTempRate("20.5");
+      // Recargar la tasa actual al abrir el modal
+      const currentRate = getInitialUsdRate();
+      setUsdRate(currentRate);
+      setTempRate(currentRate.toString());
       setShowRateInput(false);
     }
   }, [isOpen]);
@@ -172,6 +198,7 @@ function PaymentCalculator({
       setShowRateInput(false);
     } else {
       setTempRate(usdRate.toString());
+      alert("Por favor ingrese una tasa de cambio válida");
     }
   };
 
@@ -317,6 +344,13 @@ function PaymentCalculator({
                       Actualizar
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Mostrar tasa actual si no está en modo edición */}
+              {!showRateInput && (
+                <div className="mb-2 text-xs text-gray-500 text-right">
+                  Tasa: 1 USD = ${usdRate.toFixed(2)} MXN
                 </div>
               )}
 
@@ -856,7 +890,6 @@ export default function WaiterDashboard() {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
-    // Abrir la calculadora de pago
     setSelectedTableForPayment({
       id: tableId,
       number: tableNumber,
@@ -870,8 +903,6 @@ export default function WaiterDashboard() {
 
     setProcessing(`cobrar-${selectedTableForPayment.id}`);
     try {
-      // Determinar método de pago basado en los valores de la calculadora
-      // Los valores válidos son: 'cash', 'terminal', 'mixed', 'usd' o null (para ticket/mixto)
       let paymentMethod: "cash" | "terminal" | "mixed" | "usd" | null = null;
 
       let methodsUsed = 0;
@@ -880,23 +911,19 @@ export default function WaiterDashboard() {
       if (paymentData.usd > 0) methodsUsed++;
 
       if (methodsUsed === 1) {
-        // Solo un método de pago
         if (paymentData.cash > 0) {
           paymentMethod = "cash";
         } else if (paymentData.terminal > 0) {
           paymentMethod = "terminal";
         } else if (paymentData.usd > 0) {
           paymentMethod = "usd";
-        } else if (paymentData.usd > 0) {
-          paymentMethod = "mixed"; // USD también lo tratamos como mixto
         }
       } else if (methodsUsed > 1) {
-        // Múltiples métodos
         paymentMethod = "mixed";
       }
 
       console.log(
-        `💳 Método de pago a guardar: ${paymentMethod === "cash" ? "EFECTIVO" : paymentMethod === "terminal" ? "TERMINAL" : "TICKET (MIXTO)"}`,
+        `💳 Método de pago a guardar: ${paymentMethod === "cash" ? "EFECTIVO" : paymentMethod === "terminal" ? "TERMINAL" : paymentMethod === "usd" ? "DÓLARES" : "MIXTO"}`,
       );
       console.log(
         `📝 Detalle del pago: Efectivo: $${paymentData.cash.toFixed(2)}, Terminal: $${paymentData.terminal.toFixed(2)}, USD: $${paymentData.usd.toFixed(2)} (tasa: ${paymentData.usdRate})`,
@@ -908,7 +935,6 @@ export default function WaiterDashboard() {
         paymentMethod,
       );
 
-      // Mostrar resumen del pago
       let successMessage = `✅ Mesa ${selectedTableForPayment.number} cobrada exitosamente.\n\n`;
       successMessage += `💰 Total: $${selectedTableForPayment.total.toFixed(2)}\n`;
       successMessage += `💵 Pagado: $${paymentData.totalPaid.toFixed(2)}\n`;
@@ -917,7 +943,9 @@ export default function WaiterDashboard() {
           ? "EFECTIVO"
           : paymentMethod === "terminal"
             ? "TERMINAL"
-            : "TICKET (Pago Múltiple)"
+            : paymentMethod === "usd"
+              ? "DÓLARES"
+              : "MIXTO"
       }\n\n`;
 
       if (paymentData.cash > 0) {
