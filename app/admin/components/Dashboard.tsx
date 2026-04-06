@@ -1963,8 +1963,7 @@ export default function Dashboard({
               <p className="text-sm text-gray-700">
                 {salesHistory.length > 0
                   ? Math.round(
-                      (paymentMethodStats.unspecified / salesHistory.length) *
-                        100,
+                      (paymentMethodStats.mixed / salesHistory.length) * 100,
                     )
                   : 0}
                 %
