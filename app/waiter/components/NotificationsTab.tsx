@@ -4,6 +4,7 @@ import {
   FaCheckCircle,
   FaSortAmountDown,
   FaSortAmountUp,
+  FaEye,
 } from "react-icons/fa";
 import { useState, useMemo, useEffect } from "react";
 
@@ -24,57 +25,62 @@ export default function NotificationsTab({
   onCompleteNotification,
   onGoToTables,
 }: NotificationsTabProps) {
-  // Inicializar el estado desde localStorage
   const [sortOrder, setSortOrder] = useState<"oldest" | "newest">(() => {
-    // Intentar obtener el valor guardado en localStorage
     const savedOrder = localStorage.getItem("notificationsSortOrder");
-    // Si existe y es válido, usarlo, sino usar "oldest" por defecto
     return savedOrder === "oldest" || savedOrder === "newest"
       ? savedOrder
       : "oldest";
   });
 
-  // Guardar en localStorage cada vez que cambia el orden
   useEffect(() => {
     localStorage.setItem("notificationsSortOrder", sortOrder);
   }, [sortOrder]);
 
-  // Filtrar solo pendientes
-  const pendingNotifications = notifications.filter(
-    (n) => !attendedNotifications.has(n.id)
-  );
+  // ✅ CORREGIDO: Calcular correctamente los contadores
+  const totalNotifications = notifications.length;
+  const attendedCount = attendedNotifications.size;
+  const pendingCount = totalNotifications - attendedCount;
+
+  // ✅ Mostrar TODAS las notificaciones, pero marcar las atendidas
+  const allNotifications = [...notifications];
 
   // Ordenar notificaciones
   const sortedNotifications = useMemo(() => {
-    const filtered = [...pendingNotifications];
+    const filtered = [...allNotifications];
 
     return filtered.sort((a, b) => {
       const timeA = new Date(a.created_at).getTime();
       const timeB = new Date(b.created_at).getTime();
 
       if (sortOrder === "oldest") {
-        // Más antiguas primero
         return timeA - timeB;
       } else {
-        // Más nuevas primero
         return timeB - timeA;
       }
     });
-  }, [pendingNotifications, sortOrder]);
+  }, [allNotifications, sortOrder]);
 
   return (
     <div className="space-y-4">
-      {/* Encabezado simple con filtro */}
+      {/* Encabezado con contadores mejorados */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-xl font-bold text-gray-800">Notificaciones</h1>
-            <p className="text-sm text-gray-600">
-              {pendingNotifications.length} pendientes
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+                {pendingCount} pendientes
+              </span>
+              <span className="text-sm bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                {attendedCount} vistas
+              </span>
+              <span className="text-sm bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full">
+                {totalNotifications} total
+              </span>
+            </div>
           </div>
 
-          {/* Filtro simple */}
+          {/* Filtro de orden */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 hidden sm:inline">
               Orden:
@@ -135,11 +141,22 @@ export default function NotificationsTab({
             />
           ))}
 
-          {/* Contador simple */}
-          <div className="text-center text-sm text-gray-500 pt-2">
-            {sortedNotifications.length} notificación
-            {sortedNotifications.length !== 1 ? "es" : ""} pendiente
-            {sortedNotifications.length !== 1 ? "s" : ""}
+          {/* Resumen de notificaciones */}
+          <div className="bg-white rounded-lg shadow p-4 text-sm text-gray-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FaEye className="text-blue-500" />
+                <span>
+                  <strong>{attendedCount}</strong> notificación(es) vista(s)
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaCheckCircle className="text-green-500" />
+                <span>
+                  <strong>{pendingCount}</strong> pendiente(s) por completar
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
