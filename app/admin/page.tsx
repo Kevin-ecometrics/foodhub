@@ -189,15 +189,15 @@ export default function AdminPage() {
       const salesData = sales || [];
       const totalSales = salesData.reduce(
         (sum: number, sale: any) => sum + sale.total_amount,
-        0
+        0,
       );
       const totalItems = salesData.reduce(
         (sum: number, sale: any) => sum + sale.item_count,
-        0
+        0,
       );
       const totalOrders = salesData.reduce(
         (sum: number, sale: any) => sum + sale.order_count,
-        0
+        0,
       );
 
       setSalesSummary({
@@ -261,7 +261,7 @@ export default function AdminPage() {
 
       const activeTablesData = (activeTables || []) as any[];
       const uniqueTables = new Set(
-        activeTablesData.map((order: any) => order.table_id)
+        activeTablesData.map((order: any) => order.table_id),
       );
 
       setDailyStats({
@@ -288,7 +288,7 @@ export default function AdminPage() {
       const { data: orders, error } = await supabase
         .from("orders")
         .select(
-          "id, table_id, total_amount, created_at, status, order_items(id)"
+          "id, table_id, total_amount, created_at, status, order_items(id)",
         )
         .gte("created_at", startISO)
         .lte("created_at", endISO)
@@ -316,7 +316,7 @@ export default function AdminPage() {
   // NUEVA FUNCIÓN: Cargar productos populares para rango de fechas
   const loadPopularProductsForRange = async (
     startISO: string,
-    endISO: string
+    endISO: string,
   ) => {
     try {
       // Primero intentar desde sales_items (datos históricos)
@@ -426,15 +426,15 @@ export default function AdminPage() {
       const salesData = sales || [];
       const totalSales = salesData.reduce(
         (sum: number, sale: any) => sum + sale.total_amount,
-        0
+        0,
       );
       const totalItems = salesData.reduce(
         (sum: number, sale: any) => sum + sale.item_count,
-        0
+        0,
       );
       const totalOrders = salesData.reduce(
         (sum: number, sale: any) => sum + sale.order_count,
-        0
+        0,
       );
 
       setSalesSummary({
@@ -524,7 +524,7 @@ export default function AdminPage() {
 
       const activeTablesData = (activeTables || []) as any[];
       const uniqueTables = new Set(
-        activeTablesData.map((order: any) => order.table_id)
+        activeTablesData.map((order: any) => order.table_id),
       );
 
       setDailyStats({
@@ -552,7 +552,7 @@ export default function AdminPage() {
       const { data: orders, error } = await supabase
         .from("orders")
         .select(
-          "id, table_id, total_amount, created_at, status, order_items(id)"
+          "id, table_id, total_amount, created_at, status, order_items(id)",
         )
         .gte("created_at", startOfDayISO)
         .lte("created_at", endOfDayISO)

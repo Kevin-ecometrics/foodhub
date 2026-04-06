@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/admin/components/Dashboard.tsx
 "use client";
 import { useState, useEffect } from "react";
 import {
@@ -18,6 +17,8 @@ import {
   FaCalendarDay,
   FaCalendarWeek,
   FaBan,
+  FaMoneyBillWave,
+  FaCreditCard,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -112,14 +113,14 @@ export default function Dashboard({
 }: DashboardProps) {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateInput, setDateInput] = useState(
-    selectedDate.toISOString().split("T")[0]
+    selectedDate.toISOString().split("T")[0],
   );
   const [filterMode, setFilterMode] = useState<FilterMode>("single");
   const [startDateInput, setStartDateInput] = useState(
-    selectedDate.toISOString().split("T")[0]
+    selectedDate.toISOString().split("T")[0],
   );
   const [endDateInput, setEndDateInput] = useState(
-    selectedDate.toISOString().split("T")[0]
+    selectedDate.toISOString().split("T")[0],
   );
   const [salesItems, setSalesItems] = useState<SalesItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -127,7 +128,7 @@ export default function Dashboard({
   const [selectedTicket, setSelectedTicket] = useState<TicketData | null>(null);
   const [loadingTicket, setLoadingTicket] = useState(false);
   const [customerFeedback, setCustomerFeedback] = useState<CustomerFeedback[]>(
-    []
+    [],
   );
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -138,7 +139,7 @@ export default function Dashboard({
     const adjustForTimezone = (date: Date) => {
       const localDate = new Date(date);
       localDate.setMinutes(
-        localDate.getMinutes() + localDate.getTimezoneOffset()
+        localDate.getMinutes() + localDate.getTimezoneOffset(),
       );
       return localDate;
     };
@@ -151,7 +152,7 @@ export default function Dashboard({
     }
 
     return `${localStart.toLocaleDateString(
-      "es-MX"
+      "es-MX",
     )} - ${localEnd.toLocaleDateString("es-MX")}`;
   };
 
@@ -242,7 +243,7 @@ export default function Dashboard({
   // NUEVA FUNCIÓN: Cargar encuestas por rango de fechas
   const loadCustomerFeedbackForRange = async (
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ) => {
     setLoadingFeedback(true);
     try {
@@ -277,7 +278,7 @@ export default function Dashboard({
     setLoadingItems(true);
     try {
       const items = await fetchSalesItemsFromSupabase(
-        salesHistory.map((sale) => sale.id)
+        salesHistory.map((sale) => sale.id),
       );
       setSalesItems(items);
     } catch (error) {
@@ -289,7 +290,7 @@ export default function Dashboard({
 
   // Función REAL para cargar items desde Supabase
   const fetchSalesItemsFromSupabase = async (
-    saleIds: string[]
+    saleIds: string[],
   ): Promise<SalesItem[]> => {
     if (saleIds.length === 0) return [];
 
@@ -326,7 +327,7 @@ export default function Dashboard({
 
   // FUNCIÓN MEJORADA: Procesar extras desde las notas - CORREGIDA
   const processExtrasFromNotes = (
-    notes: string | null | undefined
+    notes: string | null | undefined,
   ): ProcessedExtras => {
     if (!notes) {
       return {
@@ -343,7 +344,7 @@ export default function Dashboard({
     if (hasPricedExtras) {
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
+        (part) => !part.includes("Extras:") && !part.includes("Total:"),
       );
       const extrasPart = parts.find((part) => part.includes("Extras:"));
       const totalPart = parts.find((part) => part.includes("Total:"));
@@ -441,7 +442,7 @@ export default function Dashboard({
   const formatLongDate = (date: Date): string => {
     const localDate = new Date(date);
     localDate.setMinutes(
-      localDate.getMinutes() + localDate.getTimezoneOffset()
+      localDate.getMinutes() + localDate.getTimezoneOffset(),
     );
 
     return localDate.toLocaleDateString("es-MX", {
@@ -466,18 +467,30 @@ export default function Dashboard({
   // Función para obtener el texto del método de pago
   const getPaymentMethodText = (method: string | null): string => {
     switch (method) {
-      case "ticket":
-        return "TICKET";
+      case "cash":
+        return "EFECTIVO";
+      case "terminal":
+        return "TERMINAL";
+      case "usd":
+        return "DOLARES";
+      case "mixed":
+        return "MIXTO";
       default:
-        return "NO ESPECIFICADO";
+        return "TICKET";
     }
   };
 
   // Función para obtener el icono del método de pago
   const getPaymentMethodIcon = (method: string | null) => {
     switch (method) {
-      case "ticket":
-        return <FaReceipt className="text-blue-600" />;
+      case "cash":
+        return <FaMoneyBillWave className="text-green-600" />;
+      case "terminal":
+        return <FaCreditCard className="text-blue-600" />;
+      case "usd":
+        return <FaDollarSign className="text-yellow-600" />;
+      case "mixed":
+        return <FaReceipt className="text-purple-600" />;
       default:
         return <FaDollarSign className="text-gray-600" />;
     }
@@ -486,13 +499,18 @@ export default function Dashboard({
   // Función para obtener el color del método de pago
   const getPaymentMethodColor = (method: string | null): string => {
     switch (method) {
-      case "ticket":
+      case "cash":
+        return "bg-green-100 text-green-800 border-green-300";
+      case "terminal":
         return "bg-blue-100 text-blue-800 border-blue-300";
+      case "usd":
+        return "bg-yellow-100 text-yellow-800 border-yellow-300";
+      case "mixed":
+        return "bg-purple-100 text-purple-800 border-purple-300";
       default:
         return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
-
   // Función para obtener el color de la calificación
   const getRatingColor = (rating: number): string => {
     switch (rating) {
@@ -561,7 +579,7 @@ export default function Dashboard({
     const products = getGroupedProducts();
     return products.reduce(
       (total, product) => total + product.activeSubtotal,
-      0
+      0,
     );
   };
 
@@ -680,7 +698,7 @@ export default function Dashboard({
   const getProductsWithOrderDatesCorrected = () => {
     const groupedProducts = getGroupedProducts();
     const activeProducts = groupedProducts.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
     const productsWithDates = [];
 
@@ -723,7 +741,7 @@ export default function Dashboard({
               item.sale_id === sale.id &&
               item.product_name === product.product_name &&
               Math.abs(item.price - product.price) < 0.01 &&
-              item.quantity - (item.cancelled_quantity || 0) > 0
+              item.quantity - (item.cancelled_quantity || 0) > 0,
           );
 
           if (hasProduct) {
@@ -772,7 +790,7 @@ export default function Dashboard({
               (item) =>
                 item.sale_id === sale.id &&
                 item.product_name === product.product_name &&
-                item.quantity - (item.cancelled_quantity || 0) > 0
+                item.quantity - (item.cancelled_quantity || 0) > 0,
             );
 
             if (hasExtra) {
@@ -828,7 +846,7 @@ export default function Dashboard({
 
     // Filtrar solo productos activos (sin cancelados)
     const activeProducts = products.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
 
     if (activeProducts.length === 0) {
@@ -839,12 +857,12 @@ export default function Dashboard({
     // Calcular totales solo de productos activos
     const totalQuantity = activeProducts.reduce(
       (sum, product) => sum + product.activeQuantity,
-      0
+      0,
     );
 
     const totalSales = activeProducts.reduce(
       (sum, product) => sum + product.activeSubtotal,
-      0
+      0,
     );
 
     // Obtener fecha para el reporte
@@ -869,8 +887,8 @@ export default function Dashboard({
       const tipo = product.isExtra
         ? "Extra"
         : product.hasExtras
-        ? "Con Extras"
-        : "Producto";
+          ? "Con Extras"
+          : "Producto";
 
       const formattedDate = orderDate ? formatDateTime(orderDate) : "N/A";
 
@@ -884,7 +902,7 @@ export default function Dashboard({
 
     // Agregar totales al final - SIN CANCELADOS
     csvContent += `\n"","","TOTALES","","${totalQuantity}","${formatCurrency(
-      totalSales
+      totalSales,
     )}",""`;
 
     // Generar nombre de archivo
@@ -911,7 +929,7 @@ export default function Dashboard({
 
     // Filtrar solo productos activos
     const activeProducts = groupedProducts.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
     const productsWithDates = [];
 
@@ -931,7 +949,7 @@ export default function Dashboard({
               item.sale_id === sale.id &&
               item.product_name === product.product_name &&
               Math.abs(item.price - product.price) < 0.01 &&
-              item.quantity - (item.cancelled_quantity || 0) > 0 // Solo items activos
+              item.quantity - (item.cancelled_quantity || 0) > 0, // Solo items activos
           );
 
           if (hasProduct) {
@@ -974,9 +992,9 @@ export default function Dashboard({
               (item) =>
                 item.sale_id === sale.id &&
                 item.product_name.includes(
-                  product.product_name.replace("+ ", "")
+                  product.product_name.replace("+ ", ""),
                 ) &&
-                item.quantity - (item.cancelled_quantity || 0) > 0
+                item.quantity - (item.cancelled_quantity || 0) > 0,
             );
 
             if (hasExtra) {
@@ -1024,7 +1042,7 @@ export default function Dashboard({
 
     // Filtrar solo productos activos
     const activeProducts = products.filter(
-      (product) => product.activeQuantity > 0
+      (product) => product.activeQuantity > 0,
     );
 
     if (activeProducts.length === 0) {
@@ -1035,12 +1053,12 @@ export default function Dashboard({
     // Calcular totales solo de productos activos
     const totalQuantity = activeProducts.reduce(
       (sum, product) => sum + product.activeQuantity,
-      0
+      0,
     );
 
     const totalSales = activeProducts.reduce(
       (sum, product) => sum + product.activeSubtotal,
-      0
+      0,
     );
 
     // Obtener fecha para el reporte
@@ -1048,7 +1066,7 @@ export default function Dashboard({
       filterMode === "single"
         ? formatLongDate(selectedDate)
         : `${formatLongDate(new Date(startDateInput))} a ${formatLongDate(
-            new Date(endDateInput)
+            new Date(endDateInput),
           )}`;
 
     // Obtener productos ordenados por fecha
@@ -1198,7 +1216,7 @@ export default function Dashboard({
       <div class="date-info">
         <div><strong>Fecha del Reporte:</strong> ${reportDate}</div>
         <div><strong>Generado:</strong> ${new Date().toLocaleString(
-          "es-MX"
+          "es-MX",
         )}</div>
       </div>
     </div>
@@ -1255,8 +1273,8 @@ export default function Dashboard({
               product.isExtra
                 ? "extra-row"
                 : product.hasExtras
-                ? "product-with-extras"
-                : ""
+                  ? "product-with-extras"
+                  : ""
             }">
               <td class="text-center">${index + 1}</td>
               <td class="date-column">${formattedDate}</td>
@@ -1264,14 +1282,14 @@ export default function Dashboard({
               <td class="text-right">${formatCurrency(product.price)}</td>
               <td class="text-center">${product.activeQuantity}</td>
               <td class="text-right">${formatCurrency(
-                product.activeSubtotal
+                product.activeSubtotal,
               )}</td>
               <td>${
                 product.isExtra
                   ? "Extra"
                   : product.hasExtras
-                  ? "Con Extras"
-                  : "Producto"
+                    ? "Con Extras"
+                    : "Producto"
               }</td>
             </tr>
           `;
@@ -1368,6 +1386,10 @@ export default function Dashboard({
       }
     });
 
+    // Obtener el texto del método de pago para mostrarlo en el ticket
+    const paymentMethodText = getPaymentMethodText(sale.payment_method);
+    const paymentMethodColor = getPaymentMethodColor(sale.payment_method);
+
     // Crear contenido HTML para el PDF
     const content = `
     <!DOCTYPE html>
@@ -1416,6 +1438,9 @@ export default function Dashboard({
           color: #dc2626;
           text-align: center;
         }
+        .payment-cash { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .payment-terminal { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+        .payment-ticket { background: #f3e8ff; color: #6b21a5; border: 1px solid #e9d5ff; }
       </style>
     </head>
     <body>
@@ -1433,8 +1458,11 @@ export default function Dashboard({
           .toUpperCase()}</div>
       </div>
 
-      <div class="payment-method">
-        MÉTODO DE PAGO: ${getPaymentMethodText(sale.payment_method)}
+      <div class="payment-method ${paymentMethodColor.replace(
+        /bg-[^ ]+ /g,
+        "",
+      )}">
+        🧾 MÉTODO DE PAGO: ${paymentMethodText}
       </div>
 
       ${
@@ -1462,15 +1490,15 @@ export default function Dashboard({
                 item.isExtra
                   ? "extra-item"
                   : item.isBaseProduct
-                  ? "base-product"
-                  : ""
+                    ? "base-product"
+                    : ""
               }">
                 <td>${item.product_name}</td>
                 <td class="text-right">${item.quantity}</td>
                 <td class="text-right">${formatCurrency(item.price)}</td>
                 <td class="text-right">${formatCurrency(item.subtotal)}</td>
               </tr>
-            `
+            `,
             )
             .join("")}
         </tbody>
@@ -1536,16 +1564,28 @@ export default function Dashboard({
   const cancelledStats = {
     totalCancelledQuantity: salesItems.reduce(
       (sum, item) => sum + (item.cancelled_quantity || 0),
-      0
+      0,
     ),
     totalCancelledAmount: salesItems.reduce(
       (sum, item) => sum + item.price * (item.cancelled_quantity || 0),
-      0
+      0,
     ),
     totalActiveQuantity: salesItems.reduce(
       (sum, item) => sum + (item.quantity - (item.cancelled_quantity || 0)),
-      0
+      0,
     ),
+  };
+
+  // Calcular estadísticas de métodos de pago usando el campo payment_method
+  const paymentMethodStats = {
+    cash: salesHistory.filter((sale) => sale.payment_method === "cash").length,
+    terminal: salesHistory.filter((sale) => sale.payment_method === "terminal")
+      .length,
+    usd: salesHistory.filter((sale) => sale.payment_method === "usd").length,
+
+    mixed: salesHistory.filter((sale) => sale.payment_method === "mixed")
+      .length,
+    unspecified: salesHistory.filter((sale) => !sale.payment_method).length,
   };
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -1570,13 +1610,6 @@ export default function Dashboard({
     cancelledAmount: cancelledStats.totalCancelledAmount,
   };
 
-  // Calcular estadísticas de métodos de pago
-  const paymentMethodStats = {
-    ticket: salesHistory.filter((sale) => sale.payment_method === "ticket")
-      .length,
-    unspecified: salesHistory.filter((sale) => !sale.payment_method).length,
-  };
-
   return (
     <>
       {/* Header con controles de fecha */}
@@ -1599,7 +1632,7 @@ export default function Dashboard({
                     : formatLongDate(selectedDate)
                   : formatDateRange(
                       new Date(startDateInput),
-                      new Date(endDateInput)
+                      new Date(endDateInput),
                     )}
               </p>
               {combinedStats.cancelledItems > 0 && (
@@ -1843,6 +1876,103 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* Sección de Métodos de Pago - NUEVA con cash, terminal, ticket */}
+      {salesHistory.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <FaDollarSign className="text-green-600" />
+            Métodos de Pago Utilizados
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaMoneyBillWave className="text-green-600 text-xl" />
+                <p className="font-semibold text-green-800">Efectivo</p>
+              </div>
+              <p className="text-2xl font-bold text-green-600">
+                {paymentMethodStats.cash}
+              </p>
+              <p className="text-sm text-green-700">
+                {salesHistory.length > 0
+                  ? Math.round(
+                      (paymentMethodStats.cash / salesHistory.length) * 100,
+                    )
+                  : 0}
+                %
+              </p>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaCreditCard className="text-blue-600 text-xl" />
+                <p className="font-semibold text-blue-800">Terminal</p>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">
+                {paymentMethodStats.terminal}
+              </p>
+              <p className="text-sm text-blue-700">
+                {salesHistory.length > 0
+                  ? Math.round(
+                      (paymentMethodStats.terminal / salesHistory.length) * 100,
+                    )
+                  : 0}
+                %
+              </p>
+            </div>
+            {/* <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaReceipt className="text-purple-600 text-xl" />
+                <p className="font-semibold text-purple-800">Ticket</p>
+              </div>
+              <p className="text-2xl font-bold text-purple-600">
+                {paymentMethodStats.ticket}
+              </p>
+              <p className="text-sm text-purple-700">
+                {salesHistory.length > 0
+                  ? Math.round(
+                      (paymentMethodStats. / salesHistory.length) * 100,
+                    )
+                  : 0}
+                %
+              </p>
+            </div> */}
+            <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaDollarSign className="text-yellow-600 text-xl" />
+                <p className="font-semibold text-yellow-800">Dólares</p>
+              </div>
+              <p className="text-2xl font-bold text-yellow-600">
+                {paymentMethodStats.usd}
+              </p>
+              <p className="text-sm text-yellow-700">
+                {salesHistory.length > 0
+                  ? Math.round(
+                      (paymentMethodStats.usd / salesHistory.length) * 100,
+                    )
+                  : 0}
+                %
+              </p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <FaDollarSign className="text-gray-600 text-xl" />
+                <p className="font-semibold text-gray-800">Mixto</p>
+              </div>
+              <p className="text-2xl font-bold text-gray-600">
+                {paymentMethodStats.mixed}
+              </p>
+              <p className="text-sm text-gray-700">
+                {salesHistory.length > 0
+                  ? Math.round(
+                      (paymentMethodStats.mixed / salesHistory.length) * 100,
+                    )
+                  : 0}
+                %
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sección de Encuestas de Satisfacción */}
       <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
         <div className="flex justify-between items-center mb-6">
@@ -1890,7 +2020,7 @@ export default function Dashboard({
                         {count} ({percentage.toFixed(0)}%)
                       </div>
                     </div>
-                  )
+                  ),
                 )}
               </div>
             </div>
@@ -1928,7 +2058,7 @@ export default function Dashboard({
                     <div className="text-right">
                       <div
                         className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${getRatingColor(
-                          feedback.rating
+                          feedback.rating,
                         )}`}
                       >
                         <FaStar className="text-sm" />
@@ -1952,35 +2082,6 @@ export default function Dashboard({
           </div>
         )}
       </div>
-
-      {/* Estadísticas de Métodos de Pago */}
-      {salesSummary && salesSummary.saleCount > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <FaDollarSign className="text-green-600" />
-            Métodos de Pago Utilizados
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaReceipt className="text-blue-600 text-xl" />
-                <p className="font-semibold text-blue-800">Ticket</p>
-              </div>
-              <p className="text-2xl font-bold text-blue-600">
-                {paymentMethodStats.ticket}
-              </p>
-              <p className="text-sm text-blue-700">
-                {salesSummary.saleCount > 0
-                  ? Math.round(
-                      (paymentMethodStats.ticket / salesSummary.saleCount) * 100
-                    )
-                  : 0}
-                %
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Vista previa de productos vendidos CORREGIDA CON CANCELADOS */}
       {salesItems.length > 0 && (
@@ -2046,8 +2147,8 @@ export default function Dashboard({
                         product.isExtra
                           ? "bg-blue-50"
                           : product.hasExtras
-                          ? "bg-green-50"
-                          : ""
+                            ? "bg-green-50"
+                            : ""
                       }`}
                     >
                       <td className="px-4 py-3 text-gray-800">
@@ -2073,15 +2174,15 @@ export default function Dashboard({
                             product.isExtra
                               ? "bg-blue-100 text-blue-800"
                               : product.hasExtras
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {product.isExtra
                             ? "Extra"
                             : product.hasExtras
-                            ? "Con Extras"
-                            : "Producto"}
+                              ? "Con Extras"
+                              : "Producto"}
                         </span>
                       </td>
                     </tr>
@@ -2156,7 +2257,7 @@ export default function Dashboard({
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${getPaymentMethodColor(
-                        sale.payment_method
+                        sale.payment_method,
                       )}`}
                     >
                       {getPaymentMethodIcon(sale.payment_method)}
@@ -2177,6 +2278,9 @@ export default function Dashboard({
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(sale.closed_at).toLocaleTimeString("es-MX")}
+                    </p>
+                    <p className="text-xs font-medium mt-1">
+                      {getPaymentMethodText(sale.payment_method)}
                     </p>
                   </div>
                 </button>
@@ -2221,7 +2325,7 @@ export default function Dashboard({
 
                 <div
                   className={`p-4 rounded-lg border ${getRatingColor(
-                    selectedFeedback.rating
+                    selectedFeedback.rating,
                   )}`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -2332,7 +2436,7 @@ export default function Dashboard({
               {/* MÉTODO DE PAGO EN EL MODAL */}
               <div
                 className={`mt-3 p-3 rounded-lg border ${getPaymentMethodColor(
-                  selectedTicket.sale.payment_method
+                  selectedTicket.sale.payment_method,
                 )}`}
               >
                 <div className="flex items-center gap-2">
@@ -2429,7 +2533,7 @@ export default function Dashboard({
                     <span>IVA (8%):</span>
                     <span>
                       {formatCurrency(
-                        (selectedTicket.sale.total_amount * 0.08) / 1.08
+                        (selectedTicket.sale.total_amount * 0.08) / 1.08,
                       )}
                     </span>
                   </div>

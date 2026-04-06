@@ -13,14 +13,14 @@ type NotificationStatus = 'pending' | 'acknowledged' | 'completed'
 type TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning'
 type OrderItemStatus = 'ordered' | 'preparing' | 'ready' | 'served' | 'cancelled'
 type OrderStatus = 'sent' | 'completed'
-type PaymentMethod = 'cash' | 'terminal' | null
+type PaymentMethod = 'cash' | 'terminal' | 'mixed' | 'usd' | null
 
 // Interfaces públicas (para tu lógica)
 export interface WaiterNotification {
   id: string
   table_id: number
   order_id: string | null
-  type: NotificationType  // ¡Ahora incluye 'refill'!
+  type: NotificationType  
   message: string
   status: NotificationStatus
   payment_method: PaymentMethod
