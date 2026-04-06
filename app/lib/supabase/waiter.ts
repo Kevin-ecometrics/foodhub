@@ -20,7 +20,7 @@ export interface WaiterNotification {
   id: string
   table_id: number
   order_id: string | null
-  type: NotificationType  // ¡Ahora incluye 'refill'!
+  type: NotificationType  
   message: string
   status: NotificationStatus
   payment_method: PaymentMethod

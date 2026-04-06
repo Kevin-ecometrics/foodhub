@@ -20,6 +20,11 @@ import {
   FaDollarSign,
   FaExchangeAlt,
   FaTimes,
+  FaUsers,
+  FaUserPlus,
+  FaTrash,
+  FaCheck,
+  FaUtensils,
 } from "react-icons/fa";
 
 // Clave para localStorage
@@ -140,7 +145,7 @@ function PaymentCalculator({
         }
       }
     }
-    return 18.5; // Valor por defecto
+    return 18.5;
   };
 
   const [cashAmount, setCashAmount] = useState<number>(0);
@@ -156,7 +161,6 @@ function PaymentCalculator({
   const change = totalPaid > totalAmount ? totalPaid - totalAmount : 0;
   const needsChange = totalPaid > totalAmount;
 
-  // Guardar la tasa de cambio en localStorage cuando cambie
   useEffect(() => {
     if (typeof window !== "undefined" && usdRate > 0) {
       localStorage.setItem(USD_RATE_STORAGE_KEY, usdRate.toString());
@@ -168,7 +172,6 @@ function PaymentCalculator({
       setCashAmount(0);
       setTerminalAmount(0);
       setUsdAmount(0);
-      // Recargar la tasa actual al abrir el modal
       const currentRate = getInitialUsdRate();
       setUsdRate(currentRate);
       setTempRate(currentRate.toString());
@@ -262,7 +265,6 @@ function PaymentCalculator({
           </div>
 
           <div className="space-y-4">
-            {/* Efectivo */}
             <div className="bg-white border rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <FaMoneyBillWave className="text-green-600 text-xl" />
@@ -289,7 +291,6 @@ function PaymentCalculator({
               </div>
             </div>
 
-            {/* Terminal */}
             <div className="bg-white border rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <FaCreditCard className="text-blue-600 text-xl" />
@@ -306,7 +307,6 @@ function PaymentCalculator({
               />
             </div>
 
-            {/* Dólares */}
             <div className="bg-white border rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -347,7 +347,6 @@ function PaymentCalculator({
                 </div>
               )}
 
-              {/* Mostrar tasa actual si no está en modo edición */}
               {!showRateInput && (
                 <div className="mb-2 text-xs text-gray-500 text-right">
                   Tasa: 1 USD = ${usdRate.toFixed(2)} MXN
@@ -445,6 +444,659 @@ function PaymentCalculator({
   );
 }
 
+// Componente Pagos Individuales - Usa los comensales existentes
+function SeparatePaymentsModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  tableOrders,
+  tableNumber,
+  totalAmount,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (
+    payments: Array<{
+      guestName: string;
+      items: Array<{
+        itemId: string;
+        productName: string;
+        quantity: number;
+        price: number;
+        subtotal: number;
+      }>;
+      cash: number;
+      terminal: number;
+      usd: number;
+      usdRate: number;
+      total: number;
+    }>,
+  ) => void;
+  tableOrders: Array<{
+    id: string;
+    customer_name: string | null;
+    order_items: Array<{
+      id: string;
+      product_name: string;
+      quantity: number;
+      price: number;
+      cancelled_quantity?: number;
+    }>;
+  }>;
+  tableNumber: number;
+  totalAmount: number;
+}) {
+  const getInitialUsdRate = (): number => {
+    if (typeof window !== "undefined") {
+      const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
+      if (savedRate) {
+        const parsedRate = parseFloat(savedRate);
+        if (!isNaN(parsedRate) && parsedRate > 0) {
+          return parsedRate;
+        }
+      }
+    }
+    return 18.5;
+  };
+
+  interface Guest {
+    id: string;
+    name: string;
+    items: Array<{
+      itemId: string;
+      productName: string;
+      quantity: number;
+      price: number;
+      subtotal: number;
+    }>;
+    cashAmount: number;
+    terminalAmount: number;
+    usdAmount: number;
+    usdRate: number;
+    orderId: string;
+  }
+
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedGuestForPayment, setSelectedGuestForPayment] = useState<
+    string | null
+  >(null);
+
+  // Inicializar comensales desde las órdenes existentes
+  useEffect(() => {
+    if (isOpen && tableOrders.length > 0) {
+      const customersMap = new Map<string, Guest>();
+
+      tableOrders.forEach((order) => {
+        const customerName = order.customer_name || "Cliente sin nombre";
+
+        if (!customersMap.has(customerName)) {
+          customersMap.set(customerName, {
+            id: crypto.randomUUID(),
+            name: customerName,
+            items: [],
+            cashAmount: 0,
+            terminalAmount: 0,
+            usdAmount: 0,
+            usdRate: getInitialUsdRate(),
+            orderId: order.id,
+          });
+        }
+
+        const guest = customersMap.get(customerName)!;
+
+        // Agregar items de esta orden
+        order.order_items.forEach((item) => {
+          const cancelledQty = item.cancelled_quantity || 0;
+          const activeQuantity = item.quantity - cancelledQty;
+
+          if (activeQuantity > 0) {
+            const existingItem = guest.items.find((i) => i.itemId === item.id);
+            if (existingItem) {
+              existingItem.quantity += activeQuantity;
+              existingItem.subtotal =
+                existingItem.quantity * existingItem.price;
+            } else {
+              guest.items.push({
+                itemId: item.id,
+                productName: item.product_name,
+                quantity: activeQuantity,
+                price: item.price,
+                subtotal: activeQuantity * item.price,
+              });
+            }
+          }
+        });
+      });
+
+      const guestsList = Array.from(customersMap.values());
+      setGuests(guestsList);
+      if (guestsList.length > 0) {
+        setSelectedGuestId(guestsList[0].id);
+      }
+    }
+  }, [isOpen, tableOrders]);
+
+  const updateGuestPayment = (
+    guestId: string,
+    paymentData: {
+      cash: number;
+      terminal: number;
+      usd: number;
+      usdRate: number;
+    },
+  ) => {
+    setGuests(
+      guests.map((guest) => {
+        if (guest.id !== guestId) return guest;
+        return {
+          ...guest,
+          cashAmount: paymentData.cash,
+          terminalAmount: paymentData.terminal,
+          usdAmount: paymentData.usd,
+          usdRate: paymentData.usdRate,
+        };
+      }),
+    );
+    setShowPaymentModal(false);
+    setSelectedGuestForPayment(null);
+  };
+
+  const getGuestTotal = (guest: Guest) => {
+    const itemsTotal = guest.items.reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
+    const usdToMxn = guest.usdAmount * guest.usdRate;
+    const paidTotal = guest.cashAmount + guest.terminalAmount + usdToMxn;
+    return { itemsTotal, paidTotal, remaining: itemsTotal - paidTotal };
+  };
+
+  const getOverallRemaining = () => {
+    const totalPaid = guests.reduce((sum, guest) => {
+      const usdToMxn = guest.usdAmount * guest.usdRate;
+      return sum + guest.cashAmount + guest.terminalAmount + usdToMxn;
+    }, 0);
+    return totalAmount - totalPaid;
+  };
+
+  const handleConfirmAll = () => {
+    // Verificar que cada comensal haya pagado lo suyo
+    const guestsWithDebt = guests.filter((guest) => {
+      const { remaining } = getGuestTotal(guest);
+      return remaining > 0;
+    });
+
+    if (guestsWithDebt.length > 0) {
+      alert(`Faltan pagos de: ${guestsWithDebt.map((g) => g.name).join(", ")}`);
+      return;
+    }
+
+    const payments = guests.map((guest) => ({
+      guestName: guest.name,
+      items: guest.items,
+      cash: guest.cashAmount,
+      terminal: guest.terminalAmount,
+      usd: guest.usdAmount,
+      usdRate: guest.usdRate,
+      total: guest.items.reduce((sum, item) => sum + item.subtotal, 0),
+    }));
+
+    onConfirm(payments);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const selectedGuest = guests.find((g) => g.id === selectedGuestId);
+  const overallRemaining = getOverallRemaining();
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <FaUsers className="text-blue-600" />
+                Pagos Individuales
+              </h2>
+              <p className="text-sm text-gray-600">Mesa {tableNumber}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition"
+            >
+              <FaTimes className="text-xl" />
+            </button>
+          </div>
+
+          <div className="p-6">
+            {/* Resumen total */}
+            <div className="bg-gray-50 rounded-xl p-4 mb-6">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-bold text-gray-800">
+                  Total de la cuenta:
+                </span>
+                <span className="text-2xl font-bold text-green-600">
+                  ${totalAmount.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-gray-600">Restante por pagar:</span>
+                <span
+                  className={`text-xl font-bold ${overallRemaining > 0 ? "text-orange-600" : "text-green-600"}`}
+                >
+                  ${overallRemaining.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-6">
+              {/* Lista de comensales */}
+              <div className="w-80 flex-shrink-0">
+                <h3 className="font-semibold text-gray-800 mb-3">Comensales</h3>
+                <div className="space-y-2">
+                  {guests.map((guest) => {
+                    const { itemsTotal, paidTotal, remaining } =
+                      getGuestTotal(guest);
+                    return (
+                      <div
+                        key={guest.id}
+                        onClick={() => setSelectedGuestId(guest.id)}
+                        className={`p-3 rounded-lg cursor-pointer transition ${
+                          selectedGuestId === guest.id
+                            ? "bg-blue-50 border-2 border-blue-500"
+                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium text-gray-800">
+                              {guest.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {guest.items.length} productos
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Total:</span>
+                            <span>${itemsTotal.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Pagado:</span>
+                            <span className="text-green-600">
+                              ${paidTotal.toFixed(2)}
+                            </span>
+                          </div>
+                          {remaining > 0 && (
+                            <div className="flex justify-between text-red-600">
+                              <span>Falta:</span>
+                              <span>${remaining.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Detalle del comensal seleccionado */}
+              {selectedGuest && (
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-semibold text-gray-800">
+                      {selectedGuest.name} - Productos
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setSelectedGuestForPayment(selectedGuest.id);
+                        setShowPaymentModal(true);
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-2"
+                    >
+                      <FaMoneyBillWave />
+                      Registrar Pago
+                    </button>
+                  </div>
+
+                  {/* Items del comensal */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      Productos:
+                    </h4>
+                    {selectedGuest.items.length === 0 ? (
+                      <p className="text-gray-400 text-sm">Sin productos</p>
+                    ) : (
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {selectedGuest.items.map((item) => (
+                          <div
+                            key={item.itemId}
+                            className="flex justify-between items-center bg-gray-50 p-2 rounded"
+                          >
+                            <div>
+                              <span className="font-medium">
+                                {item.productName}
+                              </span>
+                              <span className="text-gray-500 text-sm ml-2">
+                                {item.quantity} x ${item.price.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="font-medium">
+                              ${item.subtotal.toFixed(2)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Resumen de pagos del comensal */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-sm">
+                      <div className="flex justify-between">
+                        <span>Total en productos:</span>
+                        <span>
+                          ${getGuestTotal(selectedGuest).itemsTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-green-600">
+                        <span>Pagado:</span>
+                        <span>
+                          ${getGuestTotal(selectedGuest).paidTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      {getGuestTotal(selectedGuest).remaining > 0 && (
+                        <div className="flex justify-between text-red-600 font-medium">
+                          <span>Falta por pagar:</span>
+                          <span>
+                            ${getGuestTotal(selectedGuest).remaining.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {getGuestTotal(selectedGuest).remaining < 0 && (
+                        <div className="flex justify-between text-orange-600">
+                          <span>Sobrante (cambio):</span>
+                          <span>
+                            $
+                            {Math.abs(
+                              getGuestTotal(selectedGuest).remaining,
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+              <button
+                onClick={onClose}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmAll}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <FaCheck />
+                Finalizar y Cobrar Todo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de pago individual */}
+      {showPaymentModal && selectedGuestForPayment && (
+        <GuestPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedGuestForPayment(null);
+          }}
+          onConfirm={updateGuestPayment}
+          guest={guests.find((g) => g.id === selectedGuestForPayment)!}
+          tableNumber={tableNumber}
+        />
+      )}
+    </>
+  );
+}
+
+// Modal de pago individual por comensal
+function GuestPaymentModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  guest,
+  tableNumber,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (
+    guestId: string,
+    paymentData: {
+      cash: number;
+      terminal: number;
+      usd: number;
+      usdRate: number;
+    },
+  ) => void;
+  guest: any;
+  tableNumber: number;
+}) {
+  const getInitialUsdRate = (): number => {
+    if (typeof window !== "undefined") {
+      const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
+      if (savedRate) {
+        const parsedRate = parseFloat(savedRate);
+        if (!isNaN(parsedRate) && parsedRate > 0) {
+          return parsedRate;
+        }
+      }
+    }
+    return 18.5;
+  };
+
+  const [cashAmount, setCashAmount] = useState<number>(0);
+  const [terminalAmount, setTerminalAmount] = useState<number>(0);
+  const [usdAmount, setUsdAmount] = useState<number>(0);
+  const [usdRate, setUsdRate] = useState<number>(getInitialUsdRate);
+  const [showRateInput, setShowRateInput] = useState<boolean>(false);
+  const [tempRate, setTempRate] = useState<string>(usdRate.toString());
+
+  const itemsTotal =
+    guest?.items.reduce((sum: number, item: any) => sum + item.subtotal, 0) ||
+    0;
+  const usdToMxn = usdAmount * usdRate;
+  const totalPaid = cashAmount + terminalAmount + usdToMxn;
+  const remaining = itemsTotal - totalPaid;
+
+  useEffect(() => {
+    if (isOpen && guest) {
+      setCashAmount(0);
+      setTerminalAmount(0);
+      setUsdAmount(0);
+      const currentRate = getInitialUsdRate();
+      setUsdRate(currentRate);
+      setTempRate(currentRate.toString());
+    }
+  }, [isOpen, guest]);
+
+  const handleConfirm = () => {
+    if (totalPaid === 0) {
+      alert("Debe ingresar al menos un monto de pago");
+      return;
+    }
+
+    onConfirm(guest.id, {
+      cash: cashAmount,
+      terminal: terminalAmount,
+      usd: usdAmount,
+      usdRate: usdRate,
+    });
+    onClose();
+  };
+
+  if (!isOpen || !guest) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+        <div className="border-b p-4 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">
+              Pago de {guest.name}
+            </h2>
+            <p className="text-sm text-gray-600">Mesa {tableNumber}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <FaTimes className="text-xl" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="bg-gray-50 rounded-xl p-3">
+            <div className="flex justify-between">
+              <span className="font-medium">Total a pagar:</span>
+              <span className="text-xl font-bold text-green-600">
+                ${itemsTotal.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <FaMoneyBillWave className="text-green-600" />
+              <span className="font-semibold">Efectivo (MXN)</span>
+            </div>
+            <input
+              type="number"
+              value={cashAmount === 0 ? "" : cashAmount}
+              onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="bg-white border rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <FaCreditCard className="text-blue-600" />
+              <span className="font-semibold">Terminal (MXN)</span>
+            </div>
+            <input
+              type="number"
+              value={terminalAmount === 0 ? "" : terminalAmount}
+              onChange={(e) =>
+                setTerminalAmount(parseFloat(e.target.value) || 0)
+              }
+              placeholder="0.00"
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="bg-white border rounded-xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <FaDollarSign className="text-yellow-600" />
+                <span className="font-semibold">Dólares (USD)</span>
+              </div>
+              <button
+                onClick={() => setShowRateInput(!showRateInput)}
+                className="text-xs text-blue-600"
+              >
+                Cambiar tasa
+              </button>
+            </div>
+            {showRateInput && (
+              <div className="mb-2 flex gap-2">
+                <input
+                  type="number"
+                  value={tempRate}
+                  onChange={(e) => setTempRate(e.target.value)}
+                  className="flex-1 px-2 py-1 border rounded text-sm"
+                />
+                <button
+                  onClick={() => {
+                    const newRate = parseFloat(tempRate);
+                    if (!isNaN(newRate) && newRate > 0) {
+                      setUsdRate(newRate);
+                      setShowRateInput(false);
+                    }
+                  }}
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                >
+                  OK
+                </button>
+              </div>
+            )}
+            <input
+              type="number"
+              value={usdAmount === 0 ? "" : usdAmount}
+              onChange={(e) => setUsdAmount(parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+            <div className="text-right text-xs text-gray-500 mt-1">
+              = ${usdToMxn.toFixed(2)} MXN (tasa: {usdRate})
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-3">
+            <div className="flex justify-between">
+              <span>Total pagado:</span>
+              <span className="font-bold">${totalPaid.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span>Restante:</span>
+              <span
+                className={
+                  remaining > 0 ? "text-red-600 font-bold" : "text-green-600"
+                }
+              >
+                ${remaining > 0 ? remaining.toFixed(2) : "0.00"}
+              </span>
+            </div>
+            {remaining < 0 && (
+              <div className="flex justify-between mt-1 text-green-600">
+                <span>Cambio:</span>
+                <span>${Math.abs(remaining).toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-red-500 text-red-600 rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg"
+            >
+              Registrar Pago
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Componente simple para ordenar mesas
 function TablesOrderSelect({
   value,
@@ -509,7 +1161,6 @@ export default function WaiterDashboard() {
     Set<string>
   >(new Set());
 
-  // Estado para el filtro FCFS (notificaciones)
   const [fcfsFilter, setFcfsFilter] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_fcfs_filter");
@@ -518,7 +1169,6 @@ export default function WaiterDashboard() {
     return false;
   });
 
-  // Estado para ordenar mesas
   const [tablesOrder, setTablesOrder] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_tables_order");
@@ -527,14 +1177,12 @@ export default function WaiterDashboard() {
     return "number";
   });
 
-  // Estados para el modal de contraseña
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingCancelAction, setPendingCancelAction] = useState<{
     itemId: string;
     cancelQuantity: number;
   } | null>(null);
 
-  // Estados para la calculadora de pago
   const [showPaymentCalculator, setShowPaymentCalculator] = useState(false);
   const [selectedTableForPayment, setSelectedTableForPayment] = useState<{
     id: number;
@@ -542,7 +1190,14 @@ export default function WaiterDashboard() {
     total: number;
   } | null>(null);
 
-  // Referencia para guardar la posición del scroll
+  const [showSeparatePayments, setShowSeparatePayments] = useState(false);
+  const [selectedTableForSeparate, setSelectedTableForSeparate] = useState<{
+    id: number;
+    number: number;
+    total: number;
+    orders: any[];
+  } | null>(null);
+
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
 
@@ -635,22 +1290,6 @@ export default function WaiterDashboard() {
       const dateB = new Date(b.created_at).getTime();
       return dateA - dateB;
     });
-  };
-
-  const toggleFcfsFilter = () => {
-    const newFcfsState = !fcfsFilter;
-    setFcfsFilter(newFcfsState);
-
-    if (notifications.length > 0 && newFcfsState) {
-      const filteredNotifications = applyFcfsFilter(notifications);
-      setNotifications(filteredNotifications);
-    } else if (notifications.length > 0 && !newFcfsState) {
-      loadData();
-    }
-  };
-
-  const handleTablesOrderChange = (order: string) => {
-    setTablesOrder(order);
   };
 
   const setupRealtimeSubscription = () => {
@@ -898,6 +1537,92 @@ export default function WaiterDashboard() {
     setShowPaymentCalculator(true);
   };
 
+  const handlePagarPorSeparado = async (
+    tableId: number,
+    tableNumber: number,
+  ) => {
+    const table = tables.find((t) => t.id === tableId);
+    if (!table) return;
+
+    const tableTotal = calculateTableTotal(table);
+
+    setSelectedTableForSeparate({
+      id: tableId,
+      number: tableNumber,
+      total: tableTotal,
+      orders: table.orders,
+    });
+    setShowSeparatePayments(true);
+  };
+
+  const handleSeparatePaymentsConfirm = async (payments: any[]) => {
+    if (!selectedTableForSeparate) return;
+
+    setProcessing(`separate-${selectedTableForSeparate.id}`);
+    try {
+      let totalCash = 0;
+      let totalTerminal = 0;
+      let totalUsd = 0;
+      let usdRateUsed = 18.5;
+
+      payments.forEach((payment) => {
+        totalCash += payment.cash;
+        totalTerminal += payment.terminal;
+        totalUsd += payment.usd;
+        if (payment.usdRate) usdRateUsed = payment.usdRate;
+      });
+
+      let paymentMethod: "cash" | "terminal" | "mixed" | "usd" | null = null;
+      let methodsUsed = 0;
+      if (totalCash > 0) methodsUsed++;
+      if (totalTerminal > 0) methodsUsed++;
+      if (totalUsd > 0) methodsUsed++;
+
+      if (methodsUsed === 1) {
+        if (totalCash > 0) paymentMethod = "cash";
+        else if (totalTerminal > 0) paymentMethod = "terminal";
+        else if (totalUsd > 0) paymentMethod = "usd";
+      } else if (methodsUsed > 1) {
+        paymentMethod = "mixed";
+      }
+
+      await waiterService.freeTableAndClean(
+        selectedTableForSeparate.id,
+        selectedTableForSeparate.number,
+        paymentMethod,
+      );
+
+      let successMessage = `✅ Mesa ${selectedTableForSeparate.number} cobrada exitosamente (Pagos Individuales).\n\n`;
+      successMessage += `💰 Total: $${selectedTableForSeparate.total.toFixed(2)}\n`;
+      successMessage += `👥 ${payments.length} comensales\n\n`;
+
+      payments.forEach((payment, idx) => {
+        successMessage += `👤 ${payment.guestName}:\n`;
+        successMessage += `   Productos: $${payment.total.toFixed(2)}\n`;
+        successMessage += `   Pagado: $${(payment.cash + payment.terminal + payment.usd * (payment.usdRate || usdRateUsed)).toFixed(2)}\n`;
+        if (payment.cash > 0)
+          successMessage += `   💵 Efectivo: $${payment.cash.toFixed(2)}\n`;
+        if (payment.terminal > 0)
+          successMessage += `   💳 Terminal: $${payment.terminal.toFixed(2)}\n`;
+        if (payment.usd > 0)
+          successMessage += `   💵 Dólares: $${payment.usd.toFixed(2)} USD\n`;
+        successMessage += `\n`;
+      });
+
+      alert(successMessage);
+      await loadData();
+    } catch (error: any) {
+      console.error("Error en pagos individuales:", error);
+      alert(
+        `❌ Error al procesar pagos individuales de la mesa ${selectedTableForSeparate.number}:\n${error.message}`,
+      );
+    } finally {
+      setProcessing(null);
+      setShowSeparatePayments(false);
+      setSelectedTableForSeparate(null);
+    }
+  };
+
   const handlePaymentConfirm = async (paymentData: any) => {
     if (!selectedTableForPayment) return;
 
@@ -921,13 +1646,6 @@ export default function WaiterDashboard() {
       } else if (methodsUsed > 1) {
         paymentMethod = "mixed";
       }
-
-      console.log(
-        `💳 Método de pago a guardar: ${paymentMethod === "cash" ? "EFECTIVO" : paymentMethod === "terminal" ? "TERMINAL" : paymentMethod === "usd" ? "DÓLARES" : "MIXTO"}`,
-      );
-      console.log(
-        `📝 Detalle del pago: Efectivo: $${paymentData.cash.toFixed(2)}, Terminal: $${paymentData.terminal.toFixed(2)}, USD: $${paymentData.usd.toFixed(2)} (tasa: ${paymentData.usdRate})`,
-      );
 
       await waiterService.freeTableAndClean(
         selectedTableForPayment.id,
@@ -1014,19 +1732,17 @@ export default function WaiterDashboard() {
 
         {activeTab === "tables" && (
           <>
-            <TablesOrderSelect
-              value={tablesOrder}
-              onChange={handleTablesOrderChange}
-            />
+            <TablesOrderSelect value={tablesOrder} onChange={setTablesOrder} />
 
             <TablesTab
               tables={tables}
               processing={processing}
               onUpdateItemStatus={handleUpdateItemStatus}
+              onCancelItem={handleCancelItem}
               onCobrarMesa={handleCobrarMesa}
+              onPagarPorSeparado={handlePagarPorSeparado}
               calculateTableTotal={calculateTableTotal}
               notifications={notifications}
-              onCancelItem={handleCancelItem}
               tablesOrder={tablesOrder}
             />
           </>
@@ -1052,6 +1768,18 @@ export default function WaiterDashboard() {
         onConfirm={handlePaymentConfirm}
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
+      />
+
+      <SeparatePaymentsModal
+        isOpen={showSeparatePayments}
+        onClose={() => {
+          setShowSeparatePayments(false);
+          setSelectedTableForSeparate(null);
+        }}
+        onConfirm={handleSeparatePaymentsConfirm}
+        tableOrders={selectedTableForSeparate?.orders || []}
+        tableNumber={selectedTableForSeparate?.number || 0}
+        totalAmount={selectedTableForSeparate?.total || 0}
       />
     </div>
   );

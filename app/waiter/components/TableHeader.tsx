@@ -9,6 +9,7 @@ import {
   FaPlus,
   FaUtensils,
   FaClock,
+  FaUsers,
 } from "react-icons/fa";
 import { useState, useEffect } from "react";
 
@@ -17,9 +18,9 @@ interface TableHeaderProps {
   tableTotal: number;
   processing: string | null;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
+  onPagarPorSeparado: (tableId: number, tableNumber: number) => void;
   notifications: WaiterNotification[];
   onOrderAdded?: () => void;
-  // Nuevas props para el filtro FCFS
   hasNotifications?: boolean;
   isHighlighted?: boolean;
   occupationTime?: string;
@@ -45,6 +46,7 @@ export default function TableHeader({
   tableTotal,
   processing,
   onCobrarMesa,
+  onPagarPorSeparado,
   notifications = [],
   onOrderAdded,
   hasNotifications = false,
@@ -60,7 +62,6 @@ export default function TableHeader({
   const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar productos cuando se abre el modal
   useEffect(() => {
     if (showAddModal) {
       loadProducts();
@@ -71,7 +72,6 @@ export default function TableHeader({
     setProductsLoading(true);
     setError(null);
     try {
-      // Cargar productos directamente desde Supabase
       const { data, error } = await supabase
         .from("products")
         .select("*")
@@ -97,9 +97,9 @@ export default function TableHeader({
         total +
         order.order_items.reduce(
           (sum: number, item: any) => sum + item.quantity,
-          0
+          0,
         ),
-      0
+      0,
     );
   };
 
@@ -109,16 +109,16 @@ export default function TableHeader({
         total +
         order.order_items.filter(
           (item: any) =>
-            item.status === "ordered" || item.status === "preparing"
+            item.status === "ordered" || item.status === "preparing",
         ).length,
-      0
+      0,
     );
 
     const ready = table.orders.reduce(
       (total, order) =>
         total +
         order.order_items.filter((item: any) => item.status === "ready").length,
-      0
+      0,
     );
 
     const served = table.orders.reduce(
@@ -126,19 +126,18 @@ export default function TableHeader({
         total +
         order.order_items.filter((item: any) => item.status === "served")
           .length,
-      0
+      0,
     );
 
     return { pending, ready, served };
   };
 
-  // Obtener notificaciones de "Solicita la cuenta" para esta mesa
   const billRequestNotifications = notifications.filter(
     (notification: any) =>
-      notification.table_id === table.id && notification.type === "bill_request"
+      notification.table_id === table.id &&
+      notification.type === "bill_request",
   );
 
-  // Obtener la notificación más reciente de cuenta
   const latestBillRequest =
     billRequestNotifications.length > 0
       ? billRequestNotifications[billRequestNotifications.length - 1]
@@ -172,7 +171,6 @@ export default function TableHeader({
     }
   };
 
-  // Funciones para el modal de agregar productos
   const handleAddClick = () => {
     setShowAddModal(true);
   };
@@ -189,7 +187,6 @@ export default function TableHeader({
     setError(null);
 
     try {
-      // Preparar los items seleccionados
       const selectedItems = Object.entries(selectedProducts)
         .filter(([_, quantity]) => quantity > 0)
         .map(([productId, quantity]) => {
@@ -211,13 +208,11 @@ export default function TableHeader({
         return;
       }
 
-      // CALCULAR EL TOTAL
       const orderTotal = selectedItems.reduce(
         (total, item) => total + item.price * item.quantity,
-        0
+        0,
       );
 
-      // CREAR LA ORDEN EN LA TABLA ORDERS
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert([
@@ -236,7 +231,6 @@ export default function TableHeader({
         throw new Error(`Error creando orden: ${orderError.message}`);
       }
 
-      // PREPARAR LOS ITEMS PARA ORDER_ITEMS
       const orderItemsData = selectedItems.map((item) => ({
         order_id: (order as any).id,
         product_id: item.product_id,
@@ -248,41 +242,33 @@ export default function TableHeader({
         cancelled_quantity: 0,
       }));
 
-      // CREAR LOS ITEMS EN LA TABLA ORDER_ITEMS
-      const { data: orderItems, error: itemsError } = await supabase
+      const { error: itemsError } = await supabase
         .from("order_items")
-        .insert(orderItemsData as any)
-        .select();
+        .insert(orderItemsData as any);
 
       if (itemsError) {
         console.error("Error creando order_items:", itemsError);
-
-        // Si falla la creación de items, eliminar la orden creada
         await supabase
           .from("orders")
           .delete()
           .eq("id", (order as any).id);
-
         throw new Error(`Error creando items: ${itemsError.message}`);
       }
 
-      // ÉXITO - Cerrar modal y limpiar
       setShowAddModal(false);
       setSelectedProducts({});
 
-      // Notificar al componente padre para refrescar los datos
       if (onOrderAdded) {
         onOrderAdded();
       }
 
-      // Mostrar mensaje de éxito
       alert(
-        `✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`
+        `✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`,
       );
     } catch (error) {
       console.error("Error completo adding order:", error);
       setError(
-        `Error: ${error instanceof Error ? error.message : "Error desconocido"}`
+        `Error: ${error instanceof Error ? error.message : "Error desconocido"}`,
       );
     } finally {
       setAddingOrder(false);
@@ -299,7 +285,7 @@ export default function TableHeader({
         const product = products.find((p) => p.id === parseInt(productId));
         return sum + (product?.price || 0) * quantity;
       },
-      0
+      0,
     );
   };
 
@@ -313,10 +299,8 @@ export default function TableHeader({
   const totalItems = calculateTotalItems(table);
   const statusCounts = calculateItemsByStatus(table);
 
-  // Determinar color según tiempo de ocupación
   const getTimeColor = () => {
     if (!occupationTime) return "text-gray-600";
-
     if (occupationTime.includes("h")) {
       return "text-red-600";
     } else if (
@@ -328,12 +312,16 @@ export default function TableHeader({
     return "text-green-600";
   };
 
+  // Determinar si mostrar los botones de cobro
+  const showPaymentButtons =
+    latestBillRequest && latestBillRequest.type === "bill_request";
+
   return (
     <>
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1">
-          {/* Línea superior con información principal */}
-          <div className="flex items-center gap-2 mb-2">
+      <div className="mb-4">
+        {/* Cabecera con número de mesa y botones */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
+          <div>
             <h3
               className={`text-lg font-bold ${
                 isHighlighted ? "text-red-700" : "text-gray-800"
@@ -343,135 +331,146 @@ export default function TableHeader({
             </h3>
           </div>
 
-          {/* Información de tiempo de ocupación */}
-          {occupationTime && (
-            <div className="flex items-center gap-1 mb-2 text-sm">
-              <FaClock className={`${getTimeColor()}`} size={12} />
-              <span className={`font-medium ${getTimeColor()}`}>
-                {occupationTime}
-              </span>
-              <span className="text-gray-500 mx-1">•</span>
-              <span className="text-gray-500 text-xs">
-                Ocupada desde:{" "}
-                {table.orders.length > 0
-                  ? new Date(table.orders[0].created_at).toLocaleTimeString(
-                      [],
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }
-                    )
-                  : "Sin registro"}
-              </span>
-            </div>
-          )}
-
-          {/* Badges de estado */}
-          <div className="flex flex-wrap gap-1 mb-2">
-            <span
-              className={`text-xs px-2 py-1 rounded ${
-                table.status === "occupied"
-                  ? "bg-green-100 text-green-800"
-                  : table.status === "reserved"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-gray-100 text-gray-800"
-              }`}
-            >
-              {table.status === "occupied"
-                ? "Ocupada"
-                : table.status === "reserved"
-                ? "Reservada"
-                : "Disponible"}
-            </span>
-
-            {/* NOTIFICACIÓN DE CUENTA CON MÉTODO DE PAGO */}
-            {latestBillRequest && (
-              <span
-                className={`text-xs px-2 py-1 rounded border ${
-                  getPaymentMethodInfo(latestBillRequest.payment_method).bgColor
-                } ${
-                  getPaymentMethodInfo(latestBillRequest.payment_method)
-                    .textColor
-                } ${
-                  getPaymentMethodInfo(latestBillRequest.payment_method)
-                    .borderColor
-                } flex items-center gap-1`}
+          {/* Contenedor de botones - siempre visible */}
+          <div className="flex flex-wrap gap-2">
+            {/* Botón Agregar */}
+            {(table.status === "occupied" || table.status === "reserved") && (
+              <button
+                onClick={handleAddClick}
+                className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm"
+                title="Agregar productos a la mesa"
               >
-                {(() => {
-                  const IconComponent = getPaymentMethodInfo(
-                    latestBillRequest.payment_method
-                  ).icon;
-                  return <IconComponent className="text-xs" />;
-                })()}
-                {getPaymentMethodInfo(latestBillRequest.payment_method).text}
-              </span>
+                <FaPlus className="text-xs" />
+                <span>Agregar</span>
+              </button>
             )}
 
-            {/* Items servidos */}
-            {totalItems > 0 && statusCounts.served > 0 && (
-              <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                {statusCounts.served} servido
-                {statusCounts.served > 1 ? "s" : ""}
-              </span>
+            {/* Botón Pagar por Separado - solo cuando hay solicitud */}
+            {showPaymentButtons && (
+              <button
+                onClick={() => onPagarPorSeparado(table.id, table.number)}
+                disabled={processing === `separate-${table.id}`}
+                className="bg-purple-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-1 shadow-sm"
+                title="Dividir cuenta entre comensales"
+              >
+                {processing === `separate-${table.id}` ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <>
+                    <FaUsers className="text-xs" />
+                    <span>Separado</span>
+                  </>
+                )}
+              </button>
             )}
 
-            {/* Items listos */}
-            {statusCounts.ready > 0 && (
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                {statusCounts.ready} listo{statusCounts.ready > 1 ? "s" : ""}
-              </span>
-            )}
-
-            {/* Items pendientes */}
-            {statusCounts.pending > 0 && (
-              <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-                {statusCounts.pending} pendiente
-                {statusCounts.pending > 1 ? "s" : ""}
-              </span>
+            {/* Botón Cobrar Todo - solo cuando hay solicitud */}
+            {showPaymentButtons && (
+              <button
+                onClick={() => onCobrarMesa(table.id, table.number)}
+                disabled={processing === `cobrar-${table.id}`}
+                className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-1 shadow-sm"
+                title="Cobrar toda la cuenta"
+              >
+                {processing === `cobrar-${table.id}` ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <>
+                    <FaDollarSign />
+                    <span>Cobrar</span>
+                  </>
+                )}
+              </button>
             )}
           </div>
-
-          {/* Información adicional de ubicación */}
-          <p className="text-sm text-gray-500">
-            {table.location} • {table.capacity} personas
-          </p>
         </div>
 
-        {/* BOTONES DE ACCIÓN */}
-        <div className="flex gap-2 ml-2">
-          {/* BOTÓN DE AGREGAR */}
-          {(table.status === "occupied" || table.status === "reserved") && (
-            <button
-              onClick={handleAddClick}
-              className="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 whitespace-nowrap flex items-center gap-1"
-              title="Agregar productos a la mesa"
+        {/* Tiempo de ocupación */}
+        {occupationTime && (
+          <div className="flex items-center gap-1 mb-2 text-sm">
+            <FaClock className={`${getTimeColor()}`} size={12} />
+            <span className={`font-medium ${getTimeColor()}`}>
+              {occupationTime}
+            </span>
+            <span className="text-gray-500 mx-1">•</span>
+            <span className="text-gray-500 text-xs">
+              Desde:{" "}
+              {table.orders.length > 0
+                ? new Date(table.orders[0].created_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Sin registro"}
+            </span>
+          </div>
+        )}
+
+        {/* Badges de estado */}
+        <div className="flex flex-wrap gap-1 mb-2">
+          <span
+            className={`text-xs px-2 py-1 rounded ${
+              table.status === "occupied"
+                ? "bg-green-100 text-green-800"
+                : table.status === "reserved"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-gray-100 text-gray-800"
+            }`}
+          >
+            {table.status === "occupied"
+              ? "Ocupada"
+              : table.status === "reserved"
+                ? "Reservada"
+                : "Disponible"}
+          </span>
+
+          {latestBillRequest && (
+            <span
+              className={`text-xs px-2 py-1 rounded border ${
+                getPaymentMethodInfo(latestBillRequest.payment_method).bgColor
+              } ${
+                getPaymentMethodInfo(latestBillRequest.payment_method).textColor
+              } ${
+                getPaymentMethodInfo(latestBillRequest.payment_method)
+                  .borderColor
+              } flex items-center gap-1`}
             >
-              <FaPlus className="text-xs" />
-              Agregar
-            </button>
+              {(() => {
+                const IconComponent = getPaymentMethodInfo(
+                  latestBillRequest.payment_method,
+                ).icon;
+                return <IconComponent className="text-xs" />;
+              })()}
+              {getPaymentMethodInfo(latestBillRequest.payment_method).text}
+            </span>
           )}
 
-          {/* BOTÓN DE COBRAR - SOLO APARECE CUANDO HAY SOLICITUD DE CUENTA */}
-          {latestBillRequest && latestBillRequest.type === "bill_request" && (
-            <button
-              onClick={() => onCobrarMesa(table.id, table.number)}
-              disabled={processing === `cobrar-${table.id}`}
-              className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 disabled:opacity-50 whitespace-nowrap flex items-center gap-1"
-            >
-              {processing === `cobrar-${table.id}` ? (
-                <FaSpinner className="animate-spin" />
-              ) : (
-                <>
-                  <FaDollarSign />
-                  Cobrar
-                </>
-              )}
-            </button>
+          {totalItems > 0 && statusCounts.served > 0 && (
+            <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+              {statusCounts.served} servido{statusCounts.served > 1 ? "s" : ""}
+            </span>
+          )}
+
+          {statusCounts.ready > 0 && (
+            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+              {statusCounts.ready} listo{statusCounts.ready > 1 ? "s" : ""}
+            </span>
+          )}
+
+          {statusCounts.pending > 0 && (
+            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+              {statusCounts.pending} pendiente
+              {statusCounts.pending > 1 ? "s" : ""}
+            </span>
           )}
         </div>
+
+        {/* Información de ubicación */}
+        <p className="text-sm text-gray-500">
+          {table.location} • {table.capacity} personas
+        </p>
       </div>
 
-      {/* MODAL PARA AGREGAR PRODUCTOS (sin cambios) */}
+      {/* Modal para agregar productos */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -489,14 +488,12 @@ export default function TableHeader({
               </div>
             </div>
 
-            {/* Mensaje de error */}
             {error && (
               <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700">
                 {error}
               </div>
             )}
 
-            {/* Lista de productos */}
             <div className="flex-1 overflow-y-auto pr-2">
               {productsLoading ? (
                 <div className="text-center py-8">
@@ -548,8 +545,8 @@ export default function TableHeader({
                                 product.id,
                                 Math.max(
                                   0,
-                                  (selectedProducts[product.id] || 0) - 1
-                                )
+                                  (selectedProducts[product.id] || 0) - 1,
+                                ),
                               )
                             }
                             disabled={(selectedProducts[product.id] || 0) <= 0}
@@ -566,7 +563,7 @@ export default function TableHeader({
                             onClick={() =>
                               handleProductQuantityChange(
                                 product.id,
-                                (selectedProducts[product.id] || 0) + 1
+                                (selectedProducts[product.id] || 0) + 1,
                               )
                             }
                             className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300"
@@ -581,9 +578,8 @@ export default function TableHeader({
               )}
             </div>
 
-            {/* Resumen y acciones */}
             <div className="border-t border-gray-200 pt-4 mt-4">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-4">
                 <div>
                   <p className="text-sm text-gray-600">
                     Total de items: <strong>{getTotalItems()}</strong>

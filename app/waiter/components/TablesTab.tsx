@@ -1,7 +1,7 @@
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import TableCard from "./TableCard";
 import { useState } from "react";
-import { FaDollarSign, FaSortNumericDown, FaClock } from "react-icons/fa";
+import { FaDollarSign } from "react-icons/fa";
 
 interface TablesTabProps {
   tables: TableWithOrder[];
@@ -9,9 +9,10 @@ interface TablesTabProps {
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
+  onPagarPorSeparado: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
-  tablesOrder: string; // Nueva prop
+  tablesOrder: string;
 }
 
 export default function TablesTab({
@@ -20,19 +21,19 @@ export default function TablesTab({
   onUpdateItemStatus,
   onCancelItem,
   onCobrarMesa,
+  onPagarPorSeparado,
   calculateTableTotal,
   notifications,
-  tablesOrder, // Recibir el orden
+  tablesOrder,
 }: TablesTabProps) {
   const totalGeneral = tables.reduce(
     (sum, table) => sum + calculateTableTotal(table),
-    0
+    0,
   );
   const occupiedTablesCount = tables.filter(
-    (t) => t.status === "occupied"
+    (t) => t.status === "occupied",
   ).length;
 
-  // Función para obtener hora de ocupación (usando la orden más antigua)
   const getTableOccupationTime = (table: TableWithOrder): Date | null => {
     if (table.orders.length === 0) return null;
 
@@ -49,7 +50,6 @@ export default function TablesTab({
     return new Date(earliestOrder.created_at);
   };
 
-  // Ordenar mesas según tablesOrder
   const sortedTables = [...tables];
 
   if (tablesOrder === "occupation") {
@@ -61,14 +61,12 @@ export default function TablesTab({
       if (!timeA) return 1;
       if (!timeB) return -1;
 
-      return timeA.getTime() - timeB.getTime(); // Más antiguas primero
+      return timeA.getTime() - timeB.getTime();
     });
   } else {
-    // Orden por número (default)
     sortedTables.sort((a, b) => a.number - b.number);
   }
 
-  // Calcular tiempo de ocupación para display
   const getOccupationDisplay = (table: TableWithOrder): string => {
     const occupationTime = getTableOccupationTime(table);
     if (!occupationTime) return "Sin pedidos";
@@ -84,13 +82,12 @@ export default function TablesTab({
     return `${diffHours} h`;
   };
 
-  // Encontrar la mesa más antigua para destacar (solo si ordenamos por ocupación)
   const oldestTableIndex =
     tablesOrder === "occupation"
       ? sortedTables.findIndex(
           (table) =>
             table.status === "occupied" &&
-            getTableOccupationTime(table) !== null
+            getTableOccupationTime(table) !== null,
         )
       : -1;
 
@@ -102,7 +99,6 @@ export default function TablesTab({
         </h2>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {/* Estadísticas */}
           <div className="text-sm text-gray-600">
             <span className="bg-green-100 text-green-800 px-2 py-1 rounded mr-2">
               {occupiedTablesCount} mesas ocupadas
@@ -132,7 +128,6 @@ export default function TablesTab({
 
           return (
             <div key={table.id} className="relative">
-              {/* Badge de posición solo cuando ordenamos por ocupación */}
               {tablesOrder === "occupation" &&
                 table.status === "occupied" &&
                 index < 3 && (
@@ -142,8 +137,8 @@ export default function TablesTab({
                         index === oldestTableIndex
                           ? "bg-red-500"
                           : index === oldestTableIndex + 1
-                          ? "bg-orange-500"
-                          : "bg-blue-500"
+                            ? "bg-orange-500"
+                            : "bg-blue-500"
                       }`}
                     >
                       #{index + 1}
@@ -157,9 +152,9 @@ export default function TablesTab({
                 onUpdateItemStatus={onUpdateItemStatus}
                 onCancelItem={onCancelItem}
                 onCobrarMesa={onCobrarMesa}
+                onPagarPorSeparado={onPagarPorSeparado}
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
-                // Props adicionales
                 occupationTime={occupationTime}
                 hasNotifications={hasNotifications}
                 isHighlighted={isOldest}
