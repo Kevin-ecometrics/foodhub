@@ -123,7 +123,7 @@ export default function CustomerPage() {
       // 1. Crear orden para el cliente
       const order = await ordersService.createOrder(
         table.id,
-        customerName.trim()
+        customerName.trim(),
       );
 
       // 2. Si la mesa está disponible, actualizar estado a "occupied"
@@ -136,7 +136,7 @@ export default function CustomerPage() {
         table.id,
         "new_order",
         `Nuevo cliente en Mesa ${table.number} - ${customerName.trim()}`,
-        order.id
+        order.id,
       );
 
       // 4. Guardar sesión en el contexto
@@ -241,7 +241,7 @@ export default function CustomerPage() {
           {/* Información adicional */}
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-sm text-center text-gray-600">
-              💡 Cada mesa tiene un código QR único para identificar tu orden
+              Cada mesa tiene un código QR único para identificar tu orden
             </p>
             <p className="text-xs text-center text-gray-500 mt-2">
               Pregunta al personal si necesitas ayuda
@@ -297,8 +297,8 @@ export default function CustomerPage() {
                     selectedTableData.status === "available"
                       ? "text-green-600"
                       : selectedTableData.status === "occupied"
-                      ? "text-orange-600"
-                      : "text-red-600"
+                        ? "text-orange-600"
+                        : "text-red-600"
                   }`}
                 >
                   Estado: {getTableStatusText(selectedTableData.status)}
@@ -374,7 +374,7 @@ export default function CustomerPage() {
         {/* Información adicional */}
         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
           <p className="text-sm text-blue-700 text-center">
-            💡 Podrás agregar más personas después desde el menú
+            Podrás agregar más personas después desde el menú
           </p>
           <p className="text-xs text-blue-600 text-center mt-2">
             * Campo obligatorio: Nombre
