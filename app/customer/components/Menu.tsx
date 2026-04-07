@@ -179,7 +179,7 @@ export default function MenuPage() {
     if (hasPricedExtras) {
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
+        (part) => !part.includes("Extras:") && !part.includes("Total:"),
       );
       const extrasPart = parts.find((part) => part.includes("Extras:"));
       const totalPart = parts.find((part) => part.includes("Total:"));
@@ -355,7 +355,7 @@ export default function MenuPage() {
               router.push("/customer");
             }, 300);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -448,7 +448,7 @@ export default function MenuPage() {
 
       const scrollPosition = window.scrollY + navbarHeight;
       const availableCategories = CATEGORIES.filter(
-        (category) => getProductsByCategory(category.id).length > 0
+        (category) => getProductsByCategory(category.id).length > 0,
       );
 
       let currentActiveCategory = availableCategories[0]?.id || "favorites";
@@ -502,7 +502,7 @@ export default function MenuPage() {
   const loadInitialData = async (
     tableId: number,
     orderId: string,
-    userId: string
+    userId: string,
   ) => {
     try {
       setIsLoading(true);
@@ -541,7 +541,7 @@ export default function MenuPage() {
 
         // Mostrar mensaje al usuario
         alert(
-          "⚠️ Hubo un problema al cargar tu orden anterior, pero puedes hacer un nuevo pedido."
+          "⚠️ Hubo un problema al cargar tu orden anterior, pero puedes hacer un nuevo pedido.",
         );
       } catch (recoveryError) {
         console.error("Error en recuperación:", recoveryError);
@@ -584,15 +584,15 @@ export default function MenuPage() {
 
     try {
       const recentOrdersItems = await getRecentOrdersItems(
-        parseInt(targetTableId.toString())
+        parseInt(targetTableId.toString()),
       );
       setRecentOrderItems(recentOrdersItems);
 
       const uniqueProductIds = new Set(
-        recentOrdersItems.map((item) => item.product_id)
+        recentOrdersItems.map((item) => item.product_id),
       );
       const recentProducts = products.filter((product) =>
-        uniqueProductIds.has(product.id)
+        uniqueProductIds.has(product.id),
       );
       setRecentItems(recentProducts);
     } catch (error) {
@@ -660,14 +660,14 @@ export default function MenuPage() {
 
     if (hasOnlySpaces) {
       alert(
-        "❌ Las instrucciones especiales no pueden contener solo espacios en blanco."
+        "❌ Las instrucciones especiales no pueden contener solo espacios en blanco.",
       );
       return;
     }
 
     if (hasValidNotes && trimmedNotes.length < 2) {
       alert(
-        "❌ Las instrucciones especiales deben tener al menos 2 caracteres válidos."
+        "❌ Las instrucciones especiales deben tener al menos 2 caracteres válidos.",
       );
       return;
     }
@@ -694,7 +694,7 @@ export default function MenuPage() {
         .filter(([_, isSelected]) => isSelected)
         .reduce((total, [extraName]) => {
           const extra = selectedProduct.extras?.find(
-            (e) => e.name === extraName
+            (e) => e.name === extraName,
           );
           return total + (extra?.price || 0);
         }, 0);
@@ -705,7 +705,7 @@ export default function MenuPage() {
         .filter(([_, isSelected]) => isSelected)
         .map(([extraName]) => {
           const extra = selectedProduct.extras?.find(
-            (e) => e.name === extraName
+            (e) => e.name === extraName,
           );
           return {
             name: extraName,
@@ -733,7 +733,7 @@ export default function MenuPage() {
         (item) =>
           item.product_id === selectedProduct.id &&
           item.notes === finalNotes &&
-          item.price === totalPrice
+          item.price === totalPrice,
       );
 
       if (existingItem) {
@@ -743,7 +743,7 @@ export default function MenuPage() {
           editingItem.id,
           editingItem.quantity,
           finalNotes,
-          totalPrice
+          totalPrice,
         );
       } else {
         await addToCart(selectedProduct, 1, finalNotes, totalPrice);
@@ -779,7 +779,7 @@ export default function MenuPage() {
             clearSession();
             window.location.href = "/customer";
           }
-        }
+        },
       )
       .subscribe();
 
@@ -824,7 +824,7 @@ export default function MenuPage() {
         currentOrder.table_id,
         "new_order",
         `Nueva orden de ${currentOrder.customer_name} desde Mesa ${currentOrder.table_id}`,
-        currentOrder.id
+        currentOrder.id,
       );
 
       // Crear NUEVA orden para el MISMO usuario
@@ -843,7 +843,7 @@ export default function MenuPage() {
       setShowCart(false);
 
       alert(
-        `✅ ¡Orden enviada a cocina, ${currentOrder.customer_name}! Tu carrito está listo para nuevos pedidos.`
+        `✅ ¡Orden enviada a cocina, ${currentOrder.customer_name}! Tu carrito está listo para nuevos pedidos.`,
       );
     } catch (error) {
       console.error("Error sending order:", error);
@@ -883,7 +883,7 @@ export default function MenuPage() {
     try {
       const newOrder = await ordersService.createOrder(
         parseInt(tableId),
-        userName.trim()
+        userName.trim(),
       );
 
       await loadTableUsers(parseInt(tableId));
@@ -968,7 +968,7 @@ export default function MenuPage() {
           refill: "Refill",
         };
         return products.filter(
-          (product) => product.category === categoryMap[categoryId]
+          (product) => product.category === categoryMap[categoryId],
         );
     }
   };
@@ -1001,7 +1001,7 @@ export default function MenuPage() {
     setAssistanceLoading(true);
     try {
       await historyService.requestAssistance(
-        parseInt(targetTableId.toString())
+        parseInt(targetTableId.toString()),
       );
       alert("✅ El mesero ha sido notificado. Pronto te atenderá.");
     } catch (error) {
@@ -1079,7 +1079,7 @@ export default function MenuPage() {
             <div className="relative">
               <div
                 className={`${getBadgeSize(
-                  cartItemsCount
+                  cartItemsCount,
                 )} bg-red-500 rounded-full flex items-center justify-center font-bold text-white animate-pulse border-2 border-white`}
               >
                 {formatBadgeCount(cartItemsCount)}
@@ -1227,7 +1227,7 @@ export default function MenuPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">FoodHub</h1>
+              <h1 className="text-2xl font-bold text-gray-800">ScanEat</h1>
               <p className="text-sm text-gray-500">
                 Mesa {tableNumber} • {customerName}
                 {currentOrder?.id && ` • Orden #${currentOrder.id.slice(0, 8)}`}
@@ -1310,7 +1310,7 @@ export default function MenuPage() {
       <main className="max-w-7xl mx-auto px-4 py-6" ref={containerRef}>
         {/* Renderizar todas las categorías con productos */}
         {CATEGORIES.filter(
-          (category) => getProductsByCategory(category.id).length > 0
+          (category) => getProductsByCategory(category.id).length > 0,
         ).map((category) => {
           const categoryProducts = getProductsByCategory(category.id);
 
@@ -1439,13 +1439,13 @@ export default function MenuPage() {
                                 <button
                                   onClick={() => {
                                     const item = orderItems.find(
-                                      (item) => item.product_id === product.id
+                                      (item) => item.product_id === product.id,
                                     );
                                     if (item) {
                                       if (currentQuantity > 1) {
                                         updateCartItem(
                                           item.id,
-                                          currentQuantity - 1
+                                          currentQuantity - 1,
                                         );
                                       } else {
                                         removeFromCart(item.id);
@@ -1464,12 +1464,12 @@ export default function MenuPage() {
                                 <button
                                   onClick={() => {
                                     const item = orderItems.find(
-                                      (item) => item.product_id === product.id
+                                      (item) => item.product_id === product.id,
                                     );
                                     if (item) {
                                       updateCartItem(
                                         item.id,
-                                        currentQuantity + 1
+                                        currentQuantity + 1,
                                       );
                                     }
                                   }}
@@ -1615,7 +1615,7 @@ export default function MenuPage() {
 
                   {/* Resumen de extras seleccionados */}
                   {Object.keys(selectedExtras).filter(
-                    (key) => selectedExtras[key]
+                    (key) => selectedExtras[key],
                   ).length > 0 && (
                     <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                       <p className="text-sm font-medium text-blue-800">
@@ -1626,7 +1626,7 @@ export default function MenuPage() {
                           .filter(([_, isSelected]) => isSelected)
                           .map(([extraName]) => {
                             const extra = selectedProduct.extras?.find(
-                              (e) => e.name === extraName
+                              (e) => e.name === extraName,
                             );
                             return (
                               <li

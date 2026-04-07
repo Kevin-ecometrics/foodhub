@@ -16,15 +16,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Food Hub Restaurant - Sistema Gestión Meseros",
+  title: "ScanEat - Sistema Gestión Meseros",
   description:
-    "Sistema profesional de gestión para restaurantes Food Hub. Administra pedidos en tiempo real, controla mesas y recibe notificaciones instantáneas. Optimiza tu servicio con nuestro panel mesero.",
+    "Sistema profesional de gestión para restaurantes ScanEat. Administra pedidos en tiempo real, controla mesas y recibe notificaciones instantáneas. Optimiza tu servicio con nuestro panel mesero.",
   keywords:
-    "food hub, restaurante, mesero, pedidos, gestión restaurante, sistema meseros, ordenes comida, administración mesas",
+    "scan eat, restaurante, mesero, pedidos, gestión restaurante, sistema meseros, ordenes comida, administración mesas",
   authors: [{ name: "Ecommetrica" }],
   publisher: "Ecommetrica",
   robots: "index, follow",
-  metadataBase: new URL("https://foodhub-software.vercel.app"),
+  metadataBase: new URL("https://www.scaneat.ai/"),
   alternates: {
     canonical: "/",
   },

@@ -227,8 +227,8 @@ export default function QRSharePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Únete a mi mesa - FoodHub",
-          text: `Únete a mi mesa ${tableNumber} en FoodHub`,
+          title: "Únete a mi mesa - ScanEat",
+          text: `Únete a mi mesa ${tableNumber} en ScanEat`,
           url: currentUrl,
         });
       } catch (err) {
