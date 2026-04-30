@@ -10,6 +10,7 @@ import {
   FaCog,
   FaSpinner,
   FaTrash,
+  FaTimes,
 } from "react-icons/fa";
 import { RestaurantTable } from "../types";
 import TableForm from "./TableForm";
@@ -718,29 +719,26 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Gestión de Mesas</h2>
-        <div className="flex gap-4">
+    <div className="space-y-5" style={{fontFamily:"var(--font-geist-sans)"}}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[18px] font-extrabold text-slate-900">Gestión de Mesas</h2>
+        <div className="flex gap-2">
           <button
             onClick={loadTables}
-            className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
           >
-            <FaSpinner className="text-sm" />
+            <FaSpinner className="text-[11px]" />
             Actualizar
           </button>
           <button
             onClick={() => {
               setEditingTable(null);
-              setTableForm({
-                capacity: "",
-                location: "",
-              });
+              setTableForm({ capacity: "", location: "" });
               setShowTableForm(true);
             }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] bg-[var(--color-accent)] text-white text-xs font-bold hover:brightness-90 transition"
           >
-            <FaPlus />
+            <FaPlus className="text-[11px]" />
             Nueva Mesa
           </button>
         </div>
@@ -761,139 +759,100 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
 
       {tablesLoading ? (
         <div className="text-center py-12">
-          <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Cargando mesas...</p>
+          <div className="w-12 h-12 rounded-[14px] bg-[var(--color-accent)] flex items-center justify-center mx-auto">
+            <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </div>
+          <p className="text-slate-500 mt-4 text-sm font-medium">Cargando mesas...</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b">
-              <h3 className="text-lg font-bold text-gray-800">
-                Todas las Mesas
-              </h3>
-              <p className="text-sm text-gray-600">
-                {tables.length} mesa{tables.length !== 1 ? "s" : ""} en total
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+        <div>
+          <div className="mb-3">
+            <p className="text-sm font-bold text-slate-800">Todas las Mesas</p>
+            <p className="text-xs text-slate-500">{tables.length} mesa{tables.length !== 1 ? "s" : ""} en total</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {[...tables]
                 .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id))
-                .map((table) => (
-                  <div
-                    key={table.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-800">
-                          Mesa {table.number || table.id}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {table.location}
-                        </p>
+                .map((table, idx) => {
+                  const occ = table.status === "occupied";
+                  const dis = table.status === "maintenance";
+                  return (
+                    <div
+                      key={table.id}
+                      className={`border border-slate-200 rounded-[14px] p-3.5 hover:shadow-sm transition ${dis ? "bg-gray-50" : occ ? "bg-white border-red-200" : "bg-white"}`}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="text-sm font-bold text-slate-900">Mesa {table.number || table.id}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-[6px] ${getStatusColor(table.status)}`}>
+                          {getStatusText(table.status)}
+                        </span>
                       </div>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                          table.status
-                        )}`}
-                      >
-                        {getStatusText(table.status)}
-                      </span>
-                    </div>
+                      <p className="text-[11px] text-slate-500 mb-0.5">{table.location}</p>
+                      <p className="text-[11px] text-slate-500 mb-3">Capacidad: {table.capacity} personas</p>
 
-                    <div className="space-y-2 mb-4">
-                      <p className="text-sm text-gray-600">
-                        <strong>Capacidad:</strong> {table.capacity} personas
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={async () => {
-                          await generateQRCode(
-                            table.number || parseInt(table.id.toString())
-                          );
-                        }}
-                        className="flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition"
-                      >
-                        <FaQrcode />
-                        QR
-                      </button>
-                      <button
-                        onClick={() => handleEditTable(table)}
-                        className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-sm hover:bg-yellow-200 transition"
-                      >
-                        <FaEdit />
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => toggleTableStatus(table)}
-                        className={`flex items-center gap-1 px-3 py-1 rounded text-sm transition ${
-                          table.status === "available"
-                            ? "bg-red-100 text-red-700 hover:bg-red-200"
-                            : "bg-green-100 text-green-700 hover:bg-green-200"
-                        }`}
-                      >
-                        <FaCog />
-                        {table.status === "available" ? "Deshab." : "Habilitar"}
-                      </button>
-
-                      {/* Botón de Eliminar Orden Completa - Solo visible cuando la mesa está ocupada o tiene órdenes */}
-                      {shouldShowDeleteOrderButton(table) && (
+                      <div className="flex gap-1.5 flex-wrap">
                         <button
-                          onClick={() =>
-                            handleDeleteTableOrder(table.id.toString())
-                          }
-                          disabled={deletingTable === table.id.toString()}
-                          className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={async () => await generateQRCode(table.number || parseInt(table.id.toString()))}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[var(--color-accent-light)] text-[var(--color-accent-dark)] text-[11px] font-bold hover:bg-[var(--color-accent-light)] transition"
                         >
-                          {deletingTable === table.id.toString() ? (
-                            <FaSpinner className="animate-spin" />
-                          ) : (
-                            <FaTrash />
-                          )}
-                          Eliminar Orden Completa
+                          <FaQrcode className="text-[10px]" /> QR
                         </button>
-                      )}
+                        <button
+                          onClick={() => handleEditTable(table)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 transition"
+                        >
+                          <FaEdit className="text-[10px]" /> Editar
+                        </button>
+                        <button
+                          onClick={() => toggleTableStatus(table)}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] text-[11px] font-bold transition ${
+                            table.status === "available"
+                              ? "bg-red-50 text-red-600 hover:bg-red-100"
+                              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          }`}
+                        >
+                          <FaCog className="text-[10px]" />
+                          {table.status === "available" ? "Deshab." : "Habilitar"}
+                        </button>
+                        {shouldShowDeleteOrderButton(table) && (
+                          <button
+                            onClick={() => handleDeleteTableOrder(table.id.toString())}
+                            disabled={deletingTable === table.id.toString()}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-red-600 text-white text-[11px] font-bold hover:brightness-90 transition disabled:opacity-50 disabled:cursor-not-allowed w-full justify-center mt-1"
+                          >
+                            {deletingTable === table.id.toString() ? (
+                              <FaSpinner className="animate-spin text-[10px]" />
+                            ) : (
+                              <FaTrash className="text-[10px]" />
+                            )}
+                            Eliminar Orden
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
+                  );
+                })}
           </div>
         </div>
       )}
       {showLogoPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">
-                  Vista Previa del Logo
-                </h2>
-                <button
-                  onClick={() => setShowLogoPreview(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="text-center">
-                {logoUrl ? (
-                  <div>
-                    <img
-                      src={logoUrl}
-                      alt="Logo preview"
-                      className="max-w-full h-auto mx-auto rounded-lg border"
-                    />
-                    <p className="text-sm text-gray-600 mt-2">
-                      URL: {logoUrl.substring(0, 50)}...
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No hay logo cargado</p>
-                )}
-              </div>
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4" onClick={() => setShowLogoPreview(false)}>
+          <div className="bg-white rounded-[18px] shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <p className="text-sm font-extrabold text-slate-900">Vista Previa del Logo</p>
+              <button onClick={() => setShowLogoPreview(false)} className="p-1 text-slate-400 hover:text-slate-600"><FaTimes /></button>
+            </div>
+            <div className="p-5 text-center">
+              {logoUrl ? (
+                <div>
+                  <img src={logoUrl} alt="Logo preview" className="max-w-full h-auto mx-auto rounded-[10px] border border-slate-200" />
+                  <p className="text-[11px] text-slate-500 mt-2">{logoUrl.substring(0, 50)}...</p>
+                </div>
+              ) : (
+                <p className="text-slate-500 text-sm">No hay logo cargado</p>
+              )}
             </div>
           </div>
         </div>

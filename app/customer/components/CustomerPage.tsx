@@ -6,13 +6,98 @@ import { useSession } from "@/app/context/SessionContext";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
-import {
-  FaSpinner,
-  FaCheck,
-  FaQrcode,
-  FaExclamationTriangle,
-  FaArrowLeft,
-} from "react-icons/fa";
+import { FaExclamationTriangle } from "react-icons/fa";
+
+const PageShell = ({ children, tableInfo }: { children: React.ReactNode; tableInfo?: { number: number; status: string } | null }) => (
+  <div className="flex flex-col min-h-screen bg-white font-['Plus_Jakarta_Sans']">
+    <header className="px-10 py-5 flex items-center justify-between border-b border-[oklch(88%_0.01_260)] animate-[fadeDown_0.4s_ease_both]">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-[oklch(62%_0.18_32)] flex items-center justify-center text-white">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+            <rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+            <rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none"/>
+            <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+          </svg>
+        </div>
+        <span className="text-[oklch(62%_0.18_32)] font-extrabold text-lg tracking-tight">ScanEat</span>
+      </div>
+      {tableInfo ? (
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${tableInfo.status === 'available' ? 'bg-[oklch(96%_0.05_32)]' : 'bg-[oklch(92%_0.06_40)]'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${tableInfo.status === 'available' ? 'bg-[oklch(62%_0.18_32)]' : 'bg-[oklch(62%_0.18_32)]'}`}></div>
+          <span className={`text-xs font-bold tracking-wider uppercase ${tableInfo.status === 'available' ? 'text-[oklch(62%_0.18_32)]' : 'text-[oklch(48%_0.14_37)]'}`}>
+            Mesa {tableInfo.number} — {tableInfo.status === 'available' ? 'Disponible' : 'Ocupado'}
+          </span>
+        </div>
+      ) : (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[oklch(92%_0.06_40)]">
+          <div className="w-1.5 h-1.5 rounded-full bg-[oklch(62%_0.18_32)]"></div>
+          <span className="text-xs font-bold tracking-wider uppercase text-[oklch(62%_0.18_32)]">Sin mesa</span>
+        </div>
+      )}
+    </header>
+
+    <main className="flex-1 flex items-center justify-center px-6 py-10">
+      <div className="w-full max-w-md">
+        {children}
+      </div>
+    </main>
+
+    <footer className="px-10 py-4 border-t border-[oklch(88%_0.01_260)] flex items-center justify-center">
+      <span className="text-xs text-[oklch(62%_0.18_32)]">© 2026 ScanEat — Todos los derechos reservados.</span>
+    </footer>
+  </div>
+);
+
+const LoadingCard = ({ label }: { label: string }) => (
+  <PageShell>
+    <div className="text-center animate-[fadeUp_0.4s_ease_both]">
+      <div className="flex justify-center mb-5">
+        <div className="w-12 h-12 rounded-[14px] flex items-center justify-center" style={{ background:"oklch(62% 0.18 32)" }}>
+          <svg className="animate-[spin_0.9s_linear_infinite]" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </div>
+      </div>
+      <p className="text-sm text-[oklch(55%_0.02_260)]">{label}</p>
+    </div>
+  </PageShell>
+);
+
+const StepsCard = () => {
+  const steps = [
+    { text: "Busca el código QR en tu mesa" },
+    { text: "Escanea el código con tu cámara" },
+    { text: "Ingresa tu nombre y comienza a ordenar" },
+  ];
+  return (
+    <div className="bg-[oklch(98.5%_0.005_80)] border border-[oklch(88%_0.01_260)] rounded-xl px-5 py-4 mb-7">
+      <div className="flex items-center gap-2 mb-4">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+          <rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+          <rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none"/>
+          <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+        </svg>
+        <span className="text-sm font-bold text-[oklch(20%_0.02_260)]">¿Cómo ingresar?</span>
+      </div>
+      {steps.map((s, i) => (
+        <div key={i} className="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-[oklch(96%_0.01_80)] transition-colors duration-150">
+          <div className="w-6 h-6 rounded-lg bg-[oklch(96%_0.05_32)] flex items-center justify-center text-[oklch(62%_0.18_32)] flex-shrink-0 text-xs font-extrabold">
+            {i + 1}
+          </div>
+          <span className="text-sm font-medium text-[oklch(20%_0.02_260)]">{s.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default function CustomerPage() {
   const router = useRouter();
@@ -26,29 +111,26 @@ export default function CustomerPage() {
   const [nameError, setNameError] = useState("");
   const [tableFromParams, setTableFromParams] = useState<string | null>(null);
   const [redirected, setRedirected] = useState(false);
-  const [paramsChecked, setParamsChecked] = useState(false); // Nuevo estado para controlar
+  const [paramsChecked, setParamsChecked] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
 
-  // Obtener parámetros de URL solo en el cliente
+  const selectedTableData = tables.find((t) => t.number === selectedTable);
+  const tableInfo = selectedTableData ? { number: selectedTableData.number, status: selectedTableData.status } : null;
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tableParam = urlParams.get("table");
     const redirectedParam = urlParams.get("redirected");
-
     setTableFromParams(tableParam);
     setRedirected(!!redirectedParam);
-    setParamsChecked(true); // ¡IMPORTANTE! Marcamos que ya verificamos los parámetros
-
-    // Limpiar URL si hay parámetro redirected
+    setParamsChecked(true);
     if (redirectedParam) {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
-      setTimeout(() => {
-        alert("👋 ¡Gracias por su visita! Esperamos verlo pronto.");
-      }, 500);
+      setTimeout(() => { alert("¡Gracias por su visita! Esperamos verlo pronto."); }, 500);
     }
   }, []);
 
-  // Cargar mesas solo si hay parámetro de mesa
   useEffect(() => {
     if (tableFromParams !== null && paramsChecked) {
       loadAllTables();
@@ -72,83 +154,30 @@ export default function CustomerPage() {
   const checkURLParams = () => {
     if (tableFromParams) {
       const tableNumber = parseInt(tableFromParams);
-      if (!isNaN(tableNumber)) {
-        setSelectedTable(tableNumber);
-      }
+      if (!isNaN(tableNumber)) setSelectedTable(tableNumber);
     }
   };
 
   const validateForm = () => {
-    if (!selectedTable) {
-      setError("No se ha especificado una mesa");
-      return false;
-    }
-
+    if (!selectedTable) { setError("No se ha especificado una mesa"); return false; }
     const table = tables.find((t) => t.number === selectedTable);
-    if (!table) {
-      setError("Mesa no encontrada");
-      return false;
-    }
-
+    if (!table) { setError("Mesa no encontrada"); return false; }
     const trimmedName = customerName.trim();
-    if (!trimmedName) {
-      setNameError("El nombre es obligatorio");
-      return false;
-    }
-
-    if (trimmedName.length < 2) {
-      setNameError("El nombre debe tener al menos 2 caracteres");
-      return false;
-    }
-
-    setError("");
-    setNameError("");
-    return true;
+    if (!trimmedName) { setNameError("El nombre es obligatorio"); return false; }
+    if (trimmedName.length < 2) { setNameError("El nombre debe tener al menos 2 caracteres"); return false; }
+    setError(""); setNameError(""); return true;
   };
 
   const handleRegisterAndRedirect = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setLoading(true);
-
     try {
       const table = tables.find((t) => t.number === selectedTable);
-      if (!table) {
-        setError("Mesa no encontrada");
-        return;
-      }
-
-      // 1. Crear orden para el cliente
-      const order = await ordersService.createOrder(
-        table.id,
-        customerName.trim(),
-      );
-
-      // 2. Si la mesa está disponible, actualizar estado a "occupied"
-      if (table.status === "available") {
-        await tablesService.updateTableStatus(table.id, "occupied");
-      }
-
-      // 3. Notificar al mesero sobre nuevo cliente
-      await notificationsService.createNotification(
-        table.id,
-        "new_order",
-        `Nuevo cliente en Mesa ${table.number} - ${customerName.trim()}`,
-        order.id,
-      );
-
-      // 4. Guardar sesión en el contexto
-      setSession({
-        tableId: table.id.toString(),
-        userId: order.id,
-        orderId: order.id,
-        customerName: customerName.trim(),
-        tableNumber: table.number,
-      });
-
-      // 5. Redirigir a ruta limpia
+      if (!table) { setError("Mesa no encontrada"); return; }
+      const order = await ordersService.createOrder(table.id, customerName.trim());
+      if (table.status === "available") await tablesService.updateTableStatus(table.id, "occupied");
+      await notificationsService.createNotification(table.id, "new_order", `Nuevo cliente en Mesa ${table.number} - ${customerName.trim()}`, order.id);
+      setSession({ tableId: table.id.toString(), userId: order.id, orderId: order.id, customerName: customerName.trim(), tableNumber: table.number });
       router.push("/customer/menu");
     } catch (err) {
       setError("Error al crear la orden");
@@ -158,239 +187,120 @@ export default function CustomerPage() {
     }
   };
 
-  const getTableStatusText = (status: Table["status"]) => {
-    switch (status) {
-      case "available":
-        return "Disponible";
-      case "occupied":
-        return "Ocupada";
-      case "disabled":
-        return "Deshabilitado";
-      default:
-        return status;
-    }
-  };
+  if (!paramsChecked) return <LoadingCard label="Verificando información de la mesa" />;
 
-  // Encontrar la mesa seleccionada para mostrar su estado
-  const selectedTableData = tables.find((t) => t.number === selectedTable);
-
-  // Mostrar loading mientras se verifican los parámetros
-  if (!paramsChecked) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaSpinner className="text-3xl text-blue-600 animate-spin" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Cargando...</h1>
-          <p className="text-gray-600">Verificando información de la mesa</p>
-        </div>
-      </div>
-    );
-  }
-
-  // VERIFICACIÓN CORREGIDA: Si NO hay parámetro de mesa, mostrar página de bienvenida
   if (!tableFromParams) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+      <PageShell>
+        <div className="animate-[fadeUp_0.4s_ease_both]">
           <div className="text-center mb-8">
-            <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaQrcode className="text-4xl text-white" />
+            <div className="w-16 h-16 rounded-2xl bg-[oklch(62%_0.18_32)] flex items-center justify-center text-white mx-auto mb-5 animate-[pulse_2.4s_ease_infinite]">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+                <rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+                <rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none"/>
+                <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+              </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Bienvenido a ScanEat
+            <h1 className="text-2xl font-extrabold text-[oklch(20%_0.02_260)] tracking-tight mb-2">
+              Bienvenido a <span className="text-[oklch(62%_0.18_32)]">ScanEat</span>
             </h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-sm text-[oklch(55%_0.02_260)] leading-relaxed">
               Escanea el código QR de tu mesa para comenzar
             </p>
           </div>
-
-          {/* Card informativa */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 mb-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FaQrcode className="text-xl text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-blue-800 mb-2">
-                ¿Cómo ingresar?
-              </h3>
-              <ul className="text-left text-gray-700 space-y-3 mb-4">
-                <li className="flex items-start gap-2">
-                  <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    1
-                  </span>
-                  <span>Busca el código QR en tu mesa</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    2
-                  </span>
-                  <span>Escanea el código con tu cámara</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                    3
-                  </span>
-                  <span>Ingresa tu nombre y comienza a ordenar</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Información adicional */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-sm text-center text-gray-600">
-              Cada mesa tiene un código QR único para identificar tu orden
+          <StepsCard />
+          <div className="flex flex-col gap-1.5 text-center">
+            <p className="text-xs text-[oklch(62%_0.18_32)] flex items-center justify-center gap-1.5">            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/>
+              </svg>
+              Cada mesa tiene un código QR único para identificar tu orden.
             </p>
-            <p className="text-xs text-center text-gray-500 mt-2">
-              Pregunta al personal si necesitas ayuda
-            </p>
+            <p className="text-xs text-[oklch(62%_0.18_32)]">Pregunta al personal si necesitas ayuda.</p>
           </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
-  // Si hay mesa pero aún estamos cargando los datos de la mesa
-  if (loadingTables) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaSpinner className="text-3xl text-blue-600 animate-spin" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Cargando...</h1>
-          <p className="text-gray-600">Verificando mesa {tableFromParams}</p>
-        </div>
-      </div>
-    );
-  }
+  if (loadingTables) return <LoadingCard label={`Verificando mesa ${tableFromParams}`} />;
 
-  // Página normal cuando hay mesa en los parámetros
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center px-4 py-8">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+    <PageShell tableInfo={tableInfo}>
+      <div className="animate-[fadeUp_0.4s_ease_both]">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaQrcode className="text-3xl text-blue-600" />
+          <div className="w-16 h-16 rounded-2xl bg-[oklch(62%_0.18_32)] flex items-center justify-center text-white mx-auto mb-5 animate-[pulse_2.4s_ease_infinite]">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Bienvenido a ScanEat
-          </h1>
-          <p className="text-gray-600">Ingresa tu nombre para comenzar</p>
+          <h2 className="text-2xl font-extrabold text-[oklch(20%_0.02_260)] tracking-tight mb-2">
+            ¿Cómo te llamas?
+          </h2>
+          <p className="text-sm text-[oklch(55%_0.02_260)] leading-relaxed">
+            Mesa {selectedTable} — Ingresa tu nombre para identificar tu pedido
+          </p>
         </div>
 
-        {/* Información de mesa */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-blue-800">
-                Mesa {selectedTable}
-              </h3>
-              <p className="text-sm text-blue-600">
-                Escaneaste el código QR de la mesa {selectedTable}
-              </p>
-              {selectedTableData && (
-                <p
-                  className={`text-sm font-medium mt-1 ${
-                    selectedTableData.status === "available"
-                      ? "text-green-600"
-                      : selectedTableData.status === "occupied"
-                        ? "text-orange-600"
-                        : "text-red-600"
-                  }`}
-                >
-                  Estado: {getTableStatusText(selectedTableData.status)}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mostrar error general */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
-            <FaExclamationTriangle />
-            {error}
+        {(error || nameError) && (
+          <div className="bg-[oklch(95%_0.02_20)] border border-[oklch(80%_0.06_20)] rounded-lg px-4 py-3 mb-4 flex items-center gap-2.5">
+            <FaExclamationTriangle className="text-[oklch(55%_0.18_20)] flex-shrink-0" />
+            <span className="text-sm text-[oklch(30%_0.10_20)] font-medium">{error || nameError}</span>
           </div>
         )}
 
-        {/* Nombre obligatorio del cliente */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tu nombre *
-          </label>
+        <div className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition-all duration-200 ${(nameError || error) ? 'border-[oklch(55%_0.18_20)] bg-white' : inputFocused ? 'border-[oklch(62%_0.18_32)] bg-white shadow-[0_0_0_4px_oklch(92%_0.05_32)]' : 'border-[oklch(88%_0.01_260)] bg-[oklch(98.5%_0.005_80)]'}`}>
+          <span className={inputFocused ? 'text-[oklch(62%_0.18_32)]' : 'text-[oklch(62%_0.18_32)]'}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </span>
           <input
             type="text"
-            placeholder="Ej: Juan Pérez"
+            placeholder="Tu nombre"
             value={customerName}
-            onChange={(e) => {
-              setCustomerName(e.target.value);
-              if (nameError && e.target.value.trim().length >= 2) {
-                setNameError("");
-              }
-            }}
-            className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
-              nameError ? "border-red-500 bg-red-50" : "border-gray-300"
-            }`}
+            onChange={(e) => { setCustomerName(e.target.value); setNameError(""); setError(""); }}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleRegisterAndRedirect(); }}
+            className="flex-1 border-none outline-none bg-transparent text-sm font-medium text-[oklch(20%_0.02_260)] placeholder:text-[oklch(55%_0.02_260)]"
           />
-          {nameError && (
-            <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
-              <FaExclamationTriangle className="text-xs" />
-              {nameError}
-            </p>
-          )}
         </div>
 
-        {/* Botón de continuar */}
         <button
           onClick={handleRegisterAndRedirect}
           disabled={loading || !customerName.trim() || !selectedTableData}
-          className={`
-            w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2
-            ${
-              customerName.trim() && !loading && selectedTableData
-                ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }
-          `}
+          className="w-full mt-2 px-6 py-3.5 rounded-xl border-none cursor-pointer bg-[oklch(62%_0.18_32)] text-white text-sm font-bold tracking-tight flex items-center justify-center gap-2.5 hover:bg-[oklch(50%_0.18_32)] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_oklch(55%_0.18_32_/_0.35)] transition-all duration-180 disabled:bg-[oklch(88%_0.01_260)] disabled:text-[oklch(55%_0.02_260)] disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
         >
           {loading ? (
             <>
-              <FaSpinner className="animate-spin" />
-              Creando tu orden...
-            </>
-          ) : customerName.trim() ? (
-            <>
-              <FaCheck />
-              Continuar al Menú
+              <svg className="animate-[spin_0.9s_linear_infinite]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+              </svg>
+              Creando tu orden…
             </>
           ) : (
-            "Ingresa tu nombre"
+            <>
+              Continuar al menú
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+              </svg>
+            </>
           )}
         </button>
 
-        {/* Información adicional */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-          <p className="text-sm text-blue-700 text-center">
-            Podrás agregar más personas después desde el menú
-          </p>
-          <p className="text-xs text-blue-600 text-center mt-2">
-            * Campo obligatorio: Nombre
-          </p>
+        <div className="mt-6 text-center">
           <button
-            onClick={() => {
-              // Limpiar y volver a escanear
-              localStorage.clear();
-              window.location.href = "/customer";
-            }}
-            className="text-xs text-gray-500 hover:text-gray-700 text-center w-full mt-2"
+            onClick={() => { localStorage.clear(); window.location.href = "/customer"; }}
+            className="text-xs text-[oklch(62%_0.18_32)] bg-transparent border-none cursor-pointer underline hover:text-[oklch(50%_0.18_32)]"
           >
             ¿Escaneaste el código QR incorrecto? Haz clic aquí
           </button>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

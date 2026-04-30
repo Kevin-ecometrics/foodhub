@@ -63,47 +63,31 @@ function PasswordModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          Confirmar Cancelación
-        </h3>
+    <div onClick={handleClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900,padding:16,animation:"wr-fadein 0.2s ease" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:16,padding:28,maxWidth:360,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.25)",animation:"wr-scalein 0.22s ease" }}>
+        <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",marginBottom:4 }}>Confirmar Cancelación</p>
+        <p style={{ fontSize:13,color:"var(--muted)",marginBottom:20,lineHeight:1.5 }}>Ingrese la contraseña para confirmar la cancelación del producto.</p>
 
-        <p className="text-gray-600 mb-4">
-          Ingrese la contraseña para confirmar la cancelación del producto.
-        </p>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Contraseña:
-          </label>
+        <div style={{ marginBottom:16 }}>
+          <label style={{ fontSize:13,fontWeight:600,color:"var(--text)",display:"block",marginBottom:6 }}>Contraseña:</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ width:"100%",border:`1.5px solid ${error?"var(--red)":"var(--border)"}`,borderRadius:10,padding:"11px 14px",fontSize:14,outline:"none",fontFamily:"inherit",transition:"border-color 0.15s" }}
             placeholder="Contraseña de autorización"
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                handleConfirm();
-              }
-            }}
+            onFocus={e => e.target.style.borderColor="var(--navy)"}
+            onBlur={e => e.target.style.borderColor=error?"var(--red)":"var(--border)"}
+            onKeyPress={(e) => { if (e.key === "Enter") handleConfirm(); }}
           />
-          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          {error && <p style={{ fontSize:12,color:"var(--red)",marginTop:6 }}>{error}</p>}
         </div>
 
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={handleClose}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
+        <div style={{ display:"flex",gap:10 }}>
+          <button onClick={handleClose} style={{ flex:1,padding:12,borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)" }}>
             Cancelar
           </button>
-          <button
-            onClick={handleConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-            disabled={!password}
-          >
+          <button onClick={handleConfirm} disabled={!password} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:"var(--red)",fontSize:13,fontWeight:700,color:"white",opacity:!password?0.5:1 }}>
             Confirmar
           </button>
         </div>
@@ -233,211 +217,98 @@ function PaymentCalculator({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+    <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:800,padding:16,animation:"wr-fadein 0.2s ease" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:420,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+        <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,background:"white" }}>
           <div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Calculadora de Pago
-            </h2>
-            <p className="text-sm text-gray-600">Mesa {tableNumber}</p>
+            <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Calculadora de Pago</p>
+            <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Mesa {tableNumber}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition"
-          >
-            <FaTimes className="text-xl" />
-          </button>
+          <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
         </div>
 
-        <div className="p-4 space-y-4">
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="border-b pb-3 mb-3">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-gray-800">
-                  Total a pagar
-                </span>
-                <span className="text-2xl font-bold text-green-600">
-                  ${totalAmount.toFixed(2)}
-                </span>
-              </div>
-            </div>
+        <div style={{ overflowY:"auto",flex:1,padding:"16px 22px",display:"flex",flexDirection:"column",gap:14 }}>
+          <div style={{ display:"flex",justifyContent:"space-between",paddingBottom:14,borderBottom:"1px solid var(--border)" }}>
+            <span style={{ fontSize:15,fontWeight:600,color:"var(--text)" }}>Total a pagar</span>
+            <span style={{ fontSize:17,fontWeight:800,color:"var(--green)" }}>${totalAmount.toFixed(2)}</span>
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-white border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FaMoneyBillWave className="text-green-600 text-xl" />
-                <span className="font-semibold text-gray-800">
-                  Efectivo (MXN)
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={cashAmount === 0 ? "" : cashAmount}
-                  onChange={(e) => handleCashChange(e.target.value)}
-                  placeholder="0.00"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={() =>
-                    setCashAmount(totalAmount - totalPaid + cashAmount)
-                  }
-                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
-                >
-                  Llenar
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FaCreditCard className="text-blue-600 text-xl" />
-                <span className="font-semibold text-gray-800">
-                  Terminal (MXN)
-                </span>
-              </div>
+          {/* Efectivo */}
+          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
+            <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>💵 Efectivo (MXN)</p>
+            <div style={{ display:"flex",gap:8 }}>
               <input
                 type="number"
-                value={terminalAmount === 0 ? "" : terminalAmount}
-                onChange={(e) => handleTerminalChange(e.target.value)}
+                value={cashAmount === 0 ? "" : cashAmount}
+                onChange={(e) => handleCashChange(e.target.value)}
                 placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
+                onFocus={e => e.target.style.borderColor="var(--navy)"}
+                onBlur={e => e.target.style.borderColor="var(--border)"}
               />
-            </div>
-
-            <div className="bg-white border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FaDollarSign className="text-yellow-600 text-xl" />
-                  <span className="font-semibold text-gray-800">
-                    Dólares (USD)
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowRateInput(!showRateInput)}
-                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-                >
-                  <FaExchangeAlt />
-                  Cambiar tasa
-                </button>
-              </div>
-
-              {showRateInput && (
-                <div className="mb-3 p-2 bg-gray-50 rounded-lg">
-                  <label className="text-xs text-gray-600 block mb-1">
-                    Tasa de cambio (USD a MXN):
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={tempRate}
-                      onChange={(e) => setTempRate(e.target.value)}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      step="0.01"
-                    />
-                    <button
-                      onClick={handleRateChange}
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                    >
-                      Actualizar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {!showRateInput && (
-                <div className="mb-2 text-xs text-gray-500 text-right">
-                  Tasa: 1 USD = ${usdRate.toFixed(2)} MXN
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="number"
-                  value={usdAmount === 0 ? "" : usdAmount}
-                  onChange={(e) => handleUsdChange(e.target.value)}
-                  placeholder="0.00"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-gray-600">USD</span>
-              </div>
-              <div className="text-right text-sm text-gray-600">
-                = ${usdToMxn.toFixed(2)} MXN
-              </div>
+              <button onClick={() => setCashAmount(totalAmount - totalPaid + cashAmount)} style={{ padding:"9px 14px",borderRadius:8,border:"1.5px solid var(--border)",background:"white",fontSize:12,fontWeight:600,color:"var(--muted)" }}>Llenar</button>
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Efectivo:</span>
-              <span className="font-medium">${cashAmount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Terminal:</span>
-              <span className="font-medium">${terminalAmount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Dólares:</span>
-              <span className="font-medium">
-                ${usdAmount.toFixed(2)} USD = ${usdToMxn.toFixed(2)}
-              </span>
-            </div>
-            <div className="border-t pt-2 mt-2">
-              <div className="flex justify-between font-bold">
-                <span>Total pagado:</span>
-                <span
-                  className={
-                    totalPaid >= totalAmount
-                      ? "text-green-600"
-                      : "text-orange-600"
-                  }
-                >
-                  ${totalPaid.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between font-bold mt-1">
-                <span>Falta por pagar:</span>
-                <span
-                  className={
-                    remainingAmount > 0 ? "text-red-600" : "text-green-600"
-                  }
-                >
-                  ${Math.max(0, remainingAmount).toFixed(2)}
-                </span>
-              </div>
-              {needsChange && (
-                <div className="flex justify-between font-bold mt-1 text-green-600">
-                  <span>Cambio a devolver:</span>
-                  <span>${change.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
+          {/* Terminal */}
+          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
+            <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>💳 Terminal (MXN)</p>
+            <input type="number" value={terminalAmount===0?"":terminalAmount} onChange={e => handleTerminalChange(e.target.value)} placeholder="0.00"
+              style={{ width:"100%",border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
+              onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={fillRemaining}
-              disabled={remainingAmount <= 0}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Completar con Efectivo
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-red-500 text-red-600 rounded-xl font-medium hover:bg-red-50 transition"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={totalPaid === 0}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Confirmar Pago
-            </button>
+          {/* USD */}
+          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}>
+              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>$ Dólares (USD)</p>
+              <button onClick={() => setShowRateInput(!showRateInput)} style={{ fontSize:11,color:"var(--blue)",background:"none",border:"none",cursor:"pointer" }}>⇄ Cambiar tasa</button>
+            </div>
+            {showRateInput && (
+              <div style={{ marginBottom:10,padding:"8px 10px",background:"var(--surface)",borderRadius:8 }}>
+                <p style={{ fontSize:11,color:"var(--muted)",marginBottom:6 }}>Tasa de cambio (USD a MXN):</p>
+                <div style={{ display:"flex",gap:8 }}>
+                  <input type="number" value={tempRate} onChange={e => setTempRate(e.target.value)} step="0.01"
+                    style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:7,padding:"7px 10px",fontSize:13,outline:"none" }}
+                    onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
+                  <button onClick={handleRateChange} style={{ padding:"7px 14px",borderRadius:7,border:"none",background:"var(--navy)",color:"white",fontSize:12,fontWeight:700 }}>Actualizar</button>
+                </div>
+              </div>
+            )}
+            {!showRateInput && <p style={{ fontSize:11,color:"var(--muted)",textAlign:"right",marginBottom:8 }}>Tasa: 1 USD = ${usdRate.toFixed(2)} MXN</p>}
+            <div style={{ display:"flex",gap:8,alignItems:"center",marginBottom:6 }}>
+              <input type="number" value={usdAmount===0?"":usdAmount} onChange={e => handleUsdChange(e.target.value)} placeholder="0.00"
+                style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
+                onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
+              <span style={{ fontSize:12,color:"var(--muted)" }}>USD</span>
+            </div>
+            {usdAmount > 0 && <p style={{ fontSize:11,color:"var(--muted)",textAlign:"right" }}>= ${usdToMxn.toFixed(2)} MXN</p>}
           </div>
+
+          {/* Summary */}
+          <div style={{ background:"var(--surface)",borderRadius:10,padding:"12px 14px",fontSize:13 }}>
+            {[["💵 Efectivo:",`$${cashAmount.toFixed(2)}`,"var(--green)"],["💳 Terminal:",`$${terminalAmount.toFixed(2)}`,"var(--green)"],["$ Dólares:",`$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`,"var(--green)"]].map(([label,val,col]) => (
+              <div key={label as string} style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>{label}</span><span style={{ color:col as string,fontWeight:600 }}>{val}</span></div>
+            ))}
+            <div style={{ borderTop:"1px solid var(--border)",paddingTop:8,marginTop:4 }}>
+              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+                <span style={{ fontWeight:700,color:"var(--text)" }}>Total pagado:</span>
+                <span style={{ fontWeight:700,color:totalPaid>=totalAmount?"var(--green)":"var(--amber)" }}>${totalPaid.toFixed(2)}</span>
+              </div>
+              <div style={{ display:"flex",justifyContent:"space-between" }}>
+                <span style={{ fontWeight:700,color:"var(--text)" }}>Falta por pagar:</span>
+                <span style={{ fontWeight:700,color:"var(--red)" }}>${Math.max(0,remainingAmount).toFixed(2)}</span>
+              </div>
+              {needsChange && <div style={{ display:"flex",justifyContent:"space-between",marginTop:4 }}><span style={{ fontWeight:700,color:"var(--green)" }}>Cambio a devolver:</span><span style={{ fontWeight:700,color:"var(--green)" }}>${change.toFixed(2)}</span></div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"14px 22px",borderTop:"1px solid var(--border)",display:"flex",gap:10,flexShrink:0 }}>
+          <button onClick={fillRemaining} disabled={remainingAmount<=0} style={{ flex:1,padding:12,borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",opacity:remainingAmount<=0?0.5:1 }}>Completar con Efectivo</button>
+          <button onClick={onClose} style={{ padding:"12px 18px",borderRadius:10,border:"none",background:"var(--red-light)",fontSize:13,fontWeight:600,color:"var(--red)" }}>Cancelar</button>
+          <button onClick={handleConfirm} disabled={totalPaid===0} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:totalPaid===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",opacity:totalPaid===0?0.5:1 }}>Confirmar Pago</button>
         </div>
       </div>
     </div>
@@ -654,90 +525,46 @@ function SeparatePaymentsModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+      <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
+        <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:700,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+          {/* Header */}
+          <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
             <div>
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <FaUsers className="text-blue-600" />
-                Pagos Individuales
-              </h2>
-              <p className="text-sm text-gray-600">Mesa {tableNumber}</p>
+              <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>👥 Pagos Individuales</p>
+              <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Mesa {tableNumber}</p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition"
-            >
-              <FaTimes className="text-xl" />
-            </button>
+            <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
           </div>
 
-          <div className="p-6">
-            {/* Resumen total */}
-            <div className="bg-gray-50 rounded-xl p-4 mb-6">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-gray-800">
-                  Total de la cuenta:
-                </span>
-                <span className="text-2xl font-bold text-green-600">
-                  ${totalAmount.toFixed(2)}
-                </span>
+          <div style={{ overflowY:"auto",flex:1,padding:"16px 22px" }}>
+            {/* Summary */}
+            <div style={{ background:"var(--surface)",borderRadius:12,padding:"14px 18px",marginBottom:16 }}>
+              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                <span style={{ fontSize:15,fontWeight:600,color:"var(--text)" }}>Total de la cuenta:</span>
+                <span style={{ fontSize:18,fontWeight:800,color:"var(--green)" }}>${totalAmount.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-gray-600">Restante por pagar:</span>
-                <span
-                  className={`text-xl font-bold ${overallRemaining > 0 ? "text-orange-600" : "text-green-600"}`}
-                >
-                  ${overallRemaining.toFixed(2)}
-                </span>
+              <div style={{ display:"flex",justifyContent:"space-between" }}>
+                <span style={{ fontSize:13,color:"var(--muted)" }}>Restante por pagar:</span>
+                <span style={{ fontSize:15,fontWeight:700,color:overallRemaining>0?"var(--amber)":"var(--green)" }}>${overallRemaining.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="flex gap-6">
-              {/* Lista de comensales */}
-              <div className="w-80 flex-shrink-0">
-                <h3 className="font-semibold text-gray-800 mb-3">Comensales</h3>
-                <div className="space-y-2">
-                  {guests.map((guest) => {
-                    const { itemsTotal, paidTotal, remaining } =
-                      getGuestTotal(guest);
+            <div style={{ display:"flex",gap:16 }}>
+              {/* Guest list */}
+              <div style={{ width:220,flexShrink:0 }}>
+                <p style={{ fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10 }}>Comensales</p>
+                <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                  {guests.map(guest => {
+                    const { itemsTotal, paidTotal, remaining } = getGuestTotal(guest);
+                    const isSelected = selectedGuestId === guest.id;
                     return (
-                      <div
-                        key={guest.id}
-                        onClick={() => setSelectedGuestId(guest.id)}
-                        className={`p-3 rounded-lg cursor-pointer transition ${
-                          selectedGuestId === guest.id
-                            ? "bg-blue-50 border-2 border-blue-500"
-                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-gray-800">
-                              {guest.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {guest.items.length} productos
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Total:</span>
-                            <span>${itemsTotal.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Pagado:</span>
-                            <span className="text-green-600">
-                              ${paidTotal.toFixed(2)}
-                            </span>
-                          </div>
-                          {remaining > 0 && (
-                            <div className="flex justify-between text-red-600">
-                              <span>Falta:</span>
-                              <span>${remaining.toFixed(2)}</span>
-                            </div>
-                          )}
+                      <div key={guest.id} onClick={() => setSelectedGuestId(guest.id)} style={{ padding:"10px 12px",borderRadius:10,border:`1.5px solid ${isSelected?"var(--blue)":"transparent"}`,background:isSelected?"var(--blue-light)":"var(--surface)",cursor:"pointer",transition:"all 0.15s" }}>
+                        <p style={{ fontSize:13,fontWeight:700,color:isSelected?"var(--blue)":"var(--text)",margin:0 }}>{guest.name}</p>
+                        <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginTop:2 }}>{guest.items.length} productos</p>
+                        <div style={{ marginTop:6,fontSize:12 }}>
+                          <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--muted)" }}>Total:</span><span style={{ color:"var(--text)",fontWeight:600 }}>${itemsTotal.toFixed(2)}</span></div>
+                          <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--muted)" }}>Pagado:</span><span style={{ color:"var(--green)",fontWeight:600 }}>${paidTotal.toFixed(2)}</span></div>
+                          {remaining > 0 && <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--red)" }}>Falta:</span><span style={{ color:"var(--red)",fontWeight:600 }}>${remaining.toFixed(2)}</span></div>}
                         </div>
                       </div>
                     );
@@ -745,111 +572,53 @@ function SeparatePaymentsModal({
                 </div>
               </div>
 
-              {/* Detalle del comensal seleccionado */}
+              {/* Guest detail */}
               {selectedGuest && (
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-semibold text-gray-800">
-                      {selectedGuest.name} - Productos
-                    </h3>
-                    <button
-                      onClick={() => {
-                        setSelectedGuestForPayment(selectedGuest.id);
-                        setShowPaymentModal(true);
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-2"
-                    >
-                      <FaMoneyBillWave />
-                      Registrar Pago
+                <div style={{ flex:1,minWidth:0 }}>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
+                    <p style={{ fontSize:14,fontWeight:700,color:"var(--text)",margin:0 }}>{selectedGuest.name} — Productos</p>
+                    <button onClick={() => { setSelectedGuestForPayment(selectedGuest.id); setShowPaymentModal(true); }} style={{ padding:"8px 14px",borderRadius:9,border:"none",background:"var(--green)",fontSize:12,fontWeight:700,color:"white" }}>
+                      💵 Registrar Pago
                     </button>
                   </div>
 
-                  {/* Items del comensal */}
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">
-                      Productos:
-                    </h4>
-                    {selectedGuest.items.length === 0 ? (
-                      <p className="text-gray-400 text-sm">Sin productos</p>
-                    ) : (
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {selectedGuest.items.map((item) => (
-                          <div
-                            key={item.itemId}
-                            className="flex justify-between items-center bg-gray-50 p-2 rounded"
-                          >
-                            <div>
-                              <span className="font-medium">
-                                {item.productName}
-                              </span>
-                              <span className="text-gray-500 text-sm ml-2">
-                                {item.quantity} x ${item.price.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="font-medium">
-                              ${item.subtotal.toFixed(2)}
-                            </div>
+                  <p style={{ fontSize:11,fontWeight:600,color:"var(--muted)",marginBottom:8 }}>Productos:</p>
+                  {selectedGuest.items.length === 0 ? (
+                    <p style={{ fontSize:13,color:"var(--muted)" }}>Sin productos</p>
+                  ) : (
+                    <div style={{ display:"flex",flexDirection:"column",gap:6,maxHeight:240,overflowY:"auto",marginBottom:12 }}>
+                      {selectedGuest.items.map(item => (
+                        <div key={item.itemId} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--surface)",padding:"8px 12px",borderRadius:8 }}>
+                          <div>
+                            <span style={{ fontSize:13,fontWeight:600,color:"var(--text)" }}>{item.productName}</span>
+                            <span style={{ fontSize:11,color:"var(--muted)",marginLeft:8 }}>{item.quantity} × ${item.price.toFixed(2)}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Resumen de pagos del comensal */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-sm">
-                      <div className="flex justify-between">
-                        <span>Total en productos:</span>
-                        <span>
-                          ${getGuestTotal(selectedGuest).itemsTotal.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-green-600">
-                        <span>Pagado:</span>
-                        <span>
-                          ${getGuestTotal(selectedGuest).paidTotal.toFixed(2)}
-                        </span>
-                      </div>
-                      {getGuestTotal(selectedGuest).remaining > 0 && (
-                        <div className="flex justify-between text-red-600 font-medium">
-                          <span>Falta por pagar:</span>
-                          <span>
-                            ${getGuestTotal(selectedGuest).remaining.toFixed(2)}
-                          </span>
+                          <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>${item.subtotal.toFixed(2)}</span>
                         </div>
-                      )}
-                      {getGuestTotal(selectedGuest).remaining < 0 && (
-                        <div className="flex justify-between text-orange-600">
-                          <span>Sobrante (cambio):</span>
-                          <span>
-                            $
-                            {Math.abs(
-                              getGuestTotal(selectedGuest).remaining,
-                            ).toFixed(2)}
-                          </span>
-                        </div>
-                      )}
+                      ))}
                     </div>
+                  )}
+
+                  <div style={{ background:"var(--surface)",borderRadius:10,padding:"12px 14px",fontSize:13 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>Total en productos:</span><span style={{ fontWeight:700,color:"var(--green)" }}>${getGuestTotal(selectedGuest).itemsTotal.toFixed(2)}</span></div>
+                    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>Pagado:</span><span style={{ fontWeight:700,color:"var(--green)" }}>${getGuestTotal(selectedGuest).paidTotal.toFixed(2)}</span></div>
+                    {getGuestTotal(selectedGuest).remaining > 0 && <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--red)",fontWeight:700 }}>Falta por pagar:</span><span style={{ color:"var(--red)",fontWeight:700 }}>${getGuestTotal(selectedGuest).remaining.toFixed(2)}</span></div>}
+                    {getGuestTotal(selectedGuest).remaining < 0 && <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--amber)" }}>Sobrante (cambio):</span><span style={{ color:"var(--amber)",fontWeight:700 }}>${Math.abs(getGuestTotal(selectedGuest).remaining).toFixed(2)}</span></div>}
                   </div>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Botones de acción */}
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-              <button
-                onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmAll}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-              >
-                <FaCheck />
-                Finalizar y Cobrar Todo
-              </button>
+          {/* Footer */}
+          <div style={{ padding:"14px 22px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0 }}>
+            <div>
+              <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Total: <strong style={{ color:"var(--green)" }}>${totalAmount.toFixed(2)}</strong></p>
+              <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Restante: <strong style={{ color:"var(--red)" }}>${overallRemaining.toFixed(2)}</strong></p>
+            </div>
+            <div style={{ display:"flex",gap:10 }}>
+              <button onClick={onClose} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)" }}>Cancelar</button>
+              <button onClick={handleConfirmAll} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:"var(--green)",fontSize:13,fontWeight:700,color:"white",display:"flex",alignItems:"center",gap:6 }}>✓ Finalizar y Cobrar Todo</button>
             </div>
           </div>
         </div>
@@ -950,146 +719,58 @@ function GuestPaymentModal({
   if (!isOpen || !guest) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div className="border-b p-4 flex justify-between items-center">
+    <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:800,padding:16,animation:"wr-fadein 0.2s ease" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:420,boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+        <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
           <div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Pago de {guest.name}
-            </h2>
-            <p className="text-sm text-gray-600">Mesa {tableNumber}</p>
+            <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Pago de {guest.name}</p>
+            <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Mesa {tableNumber}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <FaTimes className="text-xl" />
-          </button>
+          <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--muted)",fontSize:18,padding:4 }}>✕</button>
         </div>
 
-        <div className="p-4 space-y-4">
-          <div className="bg-gray-50 rounded-xl p-3">
-            <div className="flex justify-between">
-              <span className="font-medium">Total a pagar:</span>
-              <span className="text-xl font-bold text-green-600">
-                ${itemsTotal.toFixed(2)}
-              </span>
-            </div>
+        <div style={{ padding:"16px 22px",display:"flex",flexDirection:"column",gap:14 }}>
+          <div style={{ display:"flex",justifyContent:"space-between",padding:"12px 14px",background:"var(--surface)",borderRadius:10 }}>
+            <span style={{ fontSize:14,fontWeight:600,color:"var(--text)" }}>Total a pagar:</span>
+            <span style={{ fontSize:17,fontWeight:800,color:"var(--green)" }}>${itemsTotal.toFixed(2)}</span>
           </div>
 
-          <div className="bg-white border rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <FaMoneyBillWave className="text-green-600" />
-              <span className="font-semibold">Efectivo (MXN)</span>
+          {[["💵 Efectivo (MXN)",cashAmount,setCashAmount],["💳 Terminal (MXN)",terminalAmount,setTerminalAmount]].map(([label,val,setter]) => (
+            <div key={label as string} style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
+              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>{label as string}</p>
+              <input type="number" value={val===0?"":val as number} onChange={e => (setter as any)(parseFloat(e.target.value)||0)} placeholder="0.00"
+                style={{ width:"100%",border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
+                onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
             </div>
-            <input
-              type="number"
-              value={cashAmount === 0 ? "" : cashAmount}
-              onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-          </div>
+          ))}
 
-          <div className="bg-white border rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <FaCreditCard className="text-blue-600" />
-              <span className="font-semibold">Terminal (MXN)</span>
-            </div>
-            <input
-              type="number"
-              value={terminalAmount === 0 ? "" : terminalAmount}
-              onChange={(e) =>
-                setTerminalAmount(parseFloat(e.target.value) || 0)
-              }
-              placeholder="0.00"
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-          </div>
-
-          <div className="bg-white border rounded-xl p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <FaDollarSign className="text-yellow-600" />
-                <span className="font-semibold">Dólares (USD)</span>
-              </div>
-              <button
-                onClick={() => setShowRateInput(!showRateInput)}
-                className="text-xs text-blue-600"
-              >
-                Cambiar tasa
-              </button>
+          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}>
+              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>$ Dólares (USD)</p>
+              <button onClick={() => setShowRateInput(!showRateInput)} style={{ fontSize:11,color:"var(--blue)",background:"none",border:"none",cursor:"pointer" }}>⇄ Cambiar tasa</button>
             </div>
             {showRateInput && (
-              <div className="mb-2 flex gap-2">
-                <input
-                  type="number"
-                  value={tempRate}
-                  onChange={(e) => setTempRate(e.target.value)}
-                  className="flex-1 px-2 py-1 border rounded text-sm"
-                />
-                <button
-                  onClick={() => {
-                    const newRate = parseFloat(tempRate);
-                    if (!isNaN(newRate) && newRate > 0) {
-                      setUsdRate(newRate);
-                      setShowRateInput(false);
-                    }
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                >
-                  OK
-                </button>
+              <div style={{ display:"flex",gap:8,marginBottom:8 }}>
+                <input type="number" value={tempRate} onChange={e => setTempRate(e.target.value)} step="0.01"
+                  style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:7,padding:"7px 10px",fontSize:13,outline:"none" }} />
+                <button onClick={() => { const r=parseFloat(tempRate); if (!isNaN(r)&&r>0){setUsdRate(r);setShowRateInput(false);} }} style={{ padding:"7px 14px",borderRadius:7,border:"none",background:"var(--navy)",color:"white",fontSize:12,fontWeight:700 }}>OK</button>
               </div>
             )}
-            <input
-              type="number"
-              value={usdAmount === 0 ? "" : usdAmount}
-              onChange={(e) => setUsdAmount(parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-            <div className="text-right text-xs text-gray-500 mt-1">
-              = ${usdToMxn.toFixed(2)} MXN (tasa: {usdRate})
-            </div>
+            <input type="number" value={usdAmount===0?"":usdAmount} onChange={e => setUsdAmount(parseFloat(e.target.value)||0)} placeholder="0.00"
+              style={{ width:"100%",border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
+              onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
+            {usdAmount > 0 && <p style={{ fontSize:11,color:"var(--muted)",textAlign:"right",marginTop:4 }}>= ${usdToMxn.toFixed(2)} MXN (tasa: {usdRate})</p>}
           </div>
 
-          <div className="bg-gray-50 rounded-xl p-3">
-            <div className="flex justify-between">
-              <span>Total pagado:</span>
-              <span className="font-bold">${totalPaid.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between mt-1">
-              <span>Restante:</span>
-              <span
-                className={
-                  remaining > 0 ? "text-red-600 font-bold" : "text-green-600"
-                }
-              >
-                ${remaining > 0 ? remaining.toFixed(2) : "0.00"}
-              </span>
-            </div>
-            {remaining < 0 && (
-              <div className="flex justify-between mt-1 text-green-600">
-                <span>Cambio:</span>
-                <span>${Math.abs(remaining).toFixed(2)}</span>
-              </div>
-            )}
+          <div style={{ background:"var(--surface)",borderRadius:10,padding:"12px 14px",fontSize:13 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>Total pagado:</span><span style={{ fontWeight:700,color:"var(--text)" }}>${totalPaid.toFixed(2)}</span></div>
+            <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--muted)" }}>Restante:</span><span style={{ fontWeight:700,color:remaining>0?"var(--red)":"var(--green)" }}>${remaining>0?remaining.toFixed(2):"0.00"}</span></div>
+            {remaining < 0 && <div style={{ display:"flex",justifyContent:"space-between",marginTop:4 }}><span style={{ color:"var(--amber)" }}>Cambio:</span><span style={{ color:"var(--amber)",fontWeight:700 }}>${Math.abs(remaining).toFixed(2)}</span></div>}
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-red-500 text-red-600 rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleConfirm}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg"
-            >
-              Registrar Pago
-            </button>
+          <div style={{ display:"flex",gap:10,paddingBottom:6 }}>
+            <button onClick={onClose} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:"var(--red-light)",fontSize:13,fontWeight:600,color:"var(--red)" }}>Cancelar</button>
+            <button onClick={handleConfirm} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:"var(--green)",fontSize:13,fontWeight:700,color:"white" }}>Registrar Pago</button>
           </div>
         </div>
       </div>
@@ -1106,44 +787,14 @@ function TablesOrderSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="mb-4 p-3 bg-white rounded-lg border border-gray-300">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">
-          Ordenar mesas:
-        </span>
-
-        <div className="flex bg-gray-100 rounded-lg">
-          <button
-            onClick={() => onChange("number")}
-            className={`
-          flex items-center gap-2 px-3 py-2 rounded-l-lg text-sm
-          ${
-            value === "number"
-              ? "bg-blue-500 text-white"
-              : "text-gray-600 hover:bg-gray-200"
-          }
-        `}
-            title="Ordenar por número de mesa"
-          >
-            <span>#</span>
-            <span>Número</span>
+    <div style={{ marginBottom:16,padding:"10px 16px",background:"var(--surface)",border:"1.5px solid var(--border)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+      <span style={{ fontSize:13,fontWeight:600,color:"var(--text)" }}>Ordenar mesas:</span>
+      <div style={{ display:"flex",border:"1.5px solid var(--border)",borderRadius:9,overflow:"hidden" }}>
+        {[{k:"number",label:"# Número"},{k:"occupation",label:"⏱ Tiempo"}].map(o => (
+          <button key={o.k} onClick={() => onChange(o.k)} style={{ padding:"7px 14px",border:"none",background:value===o.k?"var(--navy)":"white",color:value===o.k?"white":"var(--muted)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit" }}>
+            {o.label}
           </button>
-          <button
-            onClick={() => onChange("occupation")}
-            className={`
-          flex items-center gap-2 px-3 py-2 rounded-r-lg text-sm
-          ${
-            value === "occupation"
-              ? "bg-blue-500 text-white"
-              : "text-gray-600 hover:bg-gray-200"
-          }
-        `}
-            title="Ordenar por tiempo de ocupación"
-          >
-            <span>🕐</span>
-            <span>Tiempo</span>
-          </button>
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -1706,52 +1357,75 @@ export default function WaiterDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="waiter-root" style={{ height:"100dvh",overflow:"hidden",display:"flex",flexDirection:"column",fontFamily:"'Plus Jakarta Sans',sans-serif",background:"white" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .waiter-root{
+          --accent:oklch(62% 0.18 32);--accent-dark:oklch(50% 0.18 32);--accent-light:oklch(96% 0.05 32);
+          --navy:oklch(22% 0.04 260);--navy-light:oklch(96% 0.01 260);
+          --text:oklch(20% 0.02 260);--muted:oklch(55% 0.02 260);--border:oklch(88% 0.01 260);--surface:oklch(98.5% 0.005 80);
+          --green:oklch(52% 0.16 145);--green-light:oklch(95% 0.06 145);
+          --amber:oklch(72% 0.16 70);--amber-light:oklch(96% 0.06 70);
+          --red:oklch(56% 0.18 20);--red-light:oklch(96% 0.05 20);
+          --blue:oklch(52% 0.18 260);--blue-light:oklch(95% 0.05 260);
+        }
+        .waiter-root * { box-sizing: border-box; }
+        @keyframes wr-fadein  { from{opacity:0} to{opacity:1} }
+        @keyframes wr-fadeup  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes wr-scalein { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+        @keyframes wr-spin    { to{transform:rotate(360deg)} }
+        .waiter-root ::-webkit-scrollbar { width:4px; }
+        .waiter-root ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+        .waiter-root button { cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; transition:filter 0.15s,transform 0.1s; }
+        .waiter-root button:hover { filter:brightness(0.92); }
+        .waiter-root button:active { transform:scale(0.97); }
+        .waiter-root input, .waiter-root textarea { font-family:'Plus Jakarta Sans',sans-serif; }
+      `}</style>
+
       <Header loading={loading} onRefresh={loadData} />
 
       <Tabs
         activeTab={activeTab}
         onTabChange={setActiveTab}
         notificationsCount={notifications.length}
-        occupiedTablesCount={
-          tables.filter((t) => t.status === "occupied").length
-        }
+        occupiedTablesCount={tables.filter((t) => t.status === "occupied").length}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === "notifications" && (
-          <NotificationsTab
-            notifications={notifications}
-            processing={processing}
-            attendedNotifications={attendedNotifications}
-            onAcknowledgeNotification={handleAcknowledgeNotification}
-            onCompleteNotification={handleCompleteNotification}
-            onGoToTables={handleGoToTables}
-          />
-        )}
-
-        {activeTab === "tables" && (
-          <>
-            <TablesOrderSelect value={tablesOrder} onChange={setTablesOrder} />
-
-            <TablesTab
-              tables={tables}
-              processing={processing}
-              onUpdateItemStatus={handleUpdateItemStatus}
-              onCancelItem={handleCancelItem}
-              onCobrarMesa={handleCobrarMesa}
-              onPagarPorSeparado={handlePagarPorSeparado}
-              calculateTableTotal={calculateTableTotal}
+      <div style={{ flex:1,overflow:"hidden",display:"flex",flexDirection:"column" }}>
+        <div style={{ flex:1,overflowY:"auto",padding:"16px 20px" }}>
+          {activeTab === "notifications" && (
+            <NotificationsTab
               notifications={notifications}
-              tablesOrder={tablesOrder}
+              processing={processing}
+              attendedNotifications={attendedNotifications}
+              onAcknowledgeNotification={handleAcknowledgeNotification}
+              onCompleteNotification={handleCompleteNotification}
+              onGoToTables={handleGoToTables}
             />
-          </>
-        )}
+          )}
 
-        {activeTab === "products" && (
-          <ProductsManagement onError={handleError} />
-        )}
-      </main>
+          {activeTab === "tables" && (
+            <>
+              <TablesOrderSelect value={tablesOrder} onChange={setTablesOrder} />
+              <TablesTab
+                tables={tables}
+                processing={processing}
+                onUpdateItemStatus={handleUpdateItemStatus}
+                onCancelItem={handleCancelItem}
+                onCobrarMesa={handleCobrarMesa}
+                onPagarPorSeparado={handlePagarPorSeparado}
+                calculateTableTotal={calculateTableTotal}
+                notifications={notifications}
+                tablesOrder={tablesOrder}
+              />
+            </>
+          )}
+
+          {activeTab === "products" && (
+            <ProductsManagement onError={handleError} />
+          )}
+        </div>
+      </div>
 
       <PasswordModal
         isOpen={showPasswordModal}
@@ -1761,10 +1435,7 @@ export default function WaiterDashboard() {
 
       <PaymentCalculator
         isOpen={showPaymentCalculator}
-        onClose={() => {
-          setShowPaymentCalculator(false);
-          setSelectedTableForPayment(null);
-        }}
+        onClose={() => { setShowPaymentCalculator(false); setSelectedTableForPayment(null); }}
         onConfirm={handlePaymentConfirm}
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
@@ -1772,10 +1443,7 @@ export default function WaiterDashboard() {
 
       <SeparatePaymentsModal
         isOpen={showSeparatePayments}
-        onClose={() => {
-          setShowSeparatePayments(false);
-          setSelectedTableForSeparate(null);
-        }}
+        onClose={() => { setShowSeparatePayments(false); setSelectedTableForSeparate(null); }}
         onConfirm={handleSeparatePaymentsConfirm}
         tableOrders={selectedTableForSeparate?.orders || []}
         tableNumber={selectedTableForSeparate?.number || 0}

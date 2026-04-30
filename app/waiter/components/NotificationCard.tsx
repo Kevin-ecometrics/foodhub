@@ -1,6 +1,4 @@
 import { WaiterNotification } from "@/app/lib/supabase/waiter";
-import { FaEye, FaCheck, FaSpinner, FaClock, FaUser } from "react-icons/fa";
-import { HiOutlineCheckCircle, HiOutlineExclamation } from "react-icons/hi";
 import NotificationIcon from "./NotificationIcon";
 
 interface NotificationCardProps {
@@ -11,232 +9,83 @@ interface NotificationCardProps {
   onComplete: () => void;
 }
 
-// Mapa de colores y etiquetas para tipos de notificación
-const NOTIFICATION_TYPES = {
-  new_order: {
-    color: "border-l-green-500 bg-green-50",
-    label: "Nuevo Pedido",
-    iconColor: "text-green-600",
-  },
-  assistance: {
-    color: "border-l-yellow-500 bg-yellow-50",
-    label: "Asistencia",
-    iconColor: "text-yellow-600",
-  },
-  bill_request: {
-    color: "border-l-red-500 bg-red-50",
-    label: "Cuenta",
-    iconColor: "text-red-600",
-  },
-  order_updated: {
-    color: "border-l-blue-500 bg-blue-50",
-    label: "Pedido Actualizado",
-    iconColor: "text-blue-600",
-  },
-  table_freed: {
-    color: "border-l-purple-500 bg-purple-50",
-    label: "Mesa Libre",
-    iconColor: "text-purple-600",
-  },
-} as const;
+const NOTIF_TYPES: Record<string, { label: string; color: string; bg: string }> = {
+  new_order:     { label: "Nuevo Pedido",       color: "var(--green)", bg: "var(--green-light)"  },
+  assistance:    { label: "Asistencia",          color: "var(--amber)", bg: "var(--amber-light)"  },
+  bill_request:  { label: "Cuenta",              color: "var(--red)",   bg: "var(--red-light)"    },
+  order_updated: { label: "Pedido Actualizado",  color: "var(--blue)",  bg: "var(--blue-light)"   },
+  table_freed:   { label: "Mesa Libre",          color: "var(--green)", bg: "var(--green-light)"  },
+};
 
-// Formatear fecha relativa
 const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
+  const diffMins = Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
   const diffHours = Math.floor(diffMins / 60);
-
   if (diffMins < 1) return "Ahora mismo";
   if (diffMins < 60) return `Hace ${diffMins} min`;
   if (diffHours < 24) return `Hace ${diffHours} h`;
-
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(dateString).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
 };
 
-export default function NotificationCard({
-  notification,
-  processing,
-  isAttended,
-  onAcknowledge,
-  onComplete,
-}: NotificationCardProps) {
-  const notificationType = NOTIFICATION_TYPES[
-    notification.type as keyof typeof NOTIFICATION_TYPES
-  ] || {
-    color: "border-l-gray-500 bg-gray-50",
-    label: "Notificación",
-    iconColor: "text-gray-600",
-  };
-
+export default function NotificationCard({ notification, processing, isAttended, onAcknowledge, onComplete }: NotificationCardProps) {
+  const cfg = NOTIF_TYPES[notification.type] || { label:"Notificación", color:"var(--muted)", bg:"var(--surface)" };
   const isProcessing = processing === notification.id;
-  const isUrgent =
-    notification.type === "bill_request" || notification.type === "assistance";
+  const isUrgent = notification.type === "bill_request" || notification.type === "assistance";
   const timeElapsed = getRelativeTime(notification.created_at);
 
   return (
-    <div
-      className={`
-        rounded-lg shadow-md border-l-4 transition-all duration-200
-        hover:shadow-lg hover:-translate-y-0.5
-        ${notificationType.color}
-        ${isAttended ? "opacity-80 scale-[0.98]" : ""}
-        ${isProcessing ? "animate-pulse" : ""}
-        ${isUrgent && !isAttended ? "ring-2 ring-opacity-30 ring-red-300" : ""}
-      `}
-      role="article"
-      aria-labelledby={`notification-${notification.id}`}
-      aria-describedby={`notification-desc-${notification.id}`}
-    >
-      <div className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-          {/* Información de la notificación */}
-          <div className="flex-1">
-            <div className="flex items-start gap-3">
-              <div className={`mt-1 ${notificationType.iconColor}`}>
-                <NotificationIcon type={notification.type} />
-              </div>
+    <div style={{ border:`1.5px solid ${isUrgent && !isAttended ? "var(--red)" : "var(--border)"}`,borderRadius:14,padding:"14px 18px",background:isAttended?"var(--surface)":"white",display:"flex",alignItems:"center",gap:14,opacity:isAttended?0.85:1,transition:"all 0.2s",boxShadow:isUrgent&&!isAttended?"0 0 0 3px oklch(90% 0.06 20)":"none",animation:"wr-fadeup 0.3s ease" }}>
+      <NotificationIcon type={notification.type} />
 
-              <div className="flex-1 min-w-0">
-                {/* Encabezado */}
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <h3
-                      id={`notification-${notification.id}`}
-                      className="font-bold text-gray-800 truncate"
-                    >
-                      Mesa {notification.tables?.number || "N/A"}
-                    </h3>
-
-                    {/* Badge de tipo */}
-                    <span
-                      className={`
-                      text-xs font-semibold px-2 py-1 rounded-full
-                      ${isUrgent ? "animate-pulse" : ""}
-                    `}
-                    >
-                      {notificationType.label}
-                    </span>
-                  </div>
-
-                  {/* Estado */}
-                  <div className="flex items-center gap-2 ml-auto sm:ml-0">
-                    {isAttended ? (
-                      <span className="flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                        <HiOutlineCheckCircle />
-                        Atendida
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                        <HiOutlineExclamation />
-                        Pendiente
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Cliente */}
-                {notification.orders?.customer_name && (
-                  <div className="flex items-center gap-1 text-gray-700 mb-1">
-                    <FaUser className="text-gray-400 text-sm" />
-                    <span className="font-medium">
-                      {notification.orders.customer_name}
-                    </span>
-                  </div>
-                )}
-
-                {/* Mensaje */}
-                <p
-                  id={`notification-desc-${notification.id}`}
-                  className="text-gray-600 mb-2 line-clamp-2"
-                >
-                  {notification.message}
-                </p>
-
-                {/* Timestamp */}
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <FaClock className="text-gray-400" />
-                  <time dateTime={notification.created_at}>
-                    {new Date(notification.created_at).toLocaleString()}
-                  </time>
-                  <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                    {timeElapsed}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Acciones */}
-          <div className="flex sm:flex-col gap-2 sm:gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-            {!isAttended && (
-              <button
-                onClick={onAcknowledge}
-                disabled={isProcessing}
-                className={`
-                  flex-1 sm:flex-none flex items-center justify-center gap-2
-                  px-4 py-2 rounded-lg text-sm font-medium
-                  transition-colors duration-200
-                  ${
-                    isProcessing
-                      ? "bg-blue-400 cursor-not-allowed"
-                      : "bg-blue-500 hover:bg-blue-600 active:bg-blue-700"
-                  }
-                  text-white shadow-sm
-                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                  disabled:opacity-60
-                `}
-                aria-label={`Atender notificación de mesa ${notification.tables?.number}`}
-                aria-busy={isProcessing}
-              >
-                {isProcessing ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  <FaEye />
-                )}
-                <span className="hidden sm:inline">Atender</span>
-              </button>
-            )}
-
-            <button
-              onClick={onComplete}
-              disabled={isProcessing}
-              className={`
-                flex-1 sm:flex-none flex items-center justify-center gap-2
-                px-4 py-2 rounded-lg text-sm font-medium
-                transition-colors duration-200
-                ${
-                  isProcessing
-                    ? "bg-green-400 cursor-not-allowed"
-                    : "bg-green-500 hover:bg-green-600 active:bg-green-700"
-                }
-                text-white shadow-sm
-                focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
-                disabled:opacity-60
-              `}
-              aria-label={`Completar notificación de mesa ${notification.tables?.number}`}
-              aria-busy={isProcessing}
-            >
-              {isProcessing ? (
-                <FaSpinner className="animate-spin" />
-              ) : (
-                <FaCheck />
-              )}
-              <span className="hidden sm:inline">Completar</span>
-            </button>
-          </div>
+      <div style={{ flex:1 }}>
+        <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap" }}>
+          <span style={{ fontSize:14,fontWeight:700,color:"var(--text)" }}>
+            Mesa {notification.tables?.number || "N/A"}
+          </span>
+          <span style={{ fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color }}>
+            {cfg.label}
+          </span>
+          {isAttended
+            ? <span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"var(--green-light)",color:"var(--green)",marginLeft:"auto" }}>✓ Atendida</span>
+            : <span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"var(--amber-light)",color:"var(--amber)",marginLeft:"auto" }}>Pendiente</span>
+          }
         </div>
 
-        {/* Indicador de urgencia */}
-        {isUrgent && !isAttended && (
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <div className="flex items-center gap-1 text-sm text-red-600 font-medium">
-              <HiOutlineExclamation className="text-red-500" />
-              <span>Atención requerida</span>
-            </div>
-          </div>
+        {notification.orders?.customer_name && (
+          <p style={{ fontSize:13,fontWeight:600,color:"var(--text)",marginBottom:2 }}>
+            👤 {notification.orders.customer_name}
+          </p>
         )}
+
+        <p style={{ fontSize:12,color:"var(--muted)",marginBottom:4 }}>{notification.message}</p>
+
+        <p style={{ fontSize:11,color:"var(--muted)" }}>
+          {new Date(notification.created_at).toLocaleString()} · <span style={{ background:"var(--surface)",padding:"1px 6px",borderRadius:4 }}>{timeElapsed}</span>
+        </p>
+
+        {isUrgent && !isAttended && (
+          <p style={{ fontSize:12,color:"var(--red)",fontWeight:600,marginTop:6 }}>⚠️ Atención requerida</p>
+        )}
+      </div>
+
+      <div style={{ display:"flex",flexDirection:"column",gap:8,flexShrink:0 }}>
+        {!isAttended && (
+          <button
+            onClick={onAcknowledge}
+            disabled={isProcessing}
+            style={{ padding:"8px 14px",borderRadius:9,border:"none",background:"var(--navy)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",opacity:isProcessing?0.6:1,display:"flex",alignItems:"center",gap:5 }}
+          >
+            {isProcessing
+              ? <span style={{ animation:"wr-spin 0.8s linear infinite",display:"inline-block" }}>↻</span>
+              : "👁 Atender"}
+          </button>
+        )}
+        <button
+          onClick={onComplete}
+          disabled={isProcessing}
+          style={{ padding:"8px 14px",borderRadius:9,border:"1.5px solid var(--border)",background:"var(--green-light)",fontSize:12,fontWeight:700,color:"var(--green)",cursor:"pointer",fontFamily:"inherit",opacity:isProcessing?0.6:1 }}
+        >
+          Completar
+        </button>
       </div>
     </div>
   );

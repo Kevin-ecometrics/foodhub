@@ -19,95 +19,33 @@ interface TableCardProps {
 }
 
 export default function TableCard({
-  table,
-  processing,
-  onUpdateItemStatus,
-  onCancelItem,
-  onCobrarMesa,
-  onPagarPorSeparado,
-  calculateTableTotal,
-  notifications,
-  occupationTime,
-  hasNotifications,
-  isHighlighted = false,
+  table, processing, onUpdateItemStatus, onCancelItem,
+  onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
+  notifications, occupationTime, hasNotifications, isHighlighted = false,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
+  const isOccupied = table.status === "occupied";
 
-  const groupOrdersByCustomer = (table: TableWithOrder) => {
-    const customerMap = new Map();
-
-    table.orders.forEach((order) => {
-      const customerName = order.customer_name || "Cliente";
-
-      if (!customerMap.has(customerName)) {
-        customerMap.set(customerName, {
-          customerName,
-          orders: [],
-          subtotal: 0,
-          taxAmount: 0,
-          total: 0,
-          itemsCount: 0,
-        });
-      }
-
-      const customerSummary = customerMap.get(customerName)!;
-      customerSummary.orders.push(order);
-
-      const orderSubtotal = order.order_items.reduce(
-        (sum: number, item: any) => sum + item.price * item.quantity,
-        0,
-      );
-
-      customerSummary.subtotal += orderSubtotal;
-      customerSummary.itemsCount += order.order_items.length;
+  const groupOrdersByCustomer = (t: TableWithOrder) => {
+    const map = new Map<string, any>();
+    t.orders.forEach(order => {
+      const name = order.customer_name || "Cliente";
+      if (!map.has(name)) map.set(name, { customerName: name, orders: [], subtotal: 0, taxAmount: 0, total: 0, itemsCount: 0 });
+      const g = map.get(name)!;
+      g.orders.push(order);
+      const sub = order.order_items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+      g.subtotal += sub;
+      g.itemsCount += order.order_items.length;
     });
-
     const taxRate = 0.16;
-    customerMap.forEach((customerSummary) => {
-      customerSummary.taxAmount = customerSummary.subtotal * taxRate;
-      customerSummary.total =
-        customerSummary.subtotal + customerSummary.taxAmount;
-    });
-
-    return Array.from(customerMap.values());
+    map.forEach(g => { g.taxAmount = g.subtotal * taxRate; g.total = g.subtotal + g.taxAmount; });
+    return Array.from(map.values());
   };
 
   const customerSummaries = groupOrdersByCustomer(table);
 
   return (
-    <div
-      className={`bg-white rounded-lg shadow-lg p-4 transition-all duration-300 hover:shadow-xl ${
-        isHighlighted
-          ? "border-2 border-red-500"
-          : table.status === "occupied"
-            ? "border-l-4 border-l-green-500"
-            : table.status === "reserved"
-              ? "border-l-4 border-l-yellow-500"
-              : "border-l-4 border-l-gray-300"
-      }`}
-    >
-      {occupationTime && (
-        <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-blue-800 font-medium">
-              Tiempo de ocupación:
-            </span>
-            <span
-              className={`font-bold ${
-                occupationTime.includes("h")
-                  ? "text-red-600"
-                  : occupationTime.includes("min") &&
-                      parseInt(occupationTime) > 30
-                    ? "text-orange-600"
-                    : "text-green-600"
-              }`}
-            >
-              {occupationTime}
-            </span>
-          </div>
-        </div>
-      )}
-
+    <div style={{ border:`2px solid ${isHighlighted?"var(--red)":isOccupied?"var(--red)":"var(--border)"}`,borderRadius:14,overflow:"hidden",background:"white",position:"relative",minWidth:0 }}>
       <TableHeader
         table={table}
         tableTotal={tableTotal}
@@ -120,10 +58,10 @@ export default function TableCard({
         occupationTime={occupationTime}
       />
 
-      {customerSummaries.map((customerSummary) => (
+      {customerSummaries.map(cs => (
         <CustomerOrderSection
-          key={customerSummary.customerName}
-          customerSummary={customerSummary}
+          key={cs.customerName}
+          customerSummary={cs}
           processing={processing}
           onUpdateItemStatus={onUpdateItemStatus}
           onCancelItem={onCancelItem}
@@ -139,20 +77,18 @@ export default function TableCard({
         />
       )}
 
-      {table.orders.length === 0 && table.status === "occupied" && (
-        <EmptyTableState />
+      {table.orders.length === 0 && isOccupied && (
+        <div style={{ textAlign:"center",padding:"24px 0",color:"var(--muted)",fontSize:13 }}>
+          🍽️ No hay pedidos enviados
+        </div>
+      )}
+
+      {!isOccupied && (
+        <div style={{ padding:"14px 14px 16px" }}>
+          <p style={{ fontSize:12,color:"var(--green)",margin:0,marginBottom:2 }}>● Sin pedidos <span style={{ color:"var(--muted)" }}>• Desde: Sin registro</span></p>
+          <p style={{ fontSize:11,color:"var(--muted)",margin:0 }}>Disponible</p>
+        </div>
       )}
     </div>
   );
 }
-
-function EmptyTableState() {
-  return (
-    <div className="text-center py-6 text-gray-500 text-sm">
-      <FaUtensils className="text-2xl text-gray-300 mx-auto mb-2" />
-      No hay pedidos enviados
-    </div>
-  );
-}
-
-import { FaUtensils } from "react-icons/fa";

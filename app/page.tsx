@@ -1,112 +1,143 @@
 // app/page.tsx
-"use client";
 import Link from "next/link";
-import { FaMapMarkerAlt } from "react-icons/fa";
+import { Plus_Jakarta_Sans } from "next/font/google";
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const IconQR = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none" />
+    <path d="M14 14h3v3" />
+    <path d="M21 14v.01" />
+    <path d="M21 21v-4" />
+    <path d="M14 21h7" />
+  </svg>
+);
+
+const IconArrow = () => (
+  <svg
+    width="17"
+    height="17"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M5 12h14" />
+    <path d="M12 5l7 7-7 7" />
+  </svg>
+);
+
+const IconStar = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="#d97751" stroke="none">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
+
+const IconBolt = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+const IconUtensils = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 2v4M8 2v4M3 10h18M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10M8 2h8" />
+    <path d="M6 6l1 4M18 6l-1 4" />
+  </svg>
+);
+
+const metrics = [
+  { num: "100%", label: "Digital, sin papel", icon: null },
+  { num: "", label: "Actualización en tiempo real", icon: "bolt" },
+  { num: "", label: "Pedido desde la mesa", icon: "utensils" },
+];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-white via-slate-50 to-slate-100">
-      {/* Header */}
-      <header className="sticky top-0 z-20 backdrop-blur-xl bg-white/80 border-b border-slate-200/50">
-        <div className="max-w-6xl mx-auto px-6 py-6 text-center">
-          <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-slate-900">
-            Scan<span className="font-semibold">Eat</span>
-          </h1>
-          <p className="text-xs text-slate-500 tracking-wide mt-1">
-            Disfruta de una experiencia digital simple, rápida y elegante
-          </p>
-        </div>
-      </header>
-
+    <div
+      className={`${plusJakarta.className} min-h-screen flex flex-col bg-white`}
+    >
       {/* Main */}
-      <main className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-        {/* Background shapes mejorados */}
-        <div className="absolute w-[500px] h-[500px] bg-gradient-to-br from-slate-200/40 to-slate-300/20 rounded-full blur-3xl animate-pulse top-[-150px] left-[-150px]" />
-        <div className="absolute w-[400px] h-[400px] bg-gradient-to-tr from-slate-200/40 to-slate-300/20 rounded-full blur-3xl animate-pulse delay-1000 bottom-[-150px] right-[-150px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-slate-100/40 rounded-full blur-3xl" />
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-[60px]">
+        {/* Tag */}
+        <div className="inline-flex items-center gap-1.5 bg-[oklch(96%_0.05_32)] rounded-full px-3.5 py-1.5 mb-7 animate-fadeDown">
+          <IconStar />
+          <span className="text-xs font-bold text-[oklch(62%_0.18_32)] tracking-widest uppercase">
+            Menú Digital
+          </span>
+        </div>
 
-        <div className="w-full max-w-md relative z-10">
-          {/* Glow wrapper */}
-          <div className="relative group">
-            {/* Glow mejorado */}
-            <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-r from-slate-300 via-slate-400 to-slate-300 opacity-30 blur-xl group-hover:opacity-60 transition duration-700"></div>
+        {/* Headline */}
+        <h1 className="text-[clamp(36px,6vw,64px)] font-extrabold text-[oklch(20%_0.02_260)] tracking-tight leading-tight text-center max-w-[640px] mb-5 animate-fadeUp">
+          Bienvenido a
+          <br />
+          <span className="text-[oklch(62%_0.18_32)]">ScanEat</span>
+        </h1>
 
-            {/* Card mejorada */}
-            <div className="relative bg-white/90 backdrop-blur-sm rounded-3xl p-10 sm:p-12 border border-slate-200/50 shadow-xl group-hover:shadow-2xl transition-all duration-500">
-              {/* Accent line */}
-              <div className="w-16 h-1 bg-gradient-to-r from-slate-700 to-slate-500 rounded-full mb-8 mx-auto"></div>
+        {/* Description */}
+        <p className="text-base text-[oklch(55%_0.02_260)] font-normal leading-relaxed text-center max-w-[400px] mb-11 animate-fadeUp">
+          Disfruta de una experiencia digital simple, rápida y elegante. Explora
+          nuestro menú desde la comodidad de tu mesa.
+        </p>
 
-              {/* Content */}
-              <div className="text-center mb-10">
-                <h2 className="text-3xl font-light text-slate-900 tracking-tight mb-4">
-                  Bienvenido
-                </h2>
-                <p className="text-slate-500 text-sm max-w-xs mx-auto leading-relaxed">
-                  Disfruta de una experiencia digital simple, rápida y elegante
-                </p>
+        {/* CTA */}
+        <div className="animate-fadeUp">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2.5 bg-[oklch(62%_0.18_32)] text-white text-[15px] font-bold tracking-tight px-8 py-[15px] rounded-xl transition-all duration-180 hover:bg-[oklch(50%_0.18_32)] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_oklch(55%_0.18_32_/_0.35)]"
+          >
+            Entrar <IconArrow />
+          </Link>
+        </div>
+
+        {/* Metrics card */}
+        <div className="mt-[72px] w-full max-w-[560px] bg-[oklch(98.5%_0.005_80)] border border-[oklch(88%_0.01_260)] rounded-2xl p-7 flex items-center justify-between gap-6 flex-wrap animate-fadeUp">
+          {metrics.map((item, i) => (
+            <div key={i} className="text-center flex-1 min-w-[100px] flex flex-col items-center">
+              <div className="min-h-[28px] flex items-center justify-center">
+                {item.num && (
+                  <span className="text-[22px] font-extrabold text-[oklch(20%_0.02_260)]">
+                    {item.num}
+                  </span>
+                )}
+                {item.icon === "bolt" && <IconBolt />}
+                {item.icon === "utensils" && <IconUtensils />}
               </div>
-
-              {/* Button mejorado */}
-              <Link
-                href="/admin"
-                className="relative w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white text-sm font-medium tracking-wide overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
-              >
-                {/* Shine effect */}
-                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></span>
-
-                <FaMapMarkerAlt className="text-base transition-transform duration-300 group-hover:scale-110" />
-                <span>Entrar</span>
-              </Link>
+              <div className="text-xs text-[oklch(55%_0.02_260)] font-medium mt-2">
+                {item.label}
+              </div>
             </div>
-          </div>
-
-          {/* Text abajo mejorado */}
-          <p className="text-center text-xs text-slate-400 mt-8 tracking-wide">
-            Explora nuestro menú digital y haz tu pedido desde la comodidad de
-            tu mesa. ¡Buen provecho!
-          </p>
+          ))}
         </div>
       </main>
 
-      {/* Footer mejorado */}
-      <footer className="border-t border-slate-200/50 bg-white/60 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-6 py-6 text-center">
-          <p className="text-xs text-slate-500">
-            &copy;{new Date().getFullYear()} ScanEat — Todos los derechos
-            reservados{" "}
-            <a
-              href="https://e-commetrics.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-800 font-medium hover:text-slate-600 transition-colors"
-            >
-              e-commetrics
-            </a>
-          </p>
-        </div>
+      {/* Footer */}
+      <footer className="py-5 px-10 border-t border-[oklch(88%_0.01_260)] flex items-center justify-center gap-1.5">
+        <span className="text-xs text-[oklch(55%_0.02_260)]">
+          © 2026 ScanEat — Todos los derechos reservados.
+        </span>
       </footer>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 0.2;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.4;
-            transform: scale(1.05);
-          }
-        }
-
-        .animate-pulse {
-          animation: pulse 4s ease-in-out infinite;
-        }
-
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
     </div>
   );
 }

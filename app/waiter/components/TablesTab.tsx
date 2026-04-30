@@ -1,7 +1,6 @@
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import TableCard from "./TableCard";
 import { useState } from "react";
-import { FaDollarSign } from "react-icons/fa";
 
 interface TablesTabProps {
   tables: TableWithOrder[];
@@ -16,136 +15,70 @@ interface TablesTabProps {
 }
 
 export default function TablesTab({
-  tables,
-  processing,
-  onUpdateItemStatus,
-  onCancelItem,
-  onCobrarMesa,
-  onPagarPorSeparado,
-  calculateTableTotal,
-  notifications,
-  tablesOrder,
+  tables, processing, onUpdateItemStatus, onCancelItem,
+  onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
+  notifications, tablesOrder,
 }: TablesTabProps) {
-  const totalGeneral = tables.reduce(
-    (sum, table) => sum + calculateTableTotal(table),
-    0,
-  );
-  const occupiedTablesCount = tables.filter(
-    (t) => t.status === "occupied",
-  ).length;
+  const totalGeneral = tables.reduce((s, t) => s + calculateTableTotal(t), 0);
+  const occupiedCount = tables.filter(t => t.status === "occupied").length;
 
-  const getTableOccupationTime = (table: TableWithOrder): Date | null => {
+  const getOccupationTime = (table: TableWithOrder): Date | null => {
     if (table.orders.length === 0) return null;
-
-    let earliestOrder = table.orders[0];
-    for (let i = 1; i < table.orders.length; i++) {
-      const currentOrder = table.orders[i];
-      const earliestDate = new Date(earliestOrder.created_at);
-      const currentDate = new Date(currentOrder.created_at);
-      if (currentDate < earliestDate) {
-        earliestOrder = currentOrder;
-      }
-    }
-
-    return new Date(earliestOrder.created_at);
+    return table.orders.reduce((earliest, o) => {
+      const d = new Date(o.created_at);
+      return d < earliest ? d : earliest;
+    }, new Date(table.orders[0].created_at));
   };
-
-  const sortedTables = [...tables];
-
-  if (tablesOrder === "occupation") {
-    sortedTables.sort((a, b) => {
-      const timeA = getTableOccupationTime(a);
-      const timeB = getTableOccupationTime(b);
-
-      if (!timeA && !timeB) return 0;
-      if (!timeA) return 1;
-      if (!timeB) return -1;
-
-      return timeA.getTime() - timeB.getTime();
-    });
-  } else {
-    sortedTables.sort((a, b) => a.number - b.number);
-  }
 
   const getOccupationDisplay = (table: TableWithOrder): string => {
-    const occupationTime = getTableOccupationTime(table);
-    if (!occupationTime) return "Sin pedidos";
-
-    const now = new Date();
-    const diffMs = now.getTime() - occupationTime.getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-    if (diffMinutes < 1) return "Recién";
-    if (diffMinutes < 60) return `${diffMinutes} min`;
-
-    const diffHours = Math.floor(diffMinutes / 60);
-    return `${diffHours} h`;
+    const t = getOccupationTime(table);
+    if (!t) return "Sin pedidos";
+    const mins = Math.floor((Date.now() - t.getTime()) / 60000);
+    if (mins < 1) return "Recién";
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)} h`;
   };
 
-  const oldestTableIndex =
-    tablesOrder === "occupation"
-      ? sortedTables.findIndex(
-          (table) =>
-            table.status === "occupied" &&
-            getTableOccupationTime(table) !== null,
-        )
-      : -1;
+  const sortedTables = [...tables].sort((a, b) => {
+    if (tablesOrder === "occupation") {
+      const ta = getOccupationTime(a), tb = getOccupationTime(b);
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return ta.getTime() - tb.getTime();
+    }
+    return a.number - b.number;
+  });
+
+  const oldestIndex = tablesOrder === "occupation"
+    ? sortedTables.findIndex(t => t.status === "occupied" && getOccupationTime(t) !== null)
+    : -1;
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">
-          Cuentas por Mesa
-        </h2>
-
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="text-sm text-gray-600">
-            <span className="bg-green-100 text-green-800 px-2 py-1 rounded mr-2">
-              {occupiedTablesCount} mesas ocupadas
-            </span>
-            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              <FaDollarSign className="inline mr-1" />
-              Total: ${totalGeneral.toFixed(2)}
-            </span>
-          </div>
+    <div style={{ animation:"wr-fadeup 0.3s ease" }}>
+      {/* Summary */}
+      <div style={{ display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:16 }}>
+        <h2 style={{ fontSize:18,fontWeight:800,color:"var(--text)",margin:0 }}>Cuentas por Mesa</h2>
+        <div style={{ display:"flex",gap:8 }}>
+          <span style={{ fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"var(--green-light)",color:"var(--green)" }}>{occupiedCount} mesas ocupadas</span>
+          <span style={{ fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"var(--amber-light)",color:"var(--amber)" }}>$ Total: ${totalGeneral.toFixed(2)}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Grid */}
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16,alignItems:"start" }}>
         {sortedTables.map((table, index) => {
-          const occupationTime = getOccupationDisplay(table);
-          let hasNotifications = false;
-
-          for (const notification of notifications) {
-            if (notification.table_id === table.id) {
-              hasNotifications = true;
-              break;
-            }
-          }
-
-          const isOldest =
-            tablesOrder === "occupation" && index === oldestTableIndex;
+          const occupationDisplay = getOccupationDisplay(table);
+          const hasNotifs = notifications.some(n => n.table_id === table.id);
+          const isOldest = tablesOrder === "occupation" && index === oldestIndex;
 
           return (
-            <div key={table.id} className="relative">
-              {tablesOrder === "occupation" &&
-                table.status === "occupied" &&
-                index < 3 && (
-                  <div className="absolute -top-2 -right-2 z-10">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                        index === oldestTableIndex
-                          ? "bg-red-500"
-                          : index === oldestTableIndex + 1
-                            ? "bg-orange-500"
-                            : "bg-blue-500"
-                      }`}
-                    >
-                      #{index + 1}
-                    </div>
-                  </div>
-                )}
-
+            <div key={table.id} style={{ position:"relative" }}>
+              {tablesOrder === "occupation" && table.status === "occupied" && index < 3 && (
+                <div style={{ position:"absolute",top:-10,right:-10,zIndex:10,width:28,height:28,borderRadius:"50%",background:index===oldestIndex?"var(--red)":index===oldestIndex+1?"var(--amber)":"var(--blue)",color:"white",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  #{index + 1}
+                </div>
+              )}
               <TableCard
                 table={table}
                 processing={processing}
@@ -155,8 +88,8 @@ export default function TablesTab({
                 onPagarPorSeparado={onPagarPorSeparado}
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
-                occupationTime={occupationTime}
-                hasNotifications={hasNotifications}
+                occupationTime={occupationDisplay}
+                hasNotifications={hasNotifs}
                 isHighlighted={isOldest}
               />
             </div>

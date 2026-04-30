@@ -1,5 +1,3 @@
-import { FaSync } from "react-icons/fa";
-
 interface HeaderProps {
   loading: boolean;
   onRefresh: () => void;
@@ -7,26 +5,23 @@ interface HeaderProps {
 
 export default function Header({ loading, onRefresh }: HeaderProps) {
   return (
-    <header className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Panel del Mesero
-            </h1>
-            <p className="text-gray-600">Pedidos enviados y cuentas por mesa</p>
-          </div>
-
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-2 disabled:opacity-50"
-          >
-            <FaSync className={loading ? "animate-spin" : ""} />
-            {loading ? "Actualizando..." : "Actualizar"}
-          </button>
-        </div>
+    <header style={{ padding:"12px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"white",flexShrink:0 }}>
+      <div>
+        <p style={{ fontSize:17,fontWeight:800,color:"var(--navy)",letterSpacing:"-0.3px",margin:0 }}>Panel del Mesero</p>
+        <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginTop:2 }}>Pedidos enviados y cuentas por mesa</p>
       </div>
+      <button
+        onClick={onRefresh}
+        disabled={loading}
+        style={{ background:"var(--navy)",color:"white",border:"none",borderRadius:9,padding:"8px 16px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontFamily:"inherit",opacity:loading?0.7:1,transition:"filter 0.15s" }}
+      >
+        <span style={{ display:"inline-block",animation:loading?"wr-spin 0.8s linear infinite":"none" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </span>
+        {loading ? "Actualizando..." : "Actualizar"}
+      </button>
     </header>
   );
 }
