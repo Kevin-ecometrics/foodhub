@@ -1,16 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import { supabase } from "@/app/lib/supabase/client";
-import {
-  FaDollarSign,
-  FaSpinner,
-  FaReceipt,
-  FaQuestion,
-  FaPlus,
-  FaUtensils,
-  FaClock,
-  FaUsers,
-} from "react-icons/fa";
 import { useState, useEffect } from "react";
 
 interface TableHeaderProps {
@@ -27,595 +17,225 @@ interface TableHeaderProps {
 }
 
 interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  image_url: string | null;
-  preparation_time: number | null;
-  is_available: boolean;
-  is_favorite: boolean;
-  rating: number;
-  rating_count: number;
-  extras?: never[];
+  id: number; name: string; description: string; price: number;
+  category: string; image_url: string | null; preparation_time: number | null;
+  is_available: boolean; is_favorite: boolean; rating: number; rating_count: number; extras?: never[];
 }
 
 export default function TableHeader({
-  table,
-  tableTotal,
-  processing,
-  onCobrarMesa,
-  onPagarPorSeparado,
-  notifications = [],
-  onOrderAdded,
-  hasNotifications = false,
-  isHighlighted = false,
-  occupationTime,
+  table, tableTotal, processing, onCobrarMesa, onPagarPorSeparado,
+  notifications = [], onOrderAdded, hasNotifications = false,
+  isHighlighted = false, occupationTime,
 }: TableHeaderProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<{
-    [key: number]: number;
-  }>({});
+  const [selectedProducts, setSelectedProducts] = useState<{ [k: number]: number }>({});
   const [addingOrder, setAddingOrder] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (showAddModal) {
-      loadProducts();
-    }
-  }, [showAddModal]);
+  useEffect(() => { if (showAddModal) loadProducts(); }, [showAddModal]);
 
   const loadProducts = async () => {
-    setProductsLoading(true);
-    setError(null);
+    setProductsLoading(true); setError(null);
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_available", true)
-        .order("name", { ascending: true });
-
-      if (error) {
-        throw new Error(`Error cargando productos: ${error.message}`);
-      }
-
+      const { data, error } = await supabase.from("products").select("*").eq("is_available", true).order("name", { ascending: true });
+      if (error) throw new Error(error.message);
       setProducts(data || []);
-    } catch (error) {
-      console.error("Error loading products:", error);
-      setError("Error cargando los productos");
-    } finally {
-      setProductsLoading(false);
-    }
+    } catch (e) { console.error(e); setError("Error cargando los productos"); }
+    finally { setProductsLoading(false); }
   };
 
-  const calculateTotalItems = (table: TableWithOrder) => {
-    return table.orders.reduce(
-      (total, order) =>
-        total +
-        order.order_items.reduce(
-          (sum: number, item: any) => sum + item.quantity,
-          0,
-        ),
-      0,
-    );
-  };
+  const calculateTotalItems = (t: TableWithOrder) =>
+    t.orders.reduce((s, o) => s + o.order_items.reduce((ss: number, i: any) => ss + i.quantity, 0), 0);
 
-  const calculateItemsByStatus = (table: TableWithOrder) => {
-    const pending = table.orders.reduce(
-      (total, order) =>
-        total +
-        order.order_items.filter(
-          (item: any) =>
-            item.status === "ordered" || item.status === "preparing",
-        ).length,
-      0,
-    );
-
-    const ready = table.orders.reduce(
-      (total, order) =>
-        total +
-        order.order_items.filter((item: any) => item.status === "ready").length,
-      0,
-    );
-
-    const served = table.orders.reduce(
-      (total, order) =>
-        total +
-        order.order_items.filter((item: any) => item.status === "served")
-          .length,
-      0,
-    );
-
+  const calculateItemsByStatus = (t: TableWithOrder) => {
+    const pending = t.orders.reduce((s, o) => s + o.order_items.filter((i: any) => i.status==="ordered"||i.status==="preparing").length, 0);
+    const ready   = t.orders.reduce((s, o) => s + o.order_items.filter((i: any) => i.status==="ready").length, 0);
+    const served  = t.orders.reduce((s, o) => s + o.order_items.filter((i: any) => i.status==="served").length, 0);
     return { pending, ready, served };
   };
 
-  const billRequestNotifications = notifications.filter(
-    (notification: any) =>
-      notification.table_id === table.id &&
-      notification.type === "bill_request",
-  );
+  const billRequestNotifs = notifications.filter((n: any) => n.table_id === table.id && n.type === "bill_request");
+  const latestBillRequest = billRequestNotifs.length > 0 ? billRequestNotifs[billRequestNotifs.length - 1] : null;
+  const showPaymentButtons = latestBillRequest?.type === "bill_request";
 
-  const latestBillRequest =
-    billRequestNotifications.length > 0
-      ? billRequestNotifications[billRequestNotifications.length - 1]
-      : null;
-
-  const getPaymentMethodInfo = (paymentMethod: string | null) => {
-    if (paymentMethod === "cash") {
-      return {
-        text: "EFECTIVO",
-        icon: FaDollarSign,
-        bgColor: "bg-green-100",
-        textColor: "text-green-800",
-        borderColor: "border-green-300",
-      };
-    } else if (paymentMethod === "terminal") {
-      return {
-        text: "TARJETA",
-        icon: FaReceipt,
-        bgColor: "bg-blue-100",
-        textColor: "text-blue-800",
-        borderColor: "border-blue-300",
-      };
-    } else {
-      return {
-        text: "PENDIENTE",
-        icon: FaQuestion,
-        bgColor: "bg-gray-100",
-        textColor: "text-gray-800",
-        borderColor: "border-gray-300",
-      };
-    }
+  const getPaymentLabel = (method: string | null) => {
+    if (method === "cash") return { text:"EFECTIVO", color:"var(--green)", bg:"var(--green-light)" };
+    if (method === "terminal") return { text:"TARJETA", color:"var(--blue)", bg:"var(--blue-light)" };
+    return { text:"PENDIENTE", color:"var(--muted)", bg:"var(--surface)" };
   };
 
-  const handleAddClick = () => {
-    setShowAddModal(true);
-  };
+  const handleProductQtyChange = (id: number, qty: number) =>
+    setSelectedProducts(prev => ({ ...prev, [id]: qty }));
 
-  const handleProductQuantityChange = (productId: number, quantity: number) => {
-    setSelectedProducts((prev) => ({
-      ...prev,
-      [productId]: quantity,
-    }));
-  };
+  const getTotalItems = () => Object.values(selectedProducts).reduce((s, q) => s + q, 0);
+  const getTotalAmount = () => Object.entries(selectedProducts).reduce((s, [id, q]) => {
+    const p = products.find(x => x.id === parseInt(id)); return s + (p?.price||0)*q;
+  }, 0);
+
+  const formatCurrency = (n: number) => new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" }).format(n);
 
   const handleConfirmAddOrder = async () => {
-    setAddingOrder(true);
-    setError(null);
-
+    setAddingOrder(true); setError(null);
     try {
-      const selectedItems = Object.entries(selectedProducts)
-        .filter(([_, quantity]) => quantity > 0)
-        .map(([productId, quantity]) => {
-          const product = products.find((p) => p.id === parseInt(productId));
-          if (!product) {
-            throw new Error(`Producto con ID ${productId} no encontrado`);
-          }
-          return {
-            product_id: product.id,
-            product_name: product.name,
-            price: product.price,
-            quantity: quantity,
-            notes: "Agregado por el mesero",
-          };
-        });
-
-      if (selectedItems.length === 0) {
-        setError("Por favor selecciona al menos un producto");
-        return;
-      }
-
-      const orderTotal = selectedItems.reduce(
-        (total, item) => total + item.price * item.quantity,
-        0,
+      const selectedItems = Object.entries(selectedProducts).filter(([,q]) => q > 0).map(([pid, qty]) => {
+        const p = products.find(x => x.id === parseInt(pid));
+        if (!p) throw new Error(`Producto ${pid} no encontrado`);
+        return { product_id: p.id, product_name: p.name, price: p.price, quantity: qty, notes: "Agregado por el mesero" };
+      });
+      if (selectedItems.length === 0) { setError("Por favor selecciona al menos un producto"); return; }
+      const orderTotal = selectedItems.reduce((s, i) => s + i.price * i.quantity, 0);
+      const { data: order, error: orderError } = await supabase.from("orders")
+        .insert([{ table_id: table.id, customer_name: `Mesero ${table.number}`, status: "sent", total_amount: orderTotal }] as any)
+        .select().single();
+      if (orderError) throw new Error(orderError.message);
+      const { error: itemsError } = await supabase.from("order_items").insert(
+        selectedItems.map(i => ({ order_id: (order as any).id, product_id: i.product_id, product_name: i.product_name, price: i.price, quantity: i.quantity, notes: i.notes, status: "ordered" as const, cancelled_quantity: 0 })) as any
       );
-
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert([
-          {
-            table_id: table.id,
-            customer_name: `Mesero ${table.number}`,
-            status: "sent",
-            total_amount: orderTotal,
-          },
-        ] as any)
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error("Error creando orden:", orderError);
-        throw new Error(`Error creando orden: ${orderError.message}`);
-      }
-
-      const orderItemsData = selectedItems.map((item) => ({
-        order_id: (order as any).id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        price: item.price,
-        quantity: item.quantity,
-        notes: item.notes,
-        status: "ordered" as const,
-        cancelled_quantity: 0,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(orderItemsData as any);
-
-      if (itemsError) {
-        console.error("Error creando order_items:", itemsError);
-        await supabase
-          .from("orders")
-          .delete()
-          .eq("id", (order as any).id);
-        throw new Error(`Error creando items: ${itemsError.message}`);
-      }
-
-      setShowAddModal(false);
-      setSelectedProducts({});
-
-      if (onOrderAdded) {
-        onOrderAdded();
-      }
-
-      alert(
-        `✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`,
-      );
-    } catch (error) {
-      console.error("Error completo adding order:", error);
-      setError(
-        `Error: ${error instanceof Error ? error.message : "Error desconocido"}`,
-      );
-    } finally {
-      setAddingOrder(false);
-    }
-  };
-
-  const getTotalItems = () => {
-    return Object.values(selectedProducts).reduce((sum, qty) => sum + qty, 0);
-  };
-
-  const getTotalAmount = () => {
-    return Object.entries(selectedProducts).reduce(
-      (sum, [productId, quantity]) => {
-        const product = products.find((p) => p.id === parseInt(productId));
-        return sum + (product?.price || 0) * quantity;
-      },
-      0,
-    );
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
+      if (itemsError) { await supabase.from("orders").delete().eq("id", (order as any).id); throw new Error(itemsError.message); }
+      setShowAddModal(false); setSelectedProducts({});
+      if (onOrderAdded) onOrderAdded();
+      alert(`✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`);
+    } catch (e) { console.error(e); setError(`Error: ${e instanceof Error ? e.message : "Error desconocido"}`); }
+    finally { setAddingOrder(false); }
   };
 
   const totalItems = calculateTotalItems(table);
   const statusCounts = calculateItemsByStatus(table);
-
   const getTimeColor = () => {
-    if (!occupationTime) return "text-gray-600";
-    if (occupationTime.includes("h")) {
-      return "text-red-600";
-    } else if (
-      occupationTime.includes("min") &&
-      parseInt(occupationTime) > 30
-    ) {
-      return "text-orange-600";
-    }
-    return "text-green-600";
+    if (!occupationTime) return "var(--muted)";
+    if (occupationTime.includes("h")) return "var(--red)";
+    if (occupationTime.includes("min") && parseInt(occupationTime) > 30) return "var(--amber)";
+    return "var(--green)";
   };
-
-  // Determinar si mostrar los botones de cobro
-  const showPaymentButtons =
-    latestBillRequest && latestBillRequest.type === "bill_request";
+  const payLabel = getPaymentLabel(latestBillRequest?.payment_method || null);
 
   return (
     <>
-      <div className="mb-4">
-        {/* Cabecera con número de mesa y botones */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
-          <div>
-            <h3
-              className={`text-lg font-bold ${
-                isHighlighted ? "text-red-700" : "text-gray-800"
-              }`}
-            >
-              Mesa {table.number}
-            </h3>
-          </div>
-
-          {/* Contenedor de botones - siempre visible */}
-          <div className="flex flex-wrap gap-2">
-            {/* Botón Agregar */}
-            {(table.status === "occupied" || table.status === "reserved") && (
-              <button
-                onClick={handleAddClick}
-                className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm"
-                title="Agregar productos a la mesa"
-              >
-                <FaPlus className="text-xs" />
-                <span>Agregar</span>
-              </button>
-            )}
-
-            {/* Botón Pagar por Separado - solo cuando hay solicitud */}
-            {showPaymentButtons && (
-              <button
-                onClick={() => onPagarPorSeparado(table.id, table.number)}
-                disabled={processing === `separate-${table.id}`}
-                className="bg-purple-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-1 shadow-sm"
-                title="Dividir cuenta entre comensales"
-              >
-                {processing === `separate-${table.id}` ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  <>
-                    <FaUsers className="text-xs" />
-                    <span>Separado</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Botón Cobrar Todo - solo cuando hay solicitud */}
-            {showPaymentButtons && (
-              <button
-                onClick={() => onCobrarMesa(table.id, table.number)}
-                disabled={processing === `cobrar-${table.id}`}
-                className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-1 shadow-sm"
-                title="Cobrar toda la cuenta"
-              >
-                {processing === `cobrar-${table.id}` ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  <>
-                    <FaDollarSign />
-                    <span>Cobrar</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tiempo de ocupación */}
+      <div>
+        {/* Time bar */}
         {occupationTime && (
-          <div className="flex items-center gap-1 mb-2 text-sm">
-            <FaClock className={`${getTimeColor()}`} size={12} />
-            <span className={`font-medium ${getTimeColor()}`}>
-              {occupationTime}
-            </span>
-            <span className="text-gray-500 mx-1">•</span>
-            <span className="text-gray-500 text-xs">
-              Desde:{" "}
-              {table.orders.length > 0
-                ? new Date(table.orders[0].created_at).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "Sin registro"}
-            </span>
+          <div style={{ padding:"10px 14px",background:"var(--surface)",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+            <span style={{ fontSize:11,color:"var(--muted)",fontWeight:600 }}>Tiempo de ocupación:</span>
+            <span style={{ fontSize:12,fontWeight:700,color:getTimeColor() }}>{occupationTime}</span>
           </div>
         )}
 
-        {/* Badges de estado */}
-        <div className="flex flex-wrap gap-1 mb-2">
-          <span
-            className={`text-xs px-2 py-1 rounded ${
-              table.status === "occupied"
-                ? "bg-green-100 text-green-800"
-                : table.status === "reserved"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            {table.status === "occupied"
-              ? "Ocupada"
-              : table.status === "reserved"
-                ? "Reservada"
-                : "Disponible"}
-          </span>
-
-          {latestBillRequest && (
-            <span
-              className={`text-xs px-2 py-1 rounded border ${
-                getPaymentMethodInfo(latestBillRequest.payment_method).bgColor
-              } ${
-                getPaymentMethodInfo(latestBillRequest.payment_method).textColor
-              } ${
-                getPaymentMethodInfo(latestBillRequest.payment_method)
-                  .borderColor
-              } flex items-center gap-1`}
-            >
-              {(() => {
-                const IconComponent = getPaymentMethodInfo(
-                  latestBillRequest.payment_method,
-                ).icon;
-                return <IconComponent className="text-xs" />;
-              })()}
-              {getPaymentMethodInfo(latestBillRequest.payment_method).text}
+        {/* Header */}
+        <div style={{ padding:"10px 14px",borderBottom:"1px solid var(--border)" }}>
+          {/* Title row */}
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:8 }}>
+            <span style={{ fontSize:16,fontWeight:800,color:isHighlighted?"var(--red)":"var(--navy)" }}>
+              Mesa {table.number}
             </span>
-          )}
-
-          {totalItems > 0 && statusCounts.served > 0 && (
-            <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-              {statusCounts.served} servido{statusCounts.served > 1 ? "s" : ""}
-            </span>
-          )}
-
-          {statusCounts.ready > 0 && (
-            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-              {statusCounts.ready} listo{statusCounts.ready > 1 ? "s" : ""}
-            </span>
-          )}
-
-          {statusCounts.pending > 0 && (
-            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-              {statusCounts.pending} pendiente
-              {statusCounts.pending > 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        {/* Información de ubicación */}
-        <p className="text-sm text-gray-500">
-          {table.location} • {table.capacity} personas
-        </p>
-      </div>
-
-      {/* Modal para agregar productos */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <FaUtensils className="text-green-600 text-xl" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">
-                  Agregar Productos - Mesa {table.number}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Selecciona los productos que deseas agregar a la orden
-                </p>
-              </div>
-            </div>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700">
-                {error}
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto pr-2">
-              {productsLoading ? (
-                <div className="text-center py-8">
-                  <FaSpinner className="animate-spin text-2xl text-blue-600 mx-auto mb-2" />
-                  <p className="text-gray-600">Cargando productos...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-green-300 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            {product.image_url && (
-                              <img
-                                src={product.image_url}
-                                alt={product.name}
-                                className="h-12 w-12 rounded-lg object-cover"
-                              />
-                            )}
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-800">
-                                {product.name}
-                              </h4>
-                              <p className="text-sm text-gray-600 line-clamp-2">
-                                {product.description}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-green-600 font-semibold">
-                                  {formatCurrency(product.price)}
-                                </span>
-                                {product.preparation_time && (
-                                  <span className="text-xs text-gray-500">
-                                    • {product.preparation_time} min
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() =>
-                              handleProductQuantityChange(
-                                product.id,
-                                Math.max(
-                                  0,
-                                  (selectedProducts[product.id] || 0) - 1,
-                                ),
-                              )
-                            }
-                            disabled={(selectedProducts[product.id] || 0) <= 0}
-                            className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-gray-300"
-                          >
-                            -
-                          </button>
-
-                          <span className="w-8 text-center font-semibold">
-                            {selectedProducts[product.id] || 0}
-                          </span>
-
-                          <button
-                            onClick={() =>
-                              handleProductQuantityChange(
-                                product.id,
-                                (selectedProducts[product.id] || 0) + 1,
-                              )
-                            }
-                            className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+              {(table.status==="occupied"||table.status==="reserved") && (
+                <button onClick={() => setShowAddModal(true)} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--green)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4 }}>
+                  + Agregar
+                </button>
+              )}
+              {showPaymentButtons && (
+                <>
+                  <button onClick={() => onPagarPorSeparado(table.id, table.number)} disabled={processing===`separate-${table.id}`} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--blue)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,opacity:processing===`separate-${table.id}`?0.6:1 }}>
+                    {processing===`separate-${table.id}` ? "↻" : "⇌ Separado"}
+                  </button>
+                  <button onClick={() => onCobrarMesa(table.id, table.number)} disabled={processing===`cobrar-${table.id}`} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--amber)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,opacity:processing===`cobrar-${table.id}`?0.6:1 }}>
+                    {processing===`cobrar-${table.id}` ? "↻" : "$ Cobrar"}
+                  </button>
+                </>
               )}
             </div>
+          </div>
 
-            <div className="border-t border-gray-200 pt-4 mt-4">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-4">
-                <div>
-                  <p className="text-sm text-gray-600">
-                    Total de items: <strong>{getTotalItems()}</strong>
-                  </p>
-                  <p className="text-lg font-bold text-green-600">
-                    Total: {formatCurrency(getTotalAmount())}
-                  </p>
-                </div>
+          {/* Time + source */}
+          {occupationTime && (
+            <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:8,fontSize:11 }}>
+              <span style={{ color:getTimeColor(),fontWeight:700 }}>⏱ {occupationTime}</span>
+              <span style={{ color:"var(--muted)" }}>•</span>
+              <span style={{ color:"var(--muted)" }}>
+                Desde: {table.orders.length>0 ? new Date(table.orders[0].created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) : "Sin registro"}
+              </span>
+            </div>
+          )}
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setSelectedProducts({});
-                      setError(null);
-                    }}
-                    disabled={addingOrder}
-                    className="px-6 py-3 bg-gray-500 text-white rounded-xl font-semibold hover:bg-gray-600 transition disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleConfirmAddOrder}
-                    disabled={addingOrder || getTotalItems() === 0}
-                    className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {addingOrder ? (
-                      <FaSpinner className="animate-spin" />
-                    ) : (
-                      <FaPlus />
-                    )}
-                    {addingOrder
-                      ? "Agregando..."
-                      : `Agregar a Mesa ${table.number}`}
-                  </button>
+          {/* Badges */}
+          <div style={{ display:"flex",flexWrap:"wrap",gap:5,marginBottom:6 }}>
+            <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:table.status==="occupied"?"var(--green-light)":table.status==="reserved"?"var(--amber-light)":"var(--surface)",color:table.status==="occupied"?"var(--green)":table.status==="reserved"?"var(--amber)":"var(--muted)" }}>
+              {table.status==="occupied"?"Ocupada":table.status==="reserved"?"Reservada":"Disponible"}
+            </span>
+            {latestBillRequest && (
+              <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:payLabel.bg,color:payLabel.color }}>
+                {payLabel.text}
+              </span>
+            )}
+            {statusCounts.served > 0 && <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"var(--surface)",color:"var(--muted)",border:"1px solid var(--border)" }}>{statusCounts.served} servido{statusCounts.served>1?"s":""}</span>}
+            {statusCounts.ready > 0 && <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"var(--blue-light)",color:"var(--blue)" }}>{statusCounts.ready} listo{statusCounts.ready>1?"s":""}</span>}
+            {statusCounts.pending > 0 && <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"var(--amber-light)",color:"var(--amber)" }}>{statusCounts.pending} pendiente{statusCounts.pending>1?"s":""}</span>}
+          </div>
+
+          <p style={{ fontSize:11,color:"var(--muted)",margin:0 }}>{table.location} • {table.capacity} personas</p>
+        </div>
+      </div>
+
+      {/* Add Products Modal */}
+      {showAddModal && (
+        <div onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); }} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:640,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+            {/* Modal header */}
+            <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+              <div>
+                <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Agregar Productos — Mesa {table.number}</p>
+                <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Selecciona los productos que deseas agregar a la orden</p>
+              </div>
+              <button onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
+            </div>
+
+            {error && <div style={{ margin:"12px 22px 0",padding:"10px 14px",background:"var(--red-light)",borderRadius:10,color:"var(--red)",fontSize:13 }}>{error}</div>}
+
+            {/* Product grid */}
+            <div style={{ overflowY:"auto",flex:1,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
+              {productsLoading ? (
+                <div style={{ gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--muted)" }}>
+                  <div style={{ width:48,height:48,borderRadius:14,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 8px" }}>
+                    <svg style={{ animation:"wr-spin 0.9s linear infinite" }} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                  </div>
+                  <p style={{ fontSize:14 }}>Cargando productos...</p>
                 </div>
+              ) : products.map(p => (
+                <div key={p.id} style={{ border:"1.5px solid var(--border)",borderRadius:12,padding:12,display:"flex",alignItems:"flex-start",gap:10,background:"white" }}>
+                  <div style={{ width:48,height:48,borderRadius:8,background:"var(--accent-light)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden" }}>
+                    {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:20 }}>🍽️</span>}
+                  </div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <p style={{ fontSize:13,fontWeight:700,color:"var(--text)",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{p.name}</p>
+                    <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginTop:2,lineHeight:1.4 }}>{p.description}</p>
+                    <p style={{ fontSize:13,fontWeight:700,color:"var(--green)",margin:0,marginTop:4 }}>
+                      ${p.price.toFixed(2)} <span style={{ fontSize:10,color:"var(--muted)",fontWeight:400 }}>• {p.preparation_time} min</span>
+                    </p>
+                  </div>
+                  <div style={{ display:"flex",alignItems:"center",gap:4,flexShrink:0 }}>
+                    <button onClick={() => handleProductQtyChange(p.id, Math.max(0, (selectedProducts[p.id]||0)-1))} style={{ width:26,height:26,borderRadius:7,border:"1.5px solid var(--border)",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--muted)",fontFamily:"inherit" }}>−</button>
+                    <span style={{ width:22,textAlign:"center",fontSize:13,fontWeight:700,color:"var(--text)" }}>{selectedProducts[p.id]||0}</span>
+                    <button onClick={() => handleProductQtyChange(p.id, (selectedProducts[p.id]||0)+1)} style={{ width:26,height:26,borderRadius:7,border:"1.5px solid var(--border)",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text)",fontFamily:"inherit" }}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+              <div>
+                <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
+                <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
+              </div>
+              <div style={{ display:"flex",gap:10 }}>
+                <button onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); }} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>Cancelar</button>
+                <button onClick={handleConfirmAddOrder} disabled={addingOrder||getTotalItems()===0} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:getTotalItems()===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
+                  {addingOrder ? "↻ Agregando..." : `+ Agregar a Mesa ${table.number}`}
+                </button>
               </div>
             </div>
           </div>

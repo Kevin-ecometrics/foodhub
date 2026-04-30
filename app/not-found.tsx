@@ -3,50 +3,78 @@
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white">
-      {/* Background blur */}
-      <div className="absolute w-[400px] h-[400px] bg-slate-200 rounded-full blur-3xl opacity-20 top-[-120px] left-[-120px]" />
-      <div className="absolute w-[300px] h-[300px] bg-slate-300 rounded-full blur-3xl opacity-20 bottom-[-120px] right-[-120px]" />
+    <div
+      className="min-h-screen bg-white flex items-center justify-center px-6"
+      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+    >
+      <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
 
-      <div className="text-center max-w-xl w-full relative z-10">
-        {/* 404 minimal */}
-        <div className="relative mb-8">
-          <h1 className="text-[120px] sm:text-[140px] font-semibold tracking-tight text-slate-900">
-            404
-          </h1>
+      <div className="w-full max-w-md">
+        {/* Brand name */}
+        <div className="flex justify-center mb-8">
+          <p
+            className="text-2xl font-extrabold tracking-tight"
+            style={{ color: "oklch(62% 0.18 32)" }}
+          >
+            ScanEat
+          </p>
+        </div>
 
-          {/* Glow sutil */}
-          <div className="absolute inset-0 text-[120px] sm:text-[140px] font-semibold text-slate-300 blur-2xl opacity-40 -z-10">
-            404
+        {/* Main card */}
+        <div className="border border-slate-200 rounded-[18px] overflow-hidden hover:bg-slate-50 transition-colors">
+          {/* Top accent bar */}
+          <div className="h-1 bg-accent" />
+
+          <div className="p-8 text-center">
+            {/* Error number */}
+            <p className="text-[80px] font-extrabold text-slate-900 leading-none mb-2 tracking-tight">
+              404
+            </p>
+
+            {/* Divider */}
+            <div className="w-10 h-0.5 bg-accent rounded-full mx-auto mb-5" />
+
+            {/* Copy */}
+            <p className="text-[15px] font-bold text-slate-900 mb-2">
+              Página no encontrada
+            </p>
+            <p className="text-sm text-slate-500 leading-relaxed mb-8">
+              La página que buscas no existe o fue movida a otra dirección.
+              Verifica la URL o regresa al inicio.
+            </p>
+
+            {/* Action */}
+            <button
+              onClick={() => window.history.back()}
+              className="w-full flex items-center justify-center gap-2 border border-slate-200 bg-gray-50 text-slate-700 py-2.5 rounded-[9px] text-sm font-semibold hover:bg-accent hover:text-white transition"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              Volver atrás
+            </button>
+          </div>
+
+          {/* Footer */}
+          <div className="px-8 py-3.5 bg-gray-50 border-t border-slate-200 flex items-center justify-between">
+            <p className="text-[11px] text-slate-400">ScanEat</p>
+            <p className="text-[11px] text-slate-400">
+              Error 404 — recurso no disponible
+            </p>
           </div>
         </div>
-
-        {/* Card */}
-        <div className="bg-white rounded-3xl p-10 border border-slate-200 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
-          <h2 className="text-2xl font-light text-slate-900 mb-3">
-            Página no encontrada
-          </h2>
-
-          <p className="text-sm text-slate-500 mb-8 leading-relaxed">
-            La página que buscas no existe o fue movida. Puedes volver al inicio
-            y continuar navegando.
-          </p>
-
-          {/* Button */}
-          <a
-            href="/customer"
-            className="relative inline-flex items-center justify-center px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-medium overflow-hidden transition-all duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
-          >
-            {/* Shine */}
-            <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition duration-300"></span>
-            Volver al inicio
-          </a>
-        </div>
-
-        {/* Footer hint */}
-        <p className="text-xs text-slate-400 mt-6">
-          Error 404 — recurso no disponible
-        </p>
       </div>
     </div>
   );

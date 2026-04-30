@@ -13,6 +13,7 @@ import {
   FaImage,
   FaTimes,
   FaSpinner,
+  FaChevronLeft,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -31,6 +32,7 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Datos del dashboard
   const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
@@ -710,200 +712,195 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                {checkingLogo ? (
-                  <div className="animate-pulse bg-gray-300 w-full h-full"></div>
-                ) : logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt="Logo del negocio"
-                    className="w-full h-full object-cover"
-                    onError={() => setLogoUrl(null)}
-                  />
-                ) : (
-                  <FaChartBar className="text-blue-600 text-sm sm:text-base" />
-                )}
-              </div>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-gray-800">
-                  <span className="hidden sm:inline">
-                    Dashboard Administrativo
-                  </span>
-                  <span className="sm:hidden">Dashboard</span>
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button
-                onClick={handleWaiter}
-                className="flex items-center gap-1 sm:gap-2 p-2 sm:px-4 sm:py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
-                title="Waiter"
-              >
-                <FaUser className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Waiter</span>
-              </button>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-1 sm:gap-2 p-2 sm:px-4 sm:py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
-                title={logoUrl ? "Actualizar Logo" : "Subir Logo"}
-              >
-                <FaUpload className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden sm:inline">
-                  {logoUrl ? "Actualizar Logo" : "Subir Logo"}
-                </span>
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1 sm:gap-2 p-2 sm:px-4 sm:py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
-                title="Cerrar Sesión"
-              >
-                <FaSignOutAlt className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Cerrar Sesión</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-white flex" style={{fontFamily:"var(--font-geist-sans)"}}>
+      {/* Botón colapsar - fuera del sidebar, posicionado junto a él */}
+      <button
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        className={`fixed top-3 z-50 p-3 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all duration-300 shadow-sm ${
+          sidebarCollapsed ? "left-[68px]" : "left-[244px]"
+        }`}
+        title={sidebarCollapsed ? "Expandir" : "Colapsar"}
+      >
+        <FaChevronLeft className={`text-[10px] transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`} />
+      </button>
 
-      {/* Navegación entre secciones */}
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex space-x-8">
-            {[
-              {
-                id: "dashboard" as AdminSection,
-                name: "Dashboard",
-                icon: FaChartBar,
-              },
-              {
-                id: "tables" as AdminSection,
-                name: "Gestión de Mesas",
-                icon: FaTable,
-              },
-              {
-                id: "products" as AdminSection,
-                name: "Gestión de Productos",
-                icon: FaBox,
-              },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeSection === item.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <item.icon />
-                {item.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
-
-        {activeSection === "dashboard" && (
-          <Dashboard
-            dailyStats={dailyStats}
-            todayOrders={todayOrders}
-            popularProducts={popularProducts}
-            dataLoading={dataLoading}
-            onDateChange={handleDateChange}
-            onDateRangeChange={handleDateRangeChange}
-            selectedDate={selectedDate}
-            salesSummary={salesSummary}
-            salesHistory={salesHistory}
-          />
-        )}
-
-        {activeSection === "tables" && (
-          <TablesManagement onError={handleError} />
-        )}
-
-        {activeSection === "products" && (
-          <ProductsManagement onError={handleError} />
-        )}
-      </main>
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
-            {/* Header simple */}
-            <div className="p-4 border-b">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {logoUrl ? "Cambiar Logo" : "Agregar Logo"}
-                </h2>
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-            </div>
-
-            {/* Contenido mínimo */}
-            <div className="p-6">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4">
-                <FaUpload className="text-gray-400 text-2xl mx-auto mb-3" />
-                <p className="text-gray-600 mb-4">
-                  Selecciona una imagen para el logo
-                </p>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleLogoUpload(file);
-                  }}
-                  disabled={uploading}
-                  className="hidden"
-                  id="logo-upload"
+      {/* Sidebar */}
+      <aside className={`${sidebarCollapsed ? "w-16" : "w-60"} h-screen sticky top-0 border-r border-slate-200 flex flex-col transition-all duration-300`}>
+        {/* Logo + Título */}
+        <div className={`${sidebarCollapsed ? "p-3" : "p-4"} border-b border-slate-200`}>
+          <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-2.5"}`}>
+            <div className="w-[34px] h-[34px] rounded-[8px] bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+              {checkingLogo ? (
+                <div className="animate-pulse bg-white/30 w-full h-full"></div>
+              ) : logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Logo del negocio"
+                  className="w-full h-full object-cover"
+                  onError={() => setLogoUrl(null)}
                 />
-                <label
-                  htmlFor="logo-upload"
-                  className={`inline-block px-4 py-2 rounded-lg font-medium ${
-                    uploading
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                  }`}
-                >
-                  {uploading ? "Subiendo..." : "Seleccionar Imagen"}
-                </label>
-              </div>
-
-              {uploading && (
-                <div className="text-center text-blue-600">
-                  <FaSpinner className="animate-spin inline mr-2" />
-                  Subiendo imagen...
-                </div>
+              ) : (
+                <FaChartBar className="text-white text-sm" />
               )}
             </div>
+            {!sidebarCollapsed && (
+              <span className="text-[15px] font-extrabold text-slate-900 truncate">
+                Dashboard
+              </span>
+            )}
+          </div>
+          {!sidebarCollapsed && (
+            <p className="text-[11px] text-slate-500 mt-0.5 ml-[42px]">Administrativo</p>
+          )}
+        </div>
 
-            {/* Footer simple */}
-            <div className="p-4 border-t bg-gray-50 rounded-b-xl">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Cerrar
-                </button>
+        {/* Navegación vertical */}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          {[
+            {
+              id: "dashboard" as AdminSection,
+              name: "Dashboard",
+              icon: FaChartBar,
+            },
+            {
+              id: "tables" as AdminSection,
+              name: "Gestión de Mesas",
+              icon: FaTable,
+            },
+            {
+              id: "products" as AdminSection,
+              name: "Gestión de Productos",
+              icon: FaBox,
+            },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-2 px-3"} py-2.5 text-[13px] border-l-[2.5px] -ml-px transition-all ${
+                activeSection === item.id
+                  ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent-light)] font-bold"
+                  : "border-transparent text-slate-500 font-medium hover:text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+              }`}
+              title={sidebarCollapsed ? item.name : undefined}
+            >
+              <item.icon className="text-[12px] flex-shrink-0" />
+              {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
+            </button>
+          ))}
+        </nav>
+
+        {/* Acciones inferiores */}
+        <div className="p-3 border-t border-slate-200 space-y-1.5">
+          <button
+            onClick={handleWaiter}
+            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition`}
+            title={sidebarCollapsed ? "Waiter" : undefined}
+          >
+            <FaUser className="w-3.5 h-3.5 flex-shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Waiter</span>}
+          </button>
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition`}
+            title={sidebarCollapsed ? (logoUrl ? "Actualizar Logo" : "Subir Logo") : undefined}
+          >
+            <FaUpload className="w-3.5 h-3.5 flex-shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">{logoUrl ? "Actualizar Logo" : "Subir Logo"}</span>}
+          </button>
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-red-600 hover:bg-red-50 transition`}
+            title={sidebarCollapsed ? "Cerrar Sesión" : undefined}
+          >
+            <FaSignOutAlt className="w-3.5 h-3.5 flex-shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Cerrar Sesión</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Contenido principal */}
+      <main className="flex-1 overflow-auto">
+        <div className="max-w-7xl mx-auto px-6 py-5">
+          {error && (
+            <div className="mb-5 bg-red-50 border border-red-200 rounded-[14px] p-4">
+              <p className="text-red-800 text-sm font-medium">{error}</p>
+            </div>
+          )}
+
+          {activeSection === "dashboard" && (
+            <Dashboard
+              dailyStats={dailyStats}
+              todayOrders={todayOrders}
+              popularProducts={popularProducts}
+              dataLoading={dataLoading}
+              onDateChange={handleDateChange}
+              onDateRangeChange={handleDateRangeChange}
+              selectedDate={selectedDate}
+              salesSummary={salesSummary}
+              salesHistory={salesHistory}
+            />
+          )}
+
+          {activeSection === "tables" && (
+            <TablesManagement onError={handleError} />
+          )}
+
+          {activeSection === "products" && (
+            <ProductsManagement onError={handleError} />
+          )}
+        </div>
+      </main>
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4" onClick={() => setShowUploadModal(false)}>
+          <div className="bg-white rounded-[18px] shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-base font-extrabold text-slate-900">{logoUrl ? "Cambiar Logo" : "Agregar Logo"}</p>
               </div>
+              <button onClick={() => setShowUploadModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="p-6 text-center">
+              <div className="w-20 h-20 rounded-[14px] bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-4 overflow-hidden cursor-pointer">
+                {logoUrl ? (
+                  <img src={logoUrl} className="w-full h-full object-cover" />
+                ) : (
+                  <FaImage className="text-white text-3xl" />
+                )}
+              </div>
+              <p className="text-sm text-[var(--color-accent)] mb-4">Selecciona una imagen para el logo</p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLogoUpload(file);
+                }}
+                disabled={uploading}
+                className="hidden"
+                id="logo-upload"
+              />
+              <label
+                htmlFor="logo-upload"
+                className={`inline-block px-5 py-2.5 rounded-[9px] text-sm font-bold ${
+                  uploading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-[var(--color-accent)] text-white hover:brightness-90 cursor-pointer"
+                }`}
+              >
+                {uploading ? <><FaSpinner className="animate-spin inline mr-1.5" />Subiendo...</> : "Seleccionar Imagen"}
+              </label>
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-accent-dark)]"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

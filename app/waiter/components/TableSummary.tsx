@@ -2,42 +2,18 @@ interface TableSummaryProps {
   tableTotal: number;
   customerCount: number;
   orderCount: number;
-  // Nueva prop para el filtro FCFS
   isHighlighted?: boolean;
 }
 
-export default function TableSummary({
-  tableTotal,
-  customerCount,
-  orderCount,
-  isHighlighted = false,
-}: TableSummaryProps) {
+export default function TableSummary({ tableTotal, customerCount, orderCount, isHighlighted = false }: TableSummaryProps) {
   return (
-    <div
-      className={`mt-4 pt-4 border-t ${
-        isHighlighted ? "border-red-300" : "border-gray-300"
-      }`}
-    >
-      <div className="flex justify-between items-center">
-        <span
-          className={`font-bold text-lg ${
-            isHighlighted ? "text-red-800" : "text-gray-800"
-          }`}
-        >
-          TOTAL A PAGAR:
-        </span>
-        <span
-          className={`text-xl font-bold ${
-            isHighlighted ? "text-red-700" : "text-green-600"
-          }`}
-        >
-          ${tableTotal.toFixed(2)}
-        </span>
+    <div style={{ padding:"12px 14px",background:"oklch(97% 0 0)",borderTop:"2px solid var(--border)" }}>
+      <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+        <span style={{ fontSize:14,fontWeight:800,color:isHighlighted?"var(--red)":"var(--text)" }}>TOTAL A PAGAR:</span>
+        <span style={{ fontSize:16,fontWeight:800,color:isHighlighted?"var(--red)":"var(--green)" }}>${tableTotal.toFixed(2)}</span>
       </div>
-      <p className="text-xs text-gray-500 mt-1 text-center">
-        {customerCount} comensal{customerCount > 1 ? "es" : ""} • {orderCount}{" "}
-        pedido{orderCount > 1 ? "s" : ""} enviado
-        {orderCount > 1 ? "s" : ""}
+      <p style={{ fontSize:11,color:"var(--muted)",textAlign:"center",margin:0 }}>
+        {customerCount} comensal{customerCount > 1 ? "es" : ""} • {orderCount} pedido{orderCount > 1 ? "s" : ""} enviado{orderCount > 1 ? "s" : ""}
       </p>
     </div>
   );

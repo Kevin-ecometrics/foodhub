@@ -486,7 +486,7 @@ export default function Dashboard({
       case "cash":
         return <FaMoneyBillWave className="text-green-600" />;
       case "terminal":
-        return <FaCreditCard className="text-blue-600" />;
+        return <FaCreditCard className="text-[var(--color-accent)]" />;
       case "usd":
         return <FaDollarSign className="text-yellow-600" />;
       case "mixed":
@@ -502,7 +502,7 @@ export default function Dashboard({
       case "cash":
         return "bg-green-100 text-green-800 border-green-300";
       case "terminal":
-        return "bg-blue-100 text-blue-800 border-blue-300";
+        return "bg-[var(--color-accent-light)] text-[var(--color-accent-dark)] border-[var(--color-accent-light)]";
       case "usd":
         return "bg-yellow-100 text-yellow-800 border-yellow-300";
       case "mixed":
@@ -1592,9 +1592,13 @@ export default function Dashboard({
 
   if (dataLoading) {
     return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="text-gray-600 mt-4">Cargando datos...</p>
+      <div className="text-center py-12" style={{fontFamily:"var(--font-geist-sans)"}}>
+        <div className="w-12 h-12 rounded-[14px] bg-[var(--color-accent)] flex items-center justify-center mx-auto">
+          <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </div>
+        <p className="text-slate-500 mt-4 text-sm font-medium">Cargando datos...</p>
       </div>
     );
   }
@@ -1613,19 +1617,19 @@ export default function Dashboard({
   return (
     <>
       {/* Header con controles de fecha */}
-      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
+      <div className="bg-white border border-slate-200 rounded-[14px] p-4 mb-5">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FaCalendarAlt className="text-blue-600 text-xl" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[var(--color-accent-light)] rounded-[10px] flex items-center justify-center text-[var(--color-accent)]">
+              <FaCalendarAlt className="text-base" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">
+              <p className="text-base font-extrabold text-slate-900">
                 {filterMode === "single"
                   ? "Reporte del Día"
                   : "Reporte por Rango"}
-              </h1>
-              <p className="text-gray-600">
+              </p>
+              <p className="text-xs text-slate-500">
                 {filterMode === "single"
                   ? isToday
                     ? "Hoy"
@@ -1636,36 +1640,35 @@ export default function Dashboard({
                     )}
               </p>
               {combinedStats.cancelledItems > 0 && (
-                <p className="text-sm text-red-600 font-medium">
-                  {combinedStats.cancelledItems} unidad(es) cancelada(s) -{" "}
-                  {formatCurrency(combinedStats.cancelledAmount)} excluido(s)
+                <p className="text-xs text-red-600 font-semibold mt-0.5">
+                  {combinedStats.cancelledItems} cancelado(s) —{" "}
+                  {formatCurrency(combinedStats.cancelledAmount)} excluidos
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-wrap gap-2">
             {/* Selector de fecha */}
             <div className="relative">
               <button
                 onClick={() => setShowDateFilter(!showDateFilter)}
-                className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
               >
-                <FaFilter />
+                <FaFilter className="text-[11px]" />
                 Filtrar Fecha
               </button>
 
               {showDateFilter && (
-                <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10 min-w-80">
-                  <div className="space-y-4">
-                    {/* Selector de modo de filtro */}
-                    <div className="flex gap-2 mb-4">
+                <div className="absolute top-[calc(100%+6px)] right-0 bg-white border border-slate-200 rounded-[14px] shadow-xl p-4 z-50 w-64">
+                  <div className="space-y-3">
+                    <div className="flex gap-1.5">
                       <button
                         onClick={() => handleFilterModeChange("single")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition ${
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-[8px] border text-xs font-bold transition ${
                           filterMode === "single"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+                            : "border-slate-200 text-slate-500 hover:bg-slate-50"
                         }`}
                       >
                         <FaCalendarDay />
@@ -1673,10 +1676,10 @@ export default function Dashboard({
                       </button>
                       <button
                         onClick={() => handleFilterModeChange("range")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition ${
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-[8px] border text-xs font-bold transition ${
                           filterMode === "range"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+                            : "border-slate-200 text-slate-500 hover:bg-slate-50"
                         }`}
                       >
                         <FaCalendarWeek />
@@ -1685,431 +1688,274 @@ export default function Dashboard({
                     </div>
 
                     {filterMode === "single" ? (
-                      <>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Seleccionar fecha:
-                        </label>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-700 mb-1.5">Fecha:</p>
                         <input
                           type="date"
                           value={dateInput}
                           onChange={handleDateChange}
                           max={new Date().toISOString().split("T")[0]}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-[8px] text-sm outline-none focus:border-slate-900"
                         />
-                      </>
+                      </div>
                     ) : (
-                      <>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-slate-700">Rango de fechas:</p>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Rango de fechas:
-                          </label>
-                          <div className="space-y-2">
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                Fecha de inicio:
-                              </label>
-                              <input
-                                type="date"
-                                value={startDateInput}
-                                onChange={(e) =>
-                                  setStartDateInput(e.target.value)
-                                }
-                                max={new Date().toISOString().split("T")[0]}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                Fecha final:
-                              </label>
-                              <input
-                                type="date"
-                                value={endDateInput}
-                                onChange={(e) =>
-                                  setEndDateInput(e.target.value)
-                                }
-                                max={new Date().toISOString().split("T")[0]}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              />
-                            </div>
-                          </div>
+                          <p className="text-[11px] text-slate-500 mb-1">Fecha de inicio:</p>
+                          <input
+                            type="date"
+                            value={startDateInput}
+                            onChange={(e) => setStartDateInput(e.target.value)}
+                            max={new Date().toISOString().split("T")[0]}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-[8px] text-sm outline-none focus:border-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-slate-500 mb-1">Fecha final:</p>
+                          <input
+                            type="date"
+                            value={endDateInput}
+                            onChange={(e) => setEndDateInput(e.target.value)}
+                            max={new Date().toISOString().split("T")[0]}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-[8px] text-sm outline-none focus:border-slate-900"
+                          />
                         </div>
                         <button
                           onClick={handleDateRangeChange}
-                          className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                          className="w-full bg-emerald-600 text-white py-2.5 rounded-[9px] text-xs font-bold hover:brightness-90 transition"
                         >
                           Aplicar Rango
                         </button>
-                      </>
+                      </div>
                     )}
 
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={() => setShowDateFilter(false)}
-                        className="flex-1 bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600 transition"
-                      >
-                        Cerrar
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setShowDateFilter(false)}
+                      className="w-full py-2 bg-gray-50 border border-slate-200 rounded-[9px] text-xs font-semibold text-slate-500 hover:bg-slate-100 transition"
+                    >
+                      Cerrar
+                    </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Botones de exportación */}
-            <div className="flex gap-2">
-              <button
-                onClick={generateProductsExcelReport}
-                disabled={salesItems.length === 0}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-                  salesItems.length === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-              >
-                <FaFileExport />
-                Excel
-              </button>
-              <button
-                onClick={generateProductsPDFReport}
-                disabled={salesItems.length === 0}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-                  salesItems.length === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-red-600 text-white hover:bg-red-700"
-                }`}
-              >
-                <FaReceipt />
-                PDF
-              </button>
-            </div>
+            <button
+              onClick={generateProductsExcelReport}
+              disabled={salesItems.length === 0}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] border text-xs font-bold transition ${
+                salesItems.length === 0
+                  ? "border-slate-200 bg-gray-50 text-slate-400 cursor-not-allowed"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              }`}
+            >
+              <FaFileExport className="text-[11px]" />
+              Excel
+            </button>
+            <button
+              onClick={generateProductsPDFReport}
+              disabled={salesItems.length === 0}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] border text-xs font-bold transition ${
+                salesItems.length === 0
+                  ? "border-slate-200 bg-gray-50 text-slate-400 cursor-not-allowed"
+                  : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              }`}
+            >
+              <FaReceipt className="text-[11px]" />
+              PDF
+            </button>
             <button
               onClick={() => onDateChange(selectedDate)}
-              className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] border border-[var(--color-accent-light)] bg-[var(--color-accent-light)] text-[var(--color-accent)] text-xs font-bold hover:bg-[var(--color-accent-light)] transition"
             >
-              <FaTable />
+              <FaFilter className="text-[11px]" />
               Actualizar
             </button>
           </div>
         </div>
       </div>
 
-      {/* Estadísticas Principales CORREGIDAS CON CANCELADOS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FaDollarSign className="text-blue-600 text-xl" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Ingresos Totales</p>
-              <p className="text-2xl font-bold text-gray-800">
-                {formatCurrency(combinedStats.totalRevenue)}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {salesSummary?.saleCount || 0} ventas procesadas
-              </p>
-              {combinedStats.cancelledAmount > 0 && (
-                <p className="text-xs text-red-500 mt-1">
-                  {formatCurrency(combinedStats.cancelledAmount)} excluidos
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <FaShoppingCart className="text-green-600 text-xl" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Items Vendidos</p>
-              <p className="text-2xl font-bold text-gray-800">
-                {combinedStats.totalItems}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                En {combinedStats.totalOrders} órdenes
-              </p>
-              {combinedStats.cancelledItems > 0 && (
-                <p className="text-xs text-red-500 mt-1">
-                  {combinedStats.cancelledItems} cancelados
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <FaUtensils className="text-orange-600 text-xl" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Órdenes Activas</p>
-              <p className="text-2xl font-bold text-gray-800">
-                {combinedStats.activeOrders}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                En {combinedStats.activeTables} mesas
-              </p>
+      {/* Estadísticas Principales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+        {[
+          {
+            label: "Ingresos Totales",
+            value: formatCurrency(combinedStats.totalRevenue),
+            sub: `${salesSummary?.saleCount || 0} ventas procesadas`,
+            note: combinedStats.cancelledAmount > 0 ? `${formatCurrency(combinedStats.cancelledAmount)} excluidos` : null,
+            noteColor: "text-red-500",
+            iconBg: "bg-[var(--color-accent-light)]",
+            iconColor: "text-[var(--color-accent)]",
+            icon: <FaDollarSign className="text-[18px]" />,
+          },
+          {
+            label: "Items Vendidos",
+            value: String(combinedStats.totalItems),
+            sub: `En ${combinedStats.totalOrders} órdenes`,
+            note: combinedStats.cancelledItems > 0 ? `${combinedStats.cancelledItems} cancelados` : null,
+            noteColor: "text-red-500",
+            iconBg: "bg-emerald-50",
+            iconColor: "text-emerald-600",
+            icon: <FaShoppingCart className="text-[18px]" />,
+          },
+          {
+            label: "Órdenes Activas",
+            value: String(combinedStats.activeOrders),
+            sub: `En ${combinedStats.activeTables} mesas`,
+            note: null,
+            noteColor: "",
+            iconBg: "bg-amber-50",
+            iconColor: "text-amber-500",
+            icon: <FaUtensils className="text-[18px]" />,
+          },
+          {
+            label: "Satisfacción Clientes",
+            value: `${feedbackStats.averageRating.toFixed(1)}/5`,
+            sub: `${feedbackStats.total} encuestas`,
+            note: null,
+            noteColor: "",
+            iconBg: "bg-purple-50",
+            iconColor: "text-purple-600",
+            icon: <FaStar className="text-[18px]" />,
+          },
+        ].map((stat, i) => (
+          <div key={i} className="bg-white border border-slate-200 rounded-[14px] p-4">
+            <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">{stat.label}</p>
+            <div className="flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-[9px] ${stat.iconBg} flex items-center justify-center ${stat.iconColor} flex-shrink-0`}>
+                {stat.icon}
+              </div>
+              <div>
+                <p className="text-[22px] font-extrabold text-slate-900 leading-none">{stat.value}</p>
+                <p className="text-[11px] text-slate-500 mt-1">{stat.sub}</p>
+                {stat.note && <p className={`text-[11px] mt-0.5 ${stat.noteColor}`}>{stat.note}</p>}
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <FaStar className="text-purple-600 text-xl" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Satisfacción Clientes</p>
-              <p className="text-2xl font-bold text-gray-800">
-                {feedbackStats.averageRating.toFixed(1)}
-                <span className="text-sm text-gray-500">/5</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {feedbackStats.total} encuestas
-              </p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Sección de Métodos de Pago - NUEVA con cash, terminal, ticket */}
+      {/* Métodos de Pago */}
       {salesHistory.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <FaDollarSign className="text-green-600" />
+        <div className="bg-white border border-slate-200 rounded-[14px] p-4 mb-5">
+          <p className="text-[15px] font-extrabold text-slate-900 mb-4 flex items-center gap-2">
+            <FaDollarSign className="text-emerald-600" />
             Métodos de Pago Utilizados
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaMoneyBillWave className="text-green-600 text-xl" />
-                <p className="font-semibold text-green-800">Efectivo</p>
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: "Efectivo", count: paymentMethodStats.cash, icon: <FaMoneyBillWave />, bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", val: "text-emerald-600" },
+              { label: "Terminal", count: paymentMethodStats.terminal, icon: <FaCreditCard />, bg: "bg-[var(--color-accent-light)] border-[var(--color-accent-light)]", text: "text-[var(--color-accent-dark)]", val: "text-[var(--color-accent)]" },
+              { label: "Dólares", count: paymentMethodStats.usd, icon: <FaDollarSign />, bg: "bg-amber-50 border-amber-200", text: "text-amber-700", val: "text-amber-600" },
+              { label: "Mixto", count: paymentMethodStats.mixed, icon: <FaDollarSign />, bg: "bg-slate-50 border-slate-200", text: "text-slate-700", val: "text-slate-600" },
+            ].map((m, i) => (
+              <div key={i} className={`text-center p-3.5 rounded-[10px] border ${m.bg}`}>
+                <div className={`flex items-center justify-center gap-1.5 mb-1.5 ${m.text} font-semibold text-sm`}>
+                  {m.icon} {m.label}
+                </div>
+                <p className={`text-[22px] font-extrabold ${m.val}`}>{m.count}</p>
+                <p className={`text-xs ${m.text}`}>
+                  {salesHistory.length > 0 ? Math.round((m.count / salesHistory.length) * 100) : 0}%
+                </p>
               </div>
-              <p className="text-2xl font-bold text-green-600">
-                {paymentMethodStats.cash}
-              </p>
-              <p className="text-sm text-green-700">
-                {salesHistory.length > 0
-                  ? Math.round(
-                      (paymentMethodStats.cash / salesHistory.length) * 100,
-                    )
-                  : 0}
-                %
-              </p>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaCreditCard className="text-blue-600 text-xl" />
-                <p className="font-semibold text-blue-800">Terminal</p>
-              </div>
-              <p className="text-2xl font-bold text-blue-600">
-                {paymentMethodStats.terminal}
-              </p>
-              <p className="text-sm text-blue-700">
-                {salesHistory.length > 0
-                  ? Math.round(
-                      (paymentMethodStats.terminal / salesHistory.length) * 100,
-                    )
-                  : 0}
-                %
-              </p>
-            </div>
-            {/* <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaReceipt className="text-purple-600 text-xl" />
-                <p className="font-semibold text-purple-800">Ticket</p>
-              </div>
-              <p className="text-2xl font-bold text-purple-600">
-                {paymentMethodStats.ticket}
-              </p>
-              <p className="text-sm text-purple-700">
-                {salesHistory.length > 0
-                  ? Math.round(
-                      (paymentMethodStats. / salesHistory.length) * 100,
-                    )
-                  : 0}
-                %
-              </p>
-            </div> */}
-            <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaDollarSign className="text-yellow-600 text-xl" />
-                <p className="font-semibold text-yellow-800">Dólares</p>
-              </div>
-              <p className="text-2xl font-bold text-yellow-600">
-                {paymentMethodStats.usd}
-              </p>
-              <p className="text-sm text-yellow-700">
-                {salesHistory.length > 0
-                  ? Math.round(
-                      (paymentMethodStats.usd / salesHistory.length) * 100,
-                    )
-                  : 0}
-                %
-              </p>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <FaDollarSign className="text-gray-600 text-xl" />
-                <p className="font-semibold text-gray-800">Mixto</p>
-              </div>
-              <p className="text-2xl font-bold text-gray-600">
-                {paymentMethodStats.mixed}
-              </p>
-              <p className="text-sm text-gray-700">
-                {salesHistory.length > 0
-                  ? Math.round(
-                      (paymentMethodStats.mixed / salesHistory.length) * 100,
-                    )
-                  : 0}
-                %
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Sección de Encuestas de Satisfacción */}
-      <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <FaStar className="text-yellow-500" />
-            Encuestas de Satisfacción
-          </h3>
-          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-            {loadingFeedback
-              ? "Cargando..."
-              : `${feedbackStats.total} encuestas`}
+      {/* Encuestas de Satisfacción */}
+      <div className="bg-white border border-slate-200 rounded-[14px] p-4 mb-5">
+        <div className="flex justify-between items-center mb-4">
+          <p className="text-[15px] font-extrabold text-slate-900 flex items-center gap-2">
+            <FaStar className="text-amber-500" /> Encuestas de Satisfacción
+          </p>
+          <span className="text-xs text-slate-500">
+            {loadingFeedback ? "Cargando..." : `${feedbackStats.total} encuestas`}
           </span>
         </div>
 
         {customerFeedback.length > 0 ? (
           <div className="space-y-4">
-            {/* Distribución de calificaciones */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <h4 className="font-semibold text-gray-700 mb-3">
-                Distribución de Calificaciones
-              </h4>
+            <div>
+              <p className="text-sm font-semibold text-slate-700 mb-3">Distribución de Calificaciones</p>
               <div className="space-y-2">
-                {feedbackStats.ratingDistribution.map(
-                  ({ rating, count, percentage }) => (
-                    <div key={rating} className="flex items-center gap-3">
-                      <div className="flex items-center gap-1 w-16">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <FaStar
-                            key={star}
-                            className={`text-sm ${
-                              star <= rating
-                                ? "text-yellow-500 fill-current"
-                                : "text-gray-300"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex-1 bg-gray-200 rounded-full h-3">
+                {[5,4,3,2,1].map((star) => {
+                  const item = feedbackStats.ratingDistribution.find(r => r.rating === star)!;
+                  return (
+                    <div key={star} className="flex items-center gap-2.5">
+                      <span className="text-amber-500 text-xs w-[60px] flex-shrink-0">{"★".repeat(star)}{"☆".repeat(5-star)}</span>
+                      <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
                         <div
-                          className="bg-yellow-500 h-3 rounded-full transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        ></div>
+                          className="bg-amber-400 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${item?.percentage || 0}%` }}
+                        />
                       </div>
-                      <div className="text-sm text-gray-600 w-16 text-right">
-                        {count} ({percentage.toFixed(0)}%)
-                      </div>
+                      <span className="text-[11px] text-slate-500 w-[50px] text-right flex-shrink-0">
+                        {item?.count || 0} ({(item?.percentage || 0).toFixed(0)}%)
+                      </span>
                     </div>
-                  ),
-                )}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Lista de encuestas */}
-            <div className="space-y-3 max-h-80 overflow-y-auto">
+            <div className="space-y-2.5 max-h-80 overflow-y-auto">
               {customerFeedback.map((feedback) => (
                 <button
                   key={feedback.id}
                   onClick={() => showFeedbackDetails(feedback)}
-                  className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer"
+                  className="w-full text-left p-3.5 border border-slate-200 rounded-[12px] hover:bg-[var(--color-accent-light)] hover:border-[var(--color-accent-light)] transition"
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <FaUser className="text-blue-600 text-sm" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {feedback.customer_name}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Mesa {feedback.table_id} • {feedback.order_count}{" "}
-                            órdenes • {formatCurrency(feedback.total_amount)}
-                          </p>
-                        </div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex gap-2.5 items-center">
+                      <div className="w-8 h-8 rounded-[8px] bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0">
+                        <FaUser className="text-xs" />
                       </div>
-                      {feedback.comment && (
-                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                          {feedback.comment}
-                        </p>
-                      )}
+                      <div>
+                        <p className="text-[13px] font-bold text-slate-900">{feedback.customer_name}</p>
+                        <p className="text-[11px] text-slate-500">Mesa {feedback.table_id} · {feedback.order_count} órden(es) · {formatCurrency(feedback.total_amount)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div
-                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border ${getRatingColor(
-                          feedback.rating,
-                        )}`}
-                      >
-                        <FaStar className="text-sm" />
-                        <span className="font-semibold">{feedback.rating}</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatDateTime(feedback.created_at)}
-                      </p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`px-2.5 py-1 rounded-[6px] text-xs font-bold flex items-center gap-1 ${getRatingColor(feedback.rating)}`}>
+                        <FaStar className="text-[10px]" /> {feedback.rating}
+                      </span>
+                      <span className="text-[11px] text-slate-500">{formatDateTime(feedback.created_at)}</span>
                     </div>
                   </div>
+                  {feedback.comment && (
+                    <p className="text-xs text-slate-500 mt-2 ml-10 line-clamp-2">{feedback.comment}</p>
+                  )}
                 </button>
               ))}
             </div>
           </div>
         ) : (
           <div className="text-center py-8">
-            <FaStar className="text-4xl text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">
-              No hay encuestas de satisfacción para esta fecha
-            </p>
+            <FaStar className="text-4xl text-slate-200 mx-auto" />
+            <p className="text-slate-500 text-sm mt-2">No hay encuestas de satisfacción para esta fecha</p>
           </div>
         )}
       </div>
 
-      {/* Vista previa de productos vendidos CORREGIDA CON CANCELADOS */}
+      {/* Productos Vendidos */}
       {salesItems.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <FaShoppingCart className="text-green-600" />
-              Productos Vendidos ({cancelledStats.totalActiveQuantity} items
-              activos)
-            </h3>
-            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {loadingItems
-                ? "Cargando..."
-                : `${getGroupedProducts().length} productos diferentes`}
+        <div className="bg-white border border-slate-200 rounded-[14px] p-4 mb-5">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-[15px] font-extrabold text-slate-900 flex items-center gap-2">
+              <FaShoppingCart className="text-emerald-600" />
+              Productos Vendidos ({cancelledStats.totalActiveQuantity} activos)
+            </p>
+            <span className="text-xs text-slate-500">
+              {loadingItems ? "Cargando..." : `${getGroupedProducts().length} productos`}
             </span>
           </div>
 
           {cancelledStats.totalCancelledQuantity > 0 && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2 text-red-700">
-                <FaBan className="text-red-600" />
-                <p className="text-sm font-medium">
-                  {cancelledStats.totalCancelledQuantity} unidad(es)
-                  cancelada(s) -{" "}
-                  {formatCurrency(cancelledStats.totalCancelledAmount)}{" "}
-                  excluido(s)
-                </p>
-              </div>
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-[10px] flex items-center gap-2 text-red-700 text-xs font-semibold">
+              <FaBan />
+              {cancelledStats.totalCancelledQuantity} cancelado(s) — {formatCurrency(cancelledStats.totalCancelledAmount)} excluidos
             </div>
           )}
 
@@ -2117,276 +1963,146 @@ export default function Dashboard({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700">
-                    Producto
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold text-gray-700">
-                    Precio
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold text-gray-700">
-                    Cant. Activa
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold text-gray-700">
-                    Cant. Cancelada
-                  </th>
-                  <th className="px-4 py-2 text-right font-semibold text-gray-700">
-                    Subtotal
-                  </th>
-                  <th className="px-4 py-2 text-center font-semibold text-gray-700">
-                    Tipo
-                  </th>
+                  {["Producto","Precio","Cant. Activa","Cant. Cancelada","Subtotal","Tipo"].map((h,i) => (
+                    <th key={i} className={`px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide ${i===0?"text-left":"text-right"} ${i===5?"text-center":""}`}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {getGroupedProducts()
-                  .slice(0, 10)
-                  .map((product, index) => (
-                    <tr
-                      key={index}
-                      className={`border-b border-gray-100 ${
-                        product.isExtra
-                          ? "bg-blue-50"
-                          : product.hasExtras
-                            ? "bg-green-50"
-                            : ""
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-gray-800">
-                        {product.product_name}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
-                        {formatCurrency(product.price)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
-                        {product.activeQuantity}
-                      </td>
-                      <td className="px-4 py-3 text-right text-red-600">
-                        {product.cancelledQuantity > 0
-                          ? product.cancelledQuantity
-                          : "-"}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-green-600">
-                        {formatCurrency(product.activeSubtotal)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs ${
-                            product.isExtra
-                              ? "bg-blue-100 text-blue-800"
-                              : product.hasExtras
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {product.isExtra
-                            ? "Extra"
-                            : product.hasExtras
-                              ? "Con Extras"
-                              : "Producto"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                {getGroupedProducts().slice(0, 10).map((product, index) => (
+                  <tr
+                    key={index}
+                    className={`border-b border-slate-100 transition-colors hover:bg-gray-50 ${
+                      product.isExtra ? "bg-[var(--color-accent-light)]/60" : product.hasExtras ? "bg-emerald-50/60" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-slate-800 font-medium text-xs">{product.product_name}</td>
+                    <td className="px-4 py-3 text-right text-slate-700 text-xs">{formatCurrency(product.price)}</td>
+                    <td className="px-4 py-3 text-right text-slate-700 text-xs">{product.activeQuantity}</td>
+                    <td className="px-4 py-3 text-right text-red-600 text-xs">{product.cancelledQuantity > 0 ? product.cancelledQuantity : "—"}</td>
+                    <td className="px-4 py-3 text-right font-bold text-emerald-600 text-xs">{formatCurrency(product.activeSubtotal)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-[5px] text-[10px] font-bold ${
+                        product.isExtra ? "bg-[var(--color-accent-light)] text-[var(--color-accent-dark)]" : product.hasExtras ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {product.isExtra ? "Extra" : product.hasExtras ? "Con Extras" : "Producto"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             {getGroupedProducts().length > 10 && (
-              <p className="text-sm text-gray-500 mt-3 text-center">
-                Mostrando 10 de {getGroupedProducts().length} productos. Exporta
-                el Excel o PDF para ver todos.
+              <p className="text-xs text-slate-500 mt-3 text-center">
+                Mostrando 10 de {getGroupedProducts().length} productos. Exporta Excel o PDF para ver todos.
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Detalle de Ventas Históricas CORREGIDO */}
+      {/* Ventas Procesadas */}
       {salesSummary && salesSummary.saleCount > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <FaDollarSign className="text-green-600" />
+        <div className="bg-white border border-slate-200 rounded-[14px] p-4 mb-5">
+          <p className="text-[15px] font-extrabold text-slate-900 mb-4 flex items-center gap-2">
+            <FaDollarSign className="text-emerald-600" />
             Ventas Procesadas (Cobradas)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <p className="font-semibold text-green-800">Total Cobrado</p>
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(calculateTotalCollected())}
-              </p>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="font-semibold text-blue-800">Transacciones</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {salesSummary.saleCount}
-              </p>
-            </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <p className="font-semibold text-orange-800">Items Vendidos</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {salesSummary.totalItems}
-              </p>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <p className="font-semibold text-purple-800">
-                Órdenes Procesadas
-              </p>
-              <p className="text-2xl font-bold text-purple-600">
-                {salesSummary.totalOrders}
-              </p>
-            </div>
-            <div className="text-center p-4 bg-indigo-50 rounded-lg">
-              <p className="font-semibold text-indigo-800">Ticket Promedio</p>
-              <p className="text-2xl font-bold text-indigo-600">
-                {formatCurrency(salesSummary.averageSale)}
-              </p>
-            </div>
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+            {[
+              { label: "Total Cobrado", value: formatCurrency(calculateTotalCollected()), bg: "bg-emerald-50", text: "text-emerald-700", val: "text-emerald-600" },
+              { label: "Transacciones", value: String(salesSummary.saleCount), bg: "bg-[var(--color-accent-light)]", text: "text-[var(--color-accent-dark)]", val: "text-[var(--color-accent)]" },
+              { label: "Items Vendidos", value: String(salesSummary.totalItems), bg: "bg-amber-50", text: "text-amber-700", val: "text-amber-600" },
+              { label: "Órdenes", value: String(salesSummary.totalOrders), bg: "bg-purple-50", text: "text-purple-700", val: "text-purple-600" },
+              { label: "Ticket Promedio", value: formatCurrency(salesSummary.averageSale), bg: "bg-[var(--color-accent-light)]", text: "text-[var(--color-accent-dark)]", val: "text-[var(--color-accent)]" },
+            ].map((s, i) => (
+              <div key={i} className={`text-center p-3 ${s.bg} rounded-[10px]`}>
+                <p className={`text-xs font-semibold ${s.text} mb-1`}>{s.label}</p>
+                <p className={`text-lg font-extrabold ${s.val}`}>{s.value}</p>
+              </div>
+            ))}
           </div>
 
-          {/* Lista de ventas históricas */}
-          <div className="mt-6">
-            <h4 className="font-semibold text-gray-700 mb-3">
-              Detalle de Ventas (Click para ver ticket):
-            </h4>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {salesHistory.map((sale) => (
-                <button
-                  key={sale.id}
-                  onClick={() => loadTicketItems(sale)}
-                  disabled={loadingTicket}
-                  className="w-full text-left flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${getPaymentMethodColor(
-                        sale.payment_method,
-                      )}`}
-                    >
-                      {getPaymentMethodIcon(sale.payment_method)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        Mesa {sale.table_number}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {sale.customer_name || "Invitado"} • {sale.order_count}{" "}
-                        órdenes • {sale.item_count} items
-                      </p>
-                    </div>
+          <p className="text-xs font-semibold text-slate-600 mb-2">Detalle de Ventas (click para ver ticket):</p>
+          <div className="space-y-1.5 max-h-60 overflow-y-auto">
+            {salesHistory.map((sale) => (
+              <button
+                key={sale.id}
+                onClick={() => loadTicketItems(sale)}
+                disabled={loadingTicket}
+                className="w-full text-left flex justify-between items-center p-3 border border-slate-200 rounded-[10px] hover:bg-[var(--color-accent-light)] hover:border-[var(--color-accent-light)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-[8px] flex items-center justify-center border ${getPaymentMethodColor(sale.payment_method)}`}>
+                    {getPaymentMethodIcon(sale.payment_method)}
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-green-600">
-                      {formatCurrency(sale.total_amount)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(sale.closed_at).toLocaleTimeString("es-MX")}
-                    </p>
-                    <p className="text-xs font-medium mt-1">
-                      {getPaymentMethodText(sale.payment_method)}
-                    </p>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Mesa {sale.table_number}</p>
+                    <p className="text-[11px] text-slate-500">{sale.customer_name || "Invitado"} · {sale.order_count} órd. · {sale.item_count} items</p>
                   </div>
-                </button>
-              ))}
-            </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-emerald-600">{formatCurrency(sale.total_amount)}</p>
+                  <p className="text-[10px] text-slate-500">{new Date(sale.closed_at).toLocaleTimeString("es-MX")}</p>
+                  <p className="text-[10px] font-semibold text-slate-600 mt-0.5">{getPaymentMethodText(sale.payment_method)}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* MODAL DE DETALLES DE ENCUESTA */}
+      {/* Modal Encuesta */}
       {showFeedbackModal && selectedFeedback && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                  <FaStar className="text-yellow-500" />
-                  Detalles de Encuesta
-                </h2>
-                <button
-                  onClick={() => setShowFeedbackModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FaUser className="text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      {selectedFeedback.customer_name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Mesa {selectedFeedback.table_id}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  className={`p-4 rounded-lg border ${getRatingColor(
-                    selectedFeedback.rating,
-                  )}`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">Calificación</span>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <FaStar
-                          key={star}
-                          className={`text-lg ${
-                            star <= selectedFeedback.rating
-                              ? "text-yellow-500 fill-current"
-                              : "text-gray-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium">
-                    {getRatingText(selectedFeedback.rating)}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-gray-600">Órdenes</p>
-                    <p className="font-semibold text-gray-800">
-                      {selectedFeedback.order_count}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-gray-600">Total Gastado</p>
-                    <p className="font-semibold text-green-600">
-                      {formatCurrency(selectedFeedback.total_amount)}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedFeedback.comment && (
-                  <div>
-                    <p className="font-semibold text-gray-700 mb-2">
-                      Comentario:
-                    </p>
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                      <p className="text-gray-700 italic">
-                        {selectedFeedback.comment}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="text-sm text-gray-500">
-                  <p>Fecha: {formatDateTime(selectedFeedback.created_at)}</p>
-                </div>
-              </div>
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4" onClick={() => setShowFeedbackModal(false)}>
+          <div className="bg-white rounded-[18px] shadow-2xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <p className="text-base font-extrabold text-slate-900 flex items-center gap-2"><FaStar className="text-amber-500" /> Detalles de Encuesta</p>
+              <button onClick={() => setShowFeedbackModal(false)} className="p-1 text-slate-400 hover:text-slate-600"><FaTimes /></button>
             </div>
-
-            <div className="p-6 border-t bg-gray-50 rounded-b-2xl">
-              <button
-                onClick={() => setShowFeedbackModal(false)}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition"
-              >
+            <div className="p-5 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-slate-100 rounded-[8px] flex items-center justify-center text-slate-600 flex-shrink-0">
+                  <FaUser />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{selectedFeedback.customer_name}</p>
+                  <p className="text-xs text-slate-500">Mesa {selectedFeedback.table_id}</p>
+                </div>
+              </div>
+              <div className={`p-3.5 rounded-[10px] border ${getRatingColor(selectedFeedback.rating)}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold">Calificación</span>
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(star => (
+                      <FaStar key={star} className={`text-base ${star <= selectedFeedback.rating ? "text-amber-500" : "text-gray-300"}`} />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs font-semibold">{getRatingText(selectedFeedback.rating)}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 p-3 rounded-[10px]">
+                  <p className="text-[11px] text-slate-500">Órdenes</p>
+                  <p className="text-sm font-bold text-slate-900">{selectedFeedback.order_count}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-[10px]">
+                  <p className="text-[11px] text-slate-500">Total Gastado</p>
+                  <p className="text-sm font-bold text-emerald-600">{formatCurrency(selectedFeedback.total_amount)}</p>
+                </div>
+              </div>
+              {selectedFeedback.comment && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-1.5">Comentario:</p>
+                  <div className="bg-[var(--color-accent-light)] p-3 rounded-[10px] border border-[var(--color-accent-light)]">
+                    <p className="text-xs text-slate-700 italic">{selectedFeedback.comment}</p>
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-500">Fecha: {formatDateTime(selectedFeedback.created_at)}</p>
+            </div>
+            <div className="p-4 border-t border-slate-200 bg-gray-50">
+              <button onClick={() => setShowFeedbackModal(false)} className="w-full bg-[var(--color-accent)] text-white py-2.5 rounded-[9px] text-sm font-bold hover:brightness-90 transition">
                 Cerrar
               </button>
             </div>
@@ -2394,125 +2110,71 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* MODAL DEL TICKET */}
+      {/* Modal Ticket */}
       {showTicketModal && selectedTicket && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b sticky top-0 bg-white z-10">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                  <FaReceipt className="text-blue-600" />
-                  Ticket de Venta
-                </h2>
-                <button
-                  onClick={() => setShowTicketModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  <FaTimes />
-                </button>
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4" onClick={() => setShowTicketModal(false)}>
+          <div className="bg-white rounded-[18px] shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <FaReceipt className="text-[var(--color-accent)]" /> Ticket de Venta
+                </p>
+                <button onClick={() => setShowTicketModal(false)} className="p-1 text-slate-400 hover:text-slate-600"><FaTimes /></button>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-3 text-xs mb-3">
                 <div>
-                  <p>
-                    <strong>Mesa:</strong> {selectedTicket.sale.table_number}
-                  </p>
-                  <p>
-                    <strong>Cliente:</strong>{" "}
-                    {selectedTicket.sale.customer_name || "Invitado"}
-                  </p>
+                  <p><span className="font-semibold">Mesa:</span> {selectedTicket.sale.table_number}</p>
+                  <p><span className="font-semibold">Cliente:</span> {selectedTicket.sale.customer_name || "Invitado"}</p>
                 </div>
                 <div>
-                  <p>
-                    <strong>Fecha:</strong>{" "}
-                    {formatDateTime(selectedTicket.sale.closed_at)}
-                  </p>
-                  <p>
-                    <strong>Total:</strong>{" "}
-                    {formatCurrency(selectedTicket.sale.total_amount)}
-                  </p>
+                  <p><span className="font-semibold">Fecha:</span> {formatDateTime(selectedTicket.sale.closed_at)}</p>
+                  <p><span className="font-semibold">Total:</span> {formatCurrency(selectedTicket.sale.total_amount)}</p>
                 </div>
               </div>
-
-              {/* MÉTODO DE PAGO EN EL MODAL */}
-              <div
-                className={`mt-3 p-3 rounded-lg border ${getPaymentMethodColor(
-                  selectedTicket.sale.payment_method,
-                )}`}
-              >
-                <div className="flex items-center gap-2">
-                  {getPaymentMethodIcon(selectedTicket.sale.payment_method)}
-                  <span className="font-semibold">Método de Pago:</span>
-                  <span>
-                    {getPaymentMethodText(selectedTicket.sale.payment_method)}
-                  </span>
-                </div>
+              <div className={`p-2.5 rounded-[9px] border text-xs flex items-center gap-2 font-semibold ${getPaymentMethodColor(selectedTicket.sale.payment_method)}`}>
+                {getPaymentMethodIcon(selectedTicket.sale.payment_method)}
+                Método de Pago: {getPaymentMethodText(selectedTicket.sale.payment_method)}
               </div>
             </div>
 
-            <div className="p-6">
-              <h3 className="font-semibold text-gray-800 mb-4">Productos:</h3>
-              <div className="space-y-3">
+            <div className="p-5">
+              <p className="text-xs font-semibold text-slate-700 mb-3">Productos:</p>
+              <div className="space-y-2.5">
                 {selectedTicket.items.map((item) => {
                   const cancelledQty = item.cancelled_quantity || 0;
                   const activeQuantity = item.quantity - cancelledQty;
                   const processedExtras = processExtrasFromNotes(item.notes);
-
-                  // Solo mostrar items con cantidad activa
                   if (activeQuantity === 0) return null;
-
                   return (
                     <div key={item.id}>
-                      {/* Producto principal */}
-                      <div className="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
+                      <div className="flex justify-between items-center p-3 border border-slate-200 rounded-[10px]">
                         <div className="flex-1">
-                          <p className="font-medium text-gray-800">
+                          <p className="text-xs font-semibold text-slate-900">
                             {item.product_name}
                             {cancelledQty > 0 && (
-                              <span className="text-sm text-red-600 ml-2">
-                                (de {item.quantity}, {cancelledQty}{" "}
-                                cancelada(s))
-                              </span>
+                              <span className="text-red-600 font-normal ml-2">(de {item.quantity}, {cancelledQty} cancelada(s))</span>
                             )}
                           </p>
                           {item.notes && !processedExtras.hasExtras && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              <strong>Nota:</strong> {item.notes}
-                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5"><span className="font-semibold">Nota:</span> {item.notes}</p>
                           )}
                         </div>
                         <div className="text-right">
-                          <p className="text-gray-800">
-                            {activeQuantity} × {formatCurrency(item.price)}
-                          </p>
-                          <p className="font-semibold text-green-600">
-                            {formatCurrency(item.price * activeQuantity)}
-                          </p>
+                          <p className="text-xs text-slate-600">{activeQuantity} × {formatCurrency(item.price)}</p>
+                          <p className="text-xs font-bold text-emerald-600">{formatCurrency(item.price * activeQuantity)}</p>
                         </div>
                       </div>
-
-                      {/* Mostrar extras si existen */}
                       {processedExtras.hasExtras && (
-                        <div className="ml-4 mt-2 space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-blue-600">
-                            <FaPlus className="text-xs" />
-                            <span className="font-medium">
-                              Extras incluidos:
-                            </span>
+                        <div className="ml-3 mt-1.5 space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-accent)] font-semibold">
+                            <FaPlus className="text-[10px]" /> Extras incluidos:
                           </div>
-                          {processedExtras.extrasList.map((extra, index) => {
-                            return (
-                              <div
-                                key={index}
-                                className="flex justify-between items-center text-sm text-gray-600 ml-4"
-                              >
-                                <span>• {extra.name}</span>
-                                <span className="text-green-600">
-                                  {activeQuantity} ×{" "}
-                                  {formatCurrency(extra.price)}
-                                </span>
-                              </div>
-                            );
-                          })}
+                          {processedExtras.extrasList.map((extra, index) => (
+                            <div key={index} className="flex justify-between items-center text-[11px] text-slate-500 ml-3">
+                              <span>• {extra.name}</span>
+                              <span className="text-emerald-600">{activeQuantity} × {formatCurrency(extra.price)}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -2520,47 +2182,29 @@ export default function Dashboard({
                 })}
               </div>
 
-              {/* Cálculos de totales en el modal */}
-              <div className="mt-6 pt-4 border-t border-gray-300">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>
-                      {formatCurrency(selectedTicket.sale.total_amount / 1.08)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>IVA (8%):</span>
-                    <span>
-                      {formatCurrency(
-                        (selectedTicket.sale.total_amount * 0.08) / 1.08,
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
-                    <span>TOTAL:</span>
-                    {formatCurrency(selectedTicket.sale.total_amount)}
-                  </div>
+              <div className="mt-5 pt-4 border-t border-slate-200 space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(selectedTicket.sale.total_amount / 1.08)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>IVA (8%):</span>
+                  <span>{formatCurrency((selectedTicket.sale.total_amount * 0.08) / 1.08)}</span>
+                </div>
+                <div className="flex justify-between text-base font-extrabold text-slate-900 border-t border-slate-200 pt-2">
+                  <span>TOTAL:</span>
+                  <span>{formatCurrency(selectedTicket.sale.total_amount)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t bg-gray-50 rounded-b-2xl">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowTicketModal(false)}
-                  className="flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition"
-                >
-                  Cerrar
-                </button>
-                <button
-                  onClick={() => generateTicketPDF(selectedTicket)}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                >
-                  <FaReceipt />
-                  Imprimir PDF
-                </button>
-              </div>
+            <div className="p-4 border-t border-slate-200 bg-gray-50 rounded-b-[18px] flex gap-2.5">
+              <button onClick={() => setShowTicketModal(false)} className="flex-1 py-2.5 rounded-[9px] border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+                Cerrar
+              </button>
+              <button onClick={() => generateTicketPDF(selectedTicket)} className="flex-1 bg-[var(--color-accent)] text-white py-2.5 rounded-[9px] text-sm font-bold hover:brightness-90 transition flex items-center justify-center gap-2">
+                <FaReceipt /> Imprimir PDF
+              </button>
             </div>
           </div>
         </div>
