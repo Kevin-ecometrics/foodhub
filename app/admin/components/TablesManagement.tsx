@@ -476,122 +476,129 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: oklch(97% 0.005 80);
             min-height: 100vh;
             display: flex;
-            justify-content: center; 
-            align-items: center; 
-            padding: 20px;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
           }
-          .qr-container {
-            text-align: center;
+          .card {
             background: white;
-            padding: 30px;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            max-width: 400px;
+            border: 1.5px solid oklch(92% 0.01 260);
+            box-shadow: 0 4px 32px oklch(0% 0 0 / 0.08);
+            max-width: 380px;
             width: 100%;
+            overflow: hidden;
           }
-          .header {
+          .card-header {
+            background: oklch(62% 0.18 32);
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .header-icon {
+            width: 38px; height: 38px;
+            background: oklch(96% 0.05 32 / 0.25);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+          }
+          .header-title { color: white; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+          .header-sub { color: oklch(96% 0.05 32 / 0.75); font-size: 12px; margin-top: 1px; }
+          .card-body { padding: 24px; display: flex; flex-direction: column; align-items: center; }
+          .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: oklch(96% 0.05 32); color: oklch(50% 0.18 32);
+            padding: 5px 14px; border-radius: 999px;
+            font-size: 12px; font-weight: 700;
+            margin-bottom: 20px; align-self: center;
+          }
+          .qr-wrap {
+            background: oklch(98.5% 0.005 80);
+            border: 1.5px solid oklch(90% 0.01 260);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
           }
-          .header h1 {
-            color: #333;
-            font-size: 24px;
-            margin-bottom: 5px;
-          }
-          .header p {
-            color: #666;
-            font-size: 16px;
-          }
-          .qr-image {
+          .qr-wrap img { width: 220px; height: 220px; display: block; border-radius: 8px; }
+          .steps {
+            background: oklch(98% 0.005 80);
+            border: 1.5px solid oklch(91% 0.01 260);
+            border-radius: 12px;
+            padding: 14px 16px;
+            text-align: left;
+            margin-bottom: 20px;
             width: 100%;
-            max-width: 300px;
-            height: auto;
-            border: 2px solid #f0f0f0;
-            border-radius: 10px;
-            margin: 0 auto;
           }
-          .instruction {
-            margin-top: 20px;
-            color: #666;
-            font-size: 14px;
-            line-height: 1.5;
+          .steps-title { font-size: 11px; font-weight: 700; color: oklch(45% 0.02 260); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+          .step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+          .step:last-child { margin-bottom: 0; }
+          .step-num {
+            width: 20px; height: 20px; border-radius: 6px;
+            background: oklch(62% 0.18 32); color: white;
+            font-size: 10px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
           }
-          .table-number {
-            background: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            display: inline-block;
-            margin-bottom: 15px;
-          }
-          .actions {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-          }
+          .step-text { font-size: 12px; color: oklch(40% 0.02 260); line-height: 1.5; padding-top: 2px; }
+          .actions { display: flex; gap: 10px; width: 100%; }
           .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
+            flex: 1; padding: 12px; border: none; border-radius: 12px;
+            cursor: pointer; font-size: 13px; font-weight: 700;
+            transition: opacity 0.15s; letter-spacing: -0.1px;
           }
-          .btn-download {
-            background: #2196F3;
-            color: white;
-          }
-          .btn-download:hover {
-            background: #1976D2;
-          }
-          .btn-close {
-            background: #f5f5f5;
-            color: #333;
-          }
-          .btn-close:hover {
-            background: #e0e0e0;
+          .btn:hover { opacity: 0.88; }
+          .btn-primary { background: oklch(62% 0.18 32); color: white; }
+          .btn-secondary {
+            background: oklch(98% 0.005 80);
+            color: oklch(40% 0.02 260);
+            border: 1.5px solid oklch(88% 0.01 260);
           }
         </style>
       </head>
       <body>
-        <div class="qr-container">
-          <div class="header">
-            ${
-              tableNumber
-                ? `<div class="table-number">Mesa ${tableNumber}</div>`
-                : ""
-            }
-            <h1>Código QR</h1>
-            <p>Para pedir desde tu mesa</p>
+        <div class="card">
+          <div class="card-header">
+            <div class="header-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="5" y="5" width="3" height="3" fill="white" stroke="none"/>
+                <rect x="16" y="5" width="3" height="3" fill="white" stroke="none"/>
+                <rect x="5" y="16" width="3" height="3" fill="white" stroke="none"/>
+                <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+              </svg>
+            </div>
+            <div>
+              <div class="header-title">Código QR</div>
+              <div class="header-sub">ScanEat — Escanea para ordenar</div>
+            </div>
           </div>
-          
-          <img src="${imageUrl}" alt="QR Code" class="qr-image" />
-          
-          <div class="instruction">
-            <strong>¿Cómo usar?</strong><br>
-            1. Abre la cámara de tu teléfono<br>
-            2. Escanea el código QR<br>
-            3. Realiza tu pedido directamente
-          </div>
-          
-          <div class="actions">
-            <button class="btn btn-download" onclick="downloadQR()">Descargar QR</button>
-            <button class="btn btn-close" onclick="window.close()">Cerrar</button>
+          <div class="card-body">
+            ${tableNumber ? `<div class="badge">Mesa ${tableNumber}</div>` : ""}
+            <div class="qr-wrap">
+              <img src="${imageUrl}" alt="QR Code" />
+            </div>
+            <div class="steps">
+              <div class="steps-title">¿Cómo usar?</div>
+              <div class="step"><div class="step-num">1</div><div class="step-text">Abre la cámara de tu teléfono</div></div>
+              <div class="step"><div class="step-num">2</div><div class="step-text">Apunta al código QR</div></div>
+              <div class="step"><div class="step-num">3</div><div class="step-text">Realiza tu pedido directamente</div></div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" onclick="downloadQR()">Descargar QR</button>
+              <button class="btn btn-secondary" onclick="window.close()">Cerrar</button>
+            </div>
           </div>
         </div>
-
         <script>
           function downloadQR() {
             const link = document.createElement('a');
@@ -632,16 +639,37 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   // FALLBACK: Mostrar en la misma ventana si no se puede abrir nueva
   const showQRInCurrentWindow = (imageUrl: string, tableNumber?: number) => {
     const htmlContent = `
-    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:10000;">
-      <div style="background:white;padding:30px;border-radius:15px;text-align:center;max-width:400px;margin:20px;">
-        <h2 style="color:#333;margin-bottom:15px;">QR Code - Mesa ${
-          tableNumber || ""
-        }</h2>
-        <img src="${imageUrl}" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:10px;" />
-        <p style="color:#666;margin:15px 0;">Escanea el código QR con tu cámara</p>
-        <button onclick="this.parentElement.parentElement.remove()" style="background:#2196F3;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">
-          Cerrar
-        </button>
+    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:oklch(0% 0 0 / 0.55);backdrop-filter:blur(4px);display:flex;justify-content:center;align-items:center;z-index:10000;padding:20px;" onclick="if(event.target===this)this.remove()">
+      <div style="background:white;border-radius:20px;border:1.5px solid oklch(92% 0.01 260);box-shadow:0 8px 40px oklch(0% 0 0 / 0.14);max-width:360px;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <div style="background:oklch(62% 0.18 32);padding:18px 22px;display:flex;align-items:center;gap:12px;">
+          <div style="width:36px;height:36px;background:oklch(96% 0.05 32 / 0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="5" y="5" width="3" height="3" fill="white" stroke="none"/><rect x="16" y="5" width="3" height="3" fill="white" stroke="none"/><rect x="5" y="16" width="3" height="3" fill="white" stroke="none"/>
+              <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+            </svg>
+          </div>
+          <div>
+            <div style="color:white;font-size:15px;font-weight:800;letter-spacing:-0.3px;">Código QR${tableNumber ? ` — Mesa ${tableNumber}` : ""}</div>
+            <div style="color:oklch(96% 0.05 32 / 0.75);font-size:11px;margin-top:1px;">ScanEat — Escanea para ordenar</div>
+          </div>
+        </div>
+        <div style="padding:22px;text-align:center;">
+          <div style="background:oklch(98.5% 0.005 80);border:1.5px solid oklch(90% 0.01 260);border-radius:14px;padding:14px;display:inline-block;margin-bottom:18px;">
+            <img src="${imageUrl}" style="width:210px;height:210px;display:block;border-radius:8px;" alt="QR Code" />
+          </div>
+          <div style="background:oklch(98% 0.005 80);border:1.5px solid oklch(91% 0.01 260);border-radius:12px;padding:13px 15px;text-align:left;margin-bottom:18px;">
+            <div style="font-size:10px;font-weight:700;color:oklch(45% 0.02 260);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:9px;">¿Cómo usar?</div>
+            ${["Abre la cámara de tu teléfono","Apunta al código QR","Realiza tu pedido directamente"].map((t,i)=>`
+            <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:${i<2?7:0}px;">
+              <div style="width:19px;height:19px;border-radius:6px;background:oklch(62% 0.18 32);color:white;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</div>
+              <div style="font-size:12px;color:oklch(40% 0.02 260);line-height:1.5;padding-top:2px;">${t}</div>
+            </div>`).join("")}
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button onclick="this.closest('[onclick]').remove()" style="flex:1;padding:11px;border:1.5px solid oklch(88% 0.01 260);border-radius:11px;background:oklch(98% 0.005 80);color:oklch(40% 0.02 260);font-size:13px;font-weight:700;cursor:pointer;">Cerrar</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
