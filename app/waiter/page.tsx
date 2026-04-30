@@ -63,31 +63,128 @@ function PasswordModal({
   if (!isOpen) return null;
 
   return (
-    <div onClick={handleClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900,padding:16,animation:"wr-fadein 0.2s ease" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:16,padding:28,maxWidth:360,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.25)",animation:"wr-scalein 0.22s ease" }}>
-        <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",marginBottom:4 }}>Confirmar Cancelación</p>
-        <p style={{ fontSize:13,color:"var(--muted)",marginBottom:20,lineHeight:1.5 }}>Ingrese la contraseña para confirmar la cancelación del producto.</p>
+    <div
+      onClick={handleClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 900,
+        padding: 16,
+        animation: "wr-fadein 0.2s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: 16,
+          padding: 28,
+          maxWidth: 360,
+          width: "90%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          animation: "wr-scalein 0.22s ease",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 17,
+            fontWeight: 800,
+            color: "var(--text)",
+            marginBottom: 4,
+          }}
+        >
+          Confirmar Cancelación
+        </p>
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--muted)",
+            marginBottom: 20,
+            lineHeight: 1.5,
+          }}
+        >
+          Ingrese la contraseña para confirmar la cancelación del producto.
+        </p>
 
-        <div style={{ marginBottom:16 }}>
-          <label style={{ fontSize:13,fontWeight:600,color:"var(--text)",display:"block",marginBottom:6 }}>Contraseña:</label>
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--text)",
+              display: "block",
+              marginBottom: 6,
+            }}
+          >
+            Contraseña:
+          </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={{ width:"100%",border:`1.5px solid ${error?"var(--red)":"var(--border)"}`,borderRadius:10,padding:"11px 14px",fontSize:14,outline:"none",fontFamily:"inherit",transition:"border-color 0.15s" }}
+            style={{
+              width: "100%",
+              border: `1.5px solid ${error ? "var(--red)" : "var(--border)"}`,
+              borderRadius: 10,
+              padding: "11px 14px",
+              fontSize: 14,
+              outline: "none",
+              fontFamily: "inherit",
+              transition: "border-color 0.15s",
+            }}
             placeholder="Contraseña de autorización"
-            onFocus={e => e.target.style.borderColor="var(--navy)"}
-            onBlur={e => e.target.style.borderColor=error?"var(--red)":"var(--border)"}
-            onKeyPress={(e) => { if (e.key === "Enter") handleConfirm(); }}
+            onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+            onBlur={(e) =>
+              (e.target.style.borderColor = error
+                ? "var(--red)"
+                : "var(--border)")
+            }
+            onKeyPress={(e) => {
+              if (e.key === "Enter") handleConfirm();
+            }}
           />
-          {error && <p style={{ fontSize:12,color:"var(--red)",marginTop:6 }}>{error}</p>}
+          {error && (
+            <p style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>
+              {error}
+            </p>
+          )}
         </div>
 
-        <div style={{ display:"flex",gap:10 }}>
-          <button onClick={handleClose} style={{ flex:1,padding:12,borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={handleClose}
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 10,
+              border: "1.5px solid var(--border)",
+              background: "var(--surface)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--muted)",
+            }}
+          >
             Cancelar
           </button>
-          <button onClick={handleConfirm} disabled={!password} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:"var(--red)",fontSize:13,fontWeight:700,color:"white",opacity:!password?0.5:1 }}>
+          <button
+            onClick={handleConfirm}
+            disabled={!password}
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 10,
+              border: "none",
+              background: "var(--red)",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "white",
+              opacity: !password ? 0.5 : 1,
+            }}
+          >
             Confirmar
           </button>
         </div>
@@ -217,98 +314,497 @@ function PaymentCalculator({
   if (!isOpen) return null;
 
   return (
-    <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:800,padding:16,animation:"wr-fadein 0.2s ease" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:420,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
-        <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,background:"white" }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 800,
+        padding: 16,
+        animation: "wr-fadein 0.2s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: 18,
+          width: "100%",
+          maxWidth: 420,
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+          animation: "wr-scalein 0.22s ease",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "18px 22px 14px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+            background: "white",
+          }}
+        >
           <div>
-            <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Calculadora de Pago</p>
-            <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Mesa {tableNumber}</p>
+            <p
+              style={{
+                fontSize: 17,
+                fontWeight: 800,
+                color: "var(--text)",
+                margin: 0,
+              }}
+            >
+              Calculadora de Pago
+            </p>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--muted)",
+                margin: 0,
+                marginTop: 2,
+              }}
+            >
+              Mesa {tableNumber}
+            </p>
           </div>
-          <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--muted)",
+              padding: 4,
+              fontSize: 18,
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        <div style={{ overflowY:"auto",flex:1,padding:"16px 22px",display:"flex",flexDirection:"column",gap:14 }}>
-          <div style={{ display:"flex",justifyContent:"space-between",paddingBottom:14,borderBottom:"1px solid var(--border)" }}>
-            <span style={{ fontSize:15,fontWeight:600,color:"var(--text)" }}>Total a pagar</span>
-            <span style={{ fontSize:17,fontWeight:800,color:"var(--green)" }}>${totalAmount.toFixed(2)}</span>
+        <div
+          style={{
+            overflowY: "auto",
+            flex: 1,
+            padding: "16px 22px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              paddingBottom: 14,
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <span
+              style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}
+            >
+              Total a pagar
+            </span>
+            <span
+              style={{ fontSize: 17, fontWeight: 800, color: "var(--green)" }}
+            >
+              ${totalAmount.toFixed(2)}
+            </span>
           </div>
 
           {/* Efectivo */}
-          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
-            <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>💵 Efectivo (MXN)</p>
-            <div style={{ display:"flex",gap:8 }}>
+          <div
+            style={{
+              border: "1.5px solid var(--border)",
+              borderRadius: 10,
+              padding: "12px 14px",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text)",
+                marginBottom: 8,
+              }}
+            >
+              💵 Efectivo (MXN)
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
               <input
                 type="number"
                 value={cashAmount === 0 ? "" : cashAmount}
                 onChange={(e) => handleCashChange(e.target.value)}
                 placeholder="0.00"
-                style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
-                onFocus={e => e.target.style.borderColor="var(--navy)"}
-                onBlur={e => e.target.style.borderColor="var(--border)"}
+                style={{
+                  flex: 1,
+                  border: "1.5px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "9px 12px",
+                  fontSize: 14,
+                  outline: "none",
+                  background: "var(--surface)",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
               />
-              <button onClick={() => setCashAmount(totalAmount - totalPaid + cashAmount)} style={{ padding:"9px 14px",borderRadius:8,border:"1.5px solid var(--border)",background:"white",fontSize:12,fontWeight:600,color:"var(--muted)" }}>Llenar</button>
+              <button
+                onClick={() =>
+                  setCashAmount(totalAmount - totalPaid + cashAmount)
+                }
+                style={{
+                  padding: "9px 14px",
+                  borderRadius: 8,
+                  border: "1.5px solid var(--border)",
+                  background: "white",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--muted)",
+                }}
+              >
+                Llenar
+              </button>
             </div>
           </div>
 
           {/* Terminal */}
-          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
-            <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>💳 Terminal (MXN)</p>
-            <input type="number" value={terminalAmount===0?"":terminalAmount} onChange={e => handleTerminalChange(e.target.value)} placeholder="0.00"
-              style={{ width:"100%",border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
-              onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
+          <div
+            style={{
+              border: "1.5px solid var(--border)",
+              borderRadius: 10,
+              padding: "12px 14px",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text)",
+                marginBottom: 8,
+              }}
+            >
+              💳 Terminal (MXN)
+            </p>
+            <input
+              type="number"
+              value={terminalAmount === 0 ? "" : terminalAmount}
+              onChange={(e) => handleTerminalChange(e.target.value)}
+              placeholder="0.00"
+              style={{
+                width: "100%",
+                border: "1.5px solid var(--border)",
+                borderRadius: 8,
+                padding: "9px 12px",
+                fontSize: 14,
+                outline: "none",
+                background: "var(--surface)",
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+            />
           </div>
 
           {/* USD */}
-          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
-            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}>
-              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>$ Dólares (USD)</p>
-              <button onClick={() => setShowRateInput(!showRateInput)} style={{ fontSize:11,color:"var(--blue)",background:"none",border:"none",cursor:"pointer" }}>⇄ Cambiar tasa</button>
+          <div
+            style={{
+              border: "1.5px solid var(--border)",
+              borderRadius: 10,
+              padding: "12px 14px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  margin: 0,
+                }}
+              >
+                $ Dólares (USD)
+              </p>
+              <button
+                onClick={() => setShowRateInput(!showRateInput)}
+                style={{
+                  fontSize: 11,
+                  color: "var(--blue)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ⇄ Cambiar tasa
+              </button>
             </div>
             {showRateInput && (
-              <div style={{ marginBottom:10,padding:"8px 10px",background:"var(--surface)",borderRadius:8 }}>
-                <p style={{ fontSize:11,color:"var(--muted)",marginBottom:6 }}>Tasa de cambio (USD a MXN):</p>
-                <div style={{ display:"flex",gap:8 }}>
-                  <input type="number" value={tempRate} onChange={e => setTempRate(e.target.value)} step="0.01"
-                    style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:7,padding:"7px 10px",fontSize:13,outline:"none" }}
-                    onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
-                  <button onClick={handleRateChange} style={{ padding:"7px 14px",borderRadius:7,border:"none",background:"var(--navy)",color:"white",fontSize:12,fontWeight:700 }}>Actualizar</button>
+              <div
+                style={{
+                  marginBottom: 10,
+                  padding: "8px 10px",
+                  background: "var(--surface)",
+                  borderRadius: 8,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    marginBottom: 6,
+                  }}
+                >
+                  Tasa de cambio (USD a MXN):
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="number"
+                    value={tempRate}
+                    onChange={(e) => setTempRate(e.target.value)}
+                    step="0.01"
+                    style={{
+                      flex: 1,
+                      border: "1.5px solid var(--border)",
+                      borderRadius: 7,
+                      padding: "7px 10px",
+                      fontSize: 13,
+                      outline: "none",
+                    }}
+                    onFocus={(e) =>
+                      (e.target.style.borderColor = "var(--navy)")
+                    }
+                    onBlur={(e) =>
+                      (e.target.style.borderColor = "var(--border)")
+                    }
+                  />
+                  <button
+                    onClick={handleRateChange}
+                    style={{
+                      padding: "7px 14px",
+                      borderRadius: 7,
+                      border: "none",
+                      background: "var(--navy)",
+                      color: "white",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Actualizar
+                  </button>
                 </div>
               </div>
             )}
-            {!showRateInput && <p style={{ fontSize:11,color:"var(--muted)",textAlign:"right",marginBottom:8 }}>Tasa: 1 USD = ${usdRate.toFixed(2)} MXN</p>}
-            <div style={{ display:"flex",gap:8,alignItems:"center",marginBottom:6 }}>
-              <input type="number" value={usdAmount===0?"":usdAmount} onChange={e => handleUsdChange(e.target.value)} placeholder="0.00"
-                style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
-                onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
-              <span style={{ fontSize:12,color:"var(--muted)" }}>USD</span>
+            {!showRateInput && (
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  textAlign: "right",
+                  marginBottom: 8,
+                }}
+              >
+                Tasa: 1 USD = ${usdRate.toFixed(2)} MXN
+              </p>
+            )}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                marginBottom: 6,
+              }}
+            >
+              <input
+                type="number"
+                value={usdAmount === 0 ? "" : usdAmount}
+                onChange={(e) => handleUsdChange(e.target.value)}
+                placeholder="0.00"
+                style={{
+                  flex: 1,
+                  border: "1.5px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "9px 12px",
+                  fontSize: 14,
+                  outline: "none",
+                  background: "var(--surface)",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+              />
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>USD</span>
             </div>
-            {usdAmount > 0 && <p style={{ fontSize:11,color:"var(--muted)",textAlign:"right" }}>= ${usdToMxn.toFixed(2)} MXN</p>}
+            {usdAmount > 0 && (
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  textAlign: "right",
+                }}
+              >
+                = ${usdToMxn.toFixed(2)} MXN
+              </p>
+            )}
           </div>
 
           {/* Summary */}
-          <div style={{ background:"var(--surface)",borderRadius:10,padding:"12px 14px",fontSize:13 }}>
-            {[["💵 Efectivo:",`$${cashAmount.toFixed(2)}`,"var(--green)"],["💳 Terminal:",`$${terminalAmount.toFixed(2)}`,"var(--green)"],["$ Dólares:",`$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`,"var(--green)"]].map(([label,val,col]) => (
-              <div key={label as string} style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>{label}</span><span style={{ color:col as string,fontWeight:600 }}>{val}</span></div>
+          <div
+            style={{
+              background: "var(--surface)",
+              borderRadius: 10,
+              padding: "12px 14px",
+              fontSize: 13,
+            }}
+          >
+            {[
+              ["💵 Efectivo:", `$${cashAmount.toFixed(2)}`, "var(--green)"],
+              ["💳 Terminal:", `$${terminalAmount.toFixed(2)}`, "var(--green)"],
+              [
+                "$ Dólares:",
+                `$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`,
+                "var(--green)",
+              ],
+            ].map(([label, val, col]) => (
+              <div
+                key={label as string}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 4,
+                }}
+              >
+                <span style={{ color: "var(--muted)" }}>{label}</span>
+                <span style={{ color: col as string, fontWeight: 600 }}>
+                  {val}
+                </span>
+              </div>
             ))}
-            <div style={{ borderTop:"1px solid var(--border)",paddingTop:8,marginTop:4 }}>
-              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-                <span style={{ fontWeight:700,color:"var(--text)" }}>Total pagado:</span>
-                <span style={{ fontWeight:700,color:totalPaid>=totalAmount?"var(--green)":"var(--amber)" }}>${totalPaid.toFixed(2)}</span>
+            <div
+              style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: 8,
+                marginTop: 4,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 4,
+                }}
+              >
+                <span style={{ fontWeight: 700, color: "var(--text)" }}>
+                  Total pagado:
+                </span>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color:
+                      totalPaid >= totalAmount
+                        ? "var(--green)"
+                        : "var(--amber)",
+                  }}
+                >
+                  ${totalPaid.toFixed(2)}
+                </span>
               </div>
-              <div style={{ display:"flex",justifyContent:"space-between" }}>
-                <span style={{ fontWeight:700,color:"var(--text)" }}>Falta por pagar:</span>
-                <span style={{ fontWeight:700,color:"var(--red)" }}>${Math.max(0,remainingAmount).toFixed(2)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: 700, color: "var(--text)" }}>
+                  Falta por pagar:
+                </span>
+                <span style={{ fontWeight: 700, color: "var(--red)" }}>
+                  ${Math.max(0, remainingAmount).toFixed(2)}
+                </span>
               </div>
-              {needsChange && <div style={{ display:"flex",justifyContent:"space-between",marginTop:4 }}><span style={{ fontWeight:700,color:"var(--green)" }}>Cambio a devolver:</span><span style={{ fontWeight:700,color:"var(--green)" }}>${change.toFixed(2)}</span></div>}
+              {needsChange && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginTop: 4,
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: "var(--green)" }}>
+                    Cambio a devolver:
+                  </span>
+                  <span style={{ fontWeight: 700, color: "var(--green)" }}>
+                    ${change.toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{ padding:"14px 22px",borderTop:"1px solid var(--border)",display:"flex",gap:10,flexShrink:0 }}>
-          <button onClick={fillRemaining} disabled={remainingAmount<=0} style={{ flex:1,padding:12,borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",opacity:remainingAmount<=0?0.5:1 }}>Completar con Efectivo</button>
-          <button onClick={onClose} style={{ padding:"12px 18px",borderRadius:10,border:"none",background:"var(--red-light)",fontSize:13,fontWeight:600,color:"var(--red)" }}>Cancelar</button>
-          <button onClick={handleConfirm} disabled={totalPaid===0} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:totalPaid===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",opacity:totalPaid===0?0.5:1 }}>Confirmar Pago</button>
+        <div
+          style={{
+            padding: "14px 22px",
+            borderTop: "1px solid var(--border)",
+            display: "flex",
+            gap: 10,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={fillRemaining}
+            disabled={remainingAmount <= 0}
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 10,
+              border: "1.5px solid var(--border)",
+              background: "var(--surface)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--muted)",
+              opacity: remainingAmount <= 0 ? 0.5 : 1,
+            }}
+          >
+            Completar con Efectivo
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "12px 18px",
+              borderRadius: 10,
+              border: "none",
+              background: "var(--red-light)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--red)",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={totalPaid === 0}
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 10,
+              border: "none",
+              background: totalPaid === 0 ? "var(--border)" : "var(--green)",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "white",
+              opacity: totalPaid === 0 ? 0.5 : 1,
+            }}
+          >
+            Confirmar Pago
+          </button>
         </div>
       </div>
     </div>
@@ -525,46 +1021,240 @@ function SeparatePaymentsModal({
 
   return (
     <>
-      <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
-        <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:700,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 700,
+          padding: 16,
+          animation: "wr-fadein 0.2s ease",
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "white",
+            borderRadius: 18,
+            width: "100%",
+            maxWidth: 700,
+            maxHeight: "90vh",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+            animation: "wr-scalein 0.22s ease",
+            overflow: "hidden",
+          }}
+        >
           {/* Header */}
-          <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+          <div
+            style={{
+              padding: "18px 22px 14px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexShrink: 0,
+            }}
+          >
             <div>
-              <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>👥 Pagos Individuales</p>
-              <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Mesa {tableNumber}</p>
+              <p
+                style={{
+                  fontSize: 17,
+                  fontWeight: 800,
+                  color: "var(--text)",
+                  margin: 0,
+                }}
+              >
+                👥 Pagos Individuales
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--muted)",
+                  margin: 0,
+                  marginTop: 2,
+                }}
+              >
+                Mesa {tableNumber}
+              </p>
             </div>
-            <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
+            <button
+              onClick={onClose}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--muted)",
+                padding: 4,
+                fontSize: 18,
+              }}
+            >
+              ✕
+            </button>
           </div>
 
-          <div style={{ overflowY:"auto",flex:1,padding:"16px 22px" }}>
+          <div style={{ overflowY: "auto", flex: 1, padding: "16px 22px" }}>
             {/* Summary */}
-            <div style={{ background:"var(--surface)",borderRadius:12,padding:"14px 18px",marginBottom:16 }}>
-              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
-                <span style={{ fontSize:15,fontWeight:600,color:"var(--text)" }}>Total de la cuenta:</span>
-                <span style={{ fontSize:18,fontWeight:800,color:"var(--green)" }}>${totalAmount.toFixed(2)}</span>
+            <div
+              style={{
+                background: "var(--surface)",
+                borderRadius: 12,
+                padding: "14px 18px",
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                  }}
+                >
+                  Total de la cuenta:
+                </span>
+                <span
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: "var(--green)",
+                  }}
+                >
+                  ${totalAmount.toFixed(2)}
+                </span>
               </div>
-              <div style={{ display:"flex",justifyContent:"space-between" }}>
-                <span style={{ fontSize:13,color:"var(--muted)" }}>Restante por pagar:</span>
-                <span style={{ fontSize:15,fontWeight:700,color:overallRemaining>0?"var(--amber)":"var(--green)" }}>${overallRemaining.toFixed(2)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                  Restante por pagar:
+                </span>
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color:
+                      overallRemaining > 0 ? "var(--amber)" : "var(--green)",
+                  }}
+                >
+                  ${overallRemaining.toFixed(2)}
+                </span>
               </div>
             </div>
 
-            <div style={{ display:"flex",gap:16 }}>
+            <div style={{ display: "flex", gap: 16 }}>
               {/* Guest list */}
-              <div style={{ width:220,flexShrink:0 }}>
-                <p style={{ fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10 }}>Comensales</p>
-                <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-                  {guests.map(guest => {
-                    const { itemsTotal, paidTotal, remaining } = getGuestTotal(guest);
+              <div style={{ width: 220, flexShrink: 0 }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 10,
+                  }}
+                >
+                  Comensales
+                </p>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  {guests.map((guest) => {
+                    const { itemsTotal, paidTotal, remaining } =
+                      getGuestTotal(guest);
                     const isSelected = selectedGuestId === guest.id;
                     return (
-                      <div key={guest.id} onClick={() => setSelectedGuestId(guest.id)} style={{ padding:"10px 12px",borderRadius:10,border:`1.5px solid ${isSelected?"var(--blue)":"transparent"}`,background:isSelected?"var(--blue-light)":"var(--surface)",cursor:"pointer",transition:"all 0.15s" }}>
-                        <p style={{ fontSize:13,fontWeight:700,color:isSelected?"var(--blue)":"var(--text)",margin:0 }}>{guest.name}</p>
-                        <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginTop:2 }}>{guest.items.length} productos</p>
-                        <div style={{ marginTop:6,fontSize:12 }}>
-                          <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--muted)" }}>Total:</span><span style={{ color:"var(--text)",fontWeight:600 }}>${itemsTotal.toFixed(2)}</span></div>
-                          <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--muted)" }}>Pagado:</span><span style={{ color:"var(--green)",fontWeight:600 }}>${paidTotal.toFixed(2)}</span></div>
-                          {remaining > 0 && <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--red)" }}>Falta:</span><span style={{ color:"var(--red)",fontWeight:600 }}>${remaining.toFixed(2)}</span></div>}
+                      <div
+                        key={guest.id}
+                        onClick={() => setSelectedGuestId(guest.id)}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: `1.5px solid ${isSelected ? "var(--blue)" : "transparent"}`,
+                          background: isSelected
+                            ? "var(--blue-light)"
+                            : "var(--surface)",
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: isSelected ? "var(--blue)" : "var(--text)",
+                            margin: 0,
+                          }}
+                        >
+                          {guest.name}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "var(--muted)",
+                            margin: 0,
+                            marginTop: 2,
+                          }}
+                        >
+                          {guest.items.length} productos
+                        </p>
+                        <div style={{ marginTop: 6, fontSize: 12 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span style={{ color: "var(--muted)" }}>
+                              Total:
+                            </span>
+                            <span
+                              style={{ color: "var(--text)", fontWeight: 600 }}
+                            >
+                              ${itemsTotal.toFixed(2)}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span style={{ color: "var(--muted)" }}>
+                              Pagado:
+                            </span>
+                            <span
+                              style={{ color: "var(--green)", fontWeight: 600 }}
+                            >
+                              ${paidTotal.toFixed(2)}
+                            </span>
+                          </div>
+                          {remaining > 0 && (
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span style={{ color: "var(--red)" }}>
+                                Falta:
+                              </span>
+                              <span
+                                style={{ color: "var(--red)", fontWeight: 600 }}
+                              >
+                                ${remaining.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -574,36 +1264,184 @@ function SeparatePaymentsModal({
 
               {/* Guest detail */}
               {selectedGuest && (
-                <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
-                    <p style={{ fontSize:14,fontWeight:700,color:"var(--text)",margin:0 }}>{selectedGuest.name} — Productos</p>
-                    <button onClick={() => { setSelectedGuestForPayment(selectedGuest.id); setShowPaymentModal(true); }} style={{ padding:"8px 14px",borderRadius:9,border:"none",background:"var(--green)",fontSize:12,fontWeight:700,color:"white" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 14,
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: "var(--text)",
+                        margin: 0,
+                      }}
+                    >
+                      {selectedGuest.name} — Productos
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSelectedGuestForPayment(selectedGuest.id);
+                        setShowPaymentModal(true);
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 9,
+                        border: "none",
+                        background: "var(--green)",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "white",
+                      }}
+                    >
                       💵 Registrar Pago
                     </button>
                   </div>
 
-                  <p style={{ fontSize:11,fontWeight:600,color:"var(--muted)",marginBottom:8 }}>Productos:</p>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--muted)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Productos:
+                  </p>
                   {selectedGuest.items.length === 0 ? (
-                    <p style={{ fontSize:13,color:"var(--muted)" }}>Sin productos</p>
+                    <p style={{ fontSize: 13, color: "var(--muted)" }}>
+                      Sin productos
+                    </p>
                   ) : (
-                    <div style={{ display:"flex",flexDirection:"column",gap:6,maxHeight:240,overflowY:"auto",marginBottom:12 }}>
-                      {selectedGuest.items.map(item => (
-                        <div key={item.itemId} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:"var(--surface)",padding:"8px 12px",borderRadius:8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                        maxHeight: 240,
+                        overflowY: "auto",
+                        marginBottom: 12,
+                      }}
+                    >
+                      {selectedGuest.items.map((item) => (
+                        <div
+                          key={item.itemId}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            background: "var(--surface)",
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                          }}
+                        >
                           <div>
-                            <span style={{ fontSize:13,fontWeight:600,color:"var(--text)" }}>{item.productName}</span>
-                            <span style={{ fontSize:11,color:"var(--muted)",marginLeft:8 }}>{item.quantity} × ${item.price.toFixed(2)}</span>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "var(--text)",
+                              }}
+                            >
+                              {item.productName}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--muted)",
+                                marginLeft: 8,
+                              }}
+                            >
+                              {item.quantity} × ${item.price.toFixed(2)}
+                            </span>
                           </div>
-                          <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>${item.subtotal.toFixed(2)}</span>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "var(--text)",
+                            }}
+                          >
+                            ${item.subtotal.toFixed(2)}
+                          </span>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div style={{ background:"var(--surface)",borderRadius:10,padding:"12px 14px",fontSize:13 }}>
-                    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>Total en productos:</span><span style={{ fontWeight:700,color:"var(--green)" }}>${getGuestTotal(selectedGuest).itemsTotal.toFixed(2)}</span></div>
-                    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>Pagado:</span><span style={{ fontWeight:700,color:"var(--green)" }}>${getGuestTotal(selectedGuest).paidTotal.toFixed(2)}</span></div>
-                    {getGuestTotal(selectedGuest).remaining > 0 && <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--red)",fontWeight:700 }}>Falta por pagar:</span><span style={{ color:"var(--red)",fontWeight:700 }}>${getGuestTotal(selectedGuest).remaining.toFixed(2)}</span></div>}
-                    {getGuestTotal(selectedGuest).remaining < 0 && <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--amber)" }}>Sobrante (cambio):</span><span style={{ color:"var(--amber)",fontWeight:700 }}>${Math.abs(getGuestTotal(selectedGuest).remaining).toFixed(2)}</span></div>}
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      borderRadius: 10,
+                      padding: "12px 14px",
+                      fontSize: 13,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span style={{ color: "var(--muted)" }}>
+                        Total en productos:
+                      </span>
+                      <span style={{ fontWeight: 700, color: "var(--green)" }}>
+                        ${getGuestTotal(selectedGuest).itemsTotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span style={{ color: "var(--muted)" }}>Pagado:</span>
+                      <span style={{ fontWeight: 700, color: "var(--green)" }}>
+                        ${getGuestTotal(selectedGuest).paidTotal.toFixed(2)}
+                      </span>
+                    </div>
+                    {getGuestTotal(selectedGuest).remaining > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span style={{ color: "var(--red)", fontWeight: 700 }}>
+                          Falta por pagar:
+                        </span>
+                        <span style={{ color: "var(--red)", fontWeight: 700 }}>
+                          ${getGuestTotal(selectedGuest).remaining.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {getGuestTotal(selectedGuest).remaining < 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span style={{ color: "var(--amber)" }}>
+                          Sobrante (cambio):
+                        </span>
+                        <span
+                          style={{ color: "var(--amber)", fontWeight: 700 }}
+                        >
+                          $
+                          {Math.abs(
+                            getGuestTotal(selectedGuest).remaining,
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -611,14 +1449,62 @@ function SeparatePaymentsModal({
           </div>
 
           {/* Footer */}
-          <div style={{ padding:"14px 22px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0 }}>
+          <div
+            style={{
+              padding: "14px 22px",
+              borderTop: "1px solid var(--border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexShrink: 0,
+            }}
+          >
             <div>
-              <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Total: <strong style={{ color:"var(--green)" }}>${totalAmount.toFixed(2)}</strong></p>
-              <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Restante: <strong style={{ color:"var(--red)" }}>${overallRemaining.toFixed(2)}</strong></p>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+                Total:{" "}
+                <strong style={{ color: "var(--green)" }}>
+                  ${totalAmount.toFixed(2)}
+                </strong>
+              </p>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+                Restante:{" "}
+                <strong style={{ color: "var(--red)" }}>
+                  ${overallRemaining.toFixed(2)}
+                </strong>
+              </p>
             </div>
-            <div style={{ display:"flex",gap:10 }}>
-              <button onClick={onClose} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)" }}>Cancelar</button>
-              <button onClick={handleConfirmAll} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:"var(--green)",fontSize:13,fontWeight:700,color:"white",display:"flex",alignItems:"center",gap:6 }}>✓ Finalizar y Cobrar Todo</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: "11px 20px",
+                  borderRadius: 10,
+                  border: "1.5px solid var(--border)",
+                  background: "var(--surface)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--muted)",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmAll}
+                style={{
+                  padding: "11px 20px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "var(--green)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                ✓ Finalizar y Cobrar Todo
+              </button>
             </div>
           </div>
         </div>
@@ -719,58 +1605,334 @@ function GuestPaymentModal({
   if (!isOpen || !guest) return null;
 
   return (
-    <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:800,padding:16,animation:"wr-fadein 0.2s ease" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:420,boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
-        <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 800,
+        padding: 16,
+        animation: "wr-fadein 0.2s ease",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: 18,
+          width: "100%",
+          maxWidth: 420,
+          boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+          animation: "wr-scalein 0.22s ease",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "18px 22px 14px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <div>
-            <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Pago de {guest.name}</p>
-            <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Mesa {tableNumber}</p>
+            <p
+              style={{
+                fontSize: 17,
+                fontWeight: 800,
+                color: "var(--text)",
+                margin: 0,
+              }}
+            >
+              Pago de {guest.name}
+            </p>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--muted)",
+                margin: 0,
+                marginTop: 2,
+              }}
+            >
+              Mesa {tableNumber}
+            </p>
           </div>
-          <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--muted)",fontSize:18,padding:4 }}>✕</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--muted)",
+              fontSize: 18,
+              padding: 4,
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        <div style={{ padding:"16px 22px",display:"flex",flexDirection:"column",gap:14 }}>
-          <div style={{ display:"flex",justifyContent:"space-between",padding:"12px 14px",background:"var(--surface)",borderRadius:10 }}>
-            <span style={{ fontSize:14,fontWeight:600,color:"var(--text)" }}>Total a pagar:</span>
-            <span style={{ fontSize:17,fontWeight:800,color:"var(--green)" }}>${itemsTotal.toFixed(2)}</span>
+        <div
+          style={{
+            padding: "16px 22px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "12px 14px",
+              background: "var(--surface)",
+              borderRadius: 10,
+            }}
+          >
+            <span
+              style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}
+            >
+              Total a pagar:
+            </span>
+            <span
+              style={{ fontSize: 17, fontWeight: 800, color: "var(--green)" }}
+            >
+              ${itemsTotal.toFixed(2)}
+            </span>
           </div>
 
-          {[["💵 Efectivo (MXN)",cashAmount,setCashAmount],["💳 Terminal (MXN)",terminalAmount,setTerminalAmount]].map(([label,val,setter]) => (
-            <div key={label as string} style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
-              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>{label as string}</p>
-              <input type="number" value={val===0?"":val as number} onChange={e => (setter as any)(parseFloat(e.target.value)||0)} placeholder="0.00"
-                style={{ width:"100%",border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
-                onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
+          {[
+            ["💵 Efectivo (MXN)", cashAmount, setCashAmount],
+            ["💳 Terminal (MXN)", terminalAmount, setTerminalAmount],
+          ].map(([label, val, setter]) => (
+            <div
+              key={label as string}
+              style={{
+                border: "1.5px solid var(--border)",
+                borderRadius: 10,
+                padding: "12px 14px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  marginBottom: 8,
+                }}
+              >
+                {label as string}
+              </p>
+              <input
+                type="number"
+                value={val === 0 ? "" : (val as number)}
+                onChange={(e) =>
+                  (setter as any)(parseFloat(e.target.value) || 0)
+                }
+                placeholder="0.00"
+                style={{
+                  width: "100%",
+                  border: "1.5px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "9px 12px",
+                  fontSize: 14,
+                  outline: "none",
+                  background: "var(--surface)",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+              />
             </div>
           ))}
 
-          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
-            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}>
-              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>$ Dólares (USD)</p>
-              <button onClick={() => setShowRateInput(!showRateInput)} style={{ fontSize:11,color:"var(--blue)",background:"none",border:"none",cursor:"pointer" }}>⇄ Cambiar tasa</button>
+          <div
+            style={{
+              border: "1.5px solid var(--border)",
+              borderRadius: 10,
+              padding: "12px 14px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  margin: 0,
+                }}
+              >
+                $ Dólares (USD)
+              </p>
+              <button
+                onClick={() => setShowRateInput(!showRateInput)}
+                style={{
+                  fontSize: 11,
+                  color: "var(--blue)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ⇄ Cambiar tasa
+              </button>
             </div>
             {showRateInput && (
-              <div style={{ display:"flex",gap:8,marginBottom:8 }}>
-                <input type="number" value={tempRate} onChange={e => setTempRate(e.target.value)} step="0.01"
-                  style={{ flex:1,border:"1.5px solid var(--border)",borderRadius:7,padding:"7px 10px",fontSize:13,outline:"none" }} />
-                <button onClick={() => { const r=parseFloat(tempRate); if (!isNaN(r)&&r>0){setUsdRate(r);setShowRateInput(false);} }} style={{ padding:"7px 14px",borderRadius:7,border:"none",background:"var(--navy)",color:"white",fontSize:12,fontWeight:700 }}>OK</button>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input
+                  type="number"
+                  value={tempRate}
+                  onChange={(e) => setTempRate(e.target.value)}
+                  step="0.01"
+                  style={{
+                    flex: 1,
+                    border: "1.5px solid var(--border)",
+                    borderRadius: 7,
+                    padding: "7px 10px",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const r = parseFloat(tempRate);
+                    if (!isNaN(r) && r > 0) {
+                      setUsdRate(r);
+                      setShowRateInput(false);
+                    }
+                  }}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: 7,
+                    border: "none",
+                    background: "var(--navy)",
+                    color: "white",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  OK
+                </button>
               </div>
             )}
-            <input type="number" value={usdAmount===0?"":usdAmount} onChange={e => setUsdAmount(parseFloat(e.target.value)||0)} placeholder="0.00"
-              style={{ width:"100%",border:"1.5px solid var(--border)",borderRadius:8,padding:"9px 12px",fontSize:14,outline:"none",background:"var(--surface)" }}
-              onFocus={e => e.target.style.borderColor="var(--navy)"} onBlur={e => e.target.style.borderColor="var(--border)"} />
-            {usdAmount > 0 && <p style={{ fontSize:11,color:"var(--muted)",textAlign:"right",marginTop:4 }}>= ${usdToMxn.toFixed(2)} MXN (tasa: {usdRate})</p>}
+            <input
+              type="number"
+              value={usdAmount === 0 ? "" : usdAmount}
+              onChange={(e) => setUsdAmount(parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+              style={{
+                width: "100%",
+                border: "1.5px solid var(--border)",
+                borderRadius: 8,
+                padding: "9px 12px",
+                fontSize: 14,
+                outline: "none",
+                background: "var(--surface)",
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+            />
+            {usdAmount > 0 && (
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  textAlign: "right",
+                  marginTop: 4,
+                }}
+              >
+                = ${usdToMxn.toFixed(2)} MXN (tasa: {usdRate})
+              </p>
+            )}
           </div>
 
-          <div style={{ background:"var(--surface)",borderRadius:10,padding:"12px 14px",fontSize:13 }}>
-            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><span style={{ color:"var(--muted)" }}>Total pagado:</span><span style={{ fontWeight:700,color:"var(--text)" }}>${totalPaid.toFixed(2)}</span></div>
-            <div style={{ display:"flex",justifyContent:"space-between" }}><span style={{ color:"var(--muted)" }}>Restante:</span><span style={{ fontWeight:700,color:remaining>0?"var(--red)":"var(--green)" }}>${remaining>0?remaining.toFixed(2):"0.00"}</span></div>
-            {remaining < 0 && <div style={{ display:"flex",justifyContent:"space-between",marginTop:4 }}><span style={{ color:"var(--amber)" }}>Cambio:</span><span style={{ color:"var(--amber)",fontWeight:700 }}>${Math.abs(remaining).toFixed(2)}</span></div>}
+          <div
+            style={{
+              background: "var(--surface)",
+              borderRadius: 10,
+              padding: "12px 14px",
+              fontSize: 13,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 4,
+              }}
+            >
+              <span style={{ color: "var(--muted)" }}>Total pagado:</span>
+              <span style={{ fontWeight: 700, color: "var(--text)" }}>
+                ${totalPaid.toFixed(2)}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: "var(--muted)" }}>Restante:</span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  color: remaining > 0 ? "var(--red)" : "var(--green)",
+                }}
+              >
+                ${remaining > 0 ? remaining.toFixed(2) : "0.00"}
+              </span>
+            </div>
+            {remaining < 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 4,
+                }}
+              >
+                <span style={{ color: "var(--amber)" }}>Cambio:</span>
+                <span style={{ color: "var(--amber)", fontWeight: 700 }}>
+                  ${Math.abs(remaining).toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
 
-          <div style={{ display:"flex",gap:10,paddingBottom:6 }}>
-            <button onClick={onClose} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:"var(--red-light)",fontSize:13,fontWeight:600,color:"var(--red)" }}>Cancelar</button>
-            <button onClick={handleConfirm} style={{ flex:1,padding:12,borderRadius:10,border:"none",background:"var(--green)",fontSize:13,fontWeight:700,color:"white" }}>Registrar Pago</button>
+          <div style={{ display: "flex", gap: 10, paddingBottom: 6 }}>
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: 12,
+                borderRadius: 10,
+                border: "none",
+                background: "var(--red-light)",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--red)",
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirm}
+              style={{
+                flex: 1,
+                padding: 12,
+                borderRadius: 10,
+                border: "none",
+                background: "var(--green)",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "white",
+              }}
+            >
+              Registrar Pago
+            </button>
           </div>
         </div>
       </div>
@@ -787,11 +1949,47 @@ function TablesOrderSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <div style={{ marginBottom:16,padding:"10px 16px",background:"var(--surface)",border:"1.5px solid var(--border)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-      <span style={{ fontSize:13,fontWeight:600,color:"var(--text)" }}>Ordenar mesas:</span>
-      <div style={{ display:"flex",border:"1.5px solid var(--border)",borderRadius:9,overflow:"hidden" }}>
-        {[{k:"number",label:"# Número"},{k:"occupation",label:"⏱ Tiempo"}].map(o => (
-          <button key={o.k} onClick={() => onChange(o.k)} style={{ padding:"7px 14px",border:"none",background:value===o.k?"var(--navy)":"white",color:value===o.k?"white":"var(--muted)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit" }}>
+    <div
+      style={{
+        marginBottom: 16,
+        padding: "10px 16px",
+        background: "var(--surface)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 12,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+        Ordenar mesas:
+      </span>
+      <div
+        style={{
+          display: "flex",
+          border: "1.5px solid var(--border)",
+          borderRadius: 9,
+          overflow: "hidden",
+        }}
+      >
+        {[
+          { k: "number", label: "# Número" },
+          { k: "occupation", label: "⏱ Tiempo" },
+        ].map((o) => (
+          <button
+            key={o.k}
+            onClick={() => onChange(o.k)}
+            style={{
+              padding: "7px 14px",
+              border: "none",
+              background: value === o.k ? "var(--navy)" : "white",
+              color: value === o.k ? "white" : "var(--muted)",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
             {o.label}
           </button>
         ))}
@@ -851,6 +2049,7 @@ export default function WaiterDashboard() {
 
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     loadData();
@@ -886,8 +2085,13 @@ export default function WaiterDashboard() {
   }, [tablesOrder]);
 
   const loadData = async () => {
+    // Prevenir llamadas simultáneas
+    if (isLoadingRef.current) return;
+
+    isLoadingRef.current = true;
+    setLoading(true);
+
     try {
-      setLoading(true);
       const [notifsData, tablesData] = await Promise.all([
         waiterService.getPendingNotifications(),
         waiterService.getTablesWithOrders(),
@@ -930,7 +2134,9 @@ export default function WaiterDashboard() {
       );
     } catch (error) {
       console.error("Error cargando datos:", error);
+      setLoading(false);
     } finally {
+      isLoadingRef.current = false;
       setLoading(false);
     }
   };
@@ -1357,7 +2563,17 @@ export default function WaiterDashboard() {
   }
 
   return (
-    <div className="waiter-root" style={{ height:"100dvh",overflow:"hidden",display:"flex",flexDirection:"column",fontFamily:"'Plus Jakarta Sans',sans-serif",background:"white" }}>
+    <div
+      className="waiter-root"
+      style={{
+        height: "100dvh",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "'Plus Jakarta Sans',sans-serif",
+        background: "white",
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .waiter-root{
@@ -1388,11 +2604,20 @@ export default function WaiterDashboard() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         notificationsCount={notifications.length}
-        occupiedTablesCount={tables.filter((t) => t.status === "occupied").length}
+        occupiedTablesCount={
+          tables.filter((t) => t.status === "occupied").length
+        }
       />
 
-      <div style={{ flex:1,overflow:"hidden",display:"flex",flexDirection:"column" }}>
-        <div style={{ flex:1,overflowY:"auto",padding:"16px 20px" }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
           {activeTab === "notifications" && (
             <NotificationsTab
               notifications={notifications}
@@ -1406,7 +2631,10 @@ export default function WaiterDashboard() {
 
           {activeTab === "tables" && (
             <>
-              <TablesOrderSelect value={tablesOrder} onChange={setTablesOrder} />
+              <TablesOrderSelect
+                value={tablesOrder}
+                onChange={setTablesOrder}
+              />
               <TablesTab
                 tables={tables}
                 processing={processing}
@@ -1435,7 +2663,10 @@ export default function WaiterDashboard() {
 
       <PaymentCalculator
         isOpen={showPaymentCalculator}
-        onClose={() => { setShowPaymentCalculator(false); setSelectedTableForPayment(null); }}
+        onClose={() => {
+          setShowPaymentCalculator(false);
+          setSelectedTableForPayment(null);
+        }}
         onConfirm={handlePaymentConfirm}
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
@@ -1443,7 +2674,10 @@ export default function WaiterDashboard() {
 
       <SeparatePaymentsModal
         isOpen={showSeparatePayments}
-        onClose={() => { setShowSeparatePayments(false); setSelectedTableForSeparate(null); }}
+        onClose={() => {
+          setShowSeparatePayments(false);
+          setSelectedTableForSeparate(null);
+        }}
         onConfirm={handleSeparatePaymentsConfirm}
         tableOrders={selectedTableForSeparate?.orders || []}
         tableNumber={selectedTableForSeparate?.number || 0}
