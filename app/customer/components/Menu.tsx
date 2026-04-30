@@ -31,12 +31,18 @@ const DESIGN_CSS = `
     --amber-light:  oklch(96% 0.06 70);
     --red:          oklch(56% 0.18 20);
     --red-light:    oklch(96% 0.05 20);
+    --scale:        1;
     font-family: 'Plus Jakarta Sans', sans-serif;
     background: white;
     height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+  @media (min-width: 1024px) {
+    .menu-root {
+      --scale: 1.15;
+    }
   }
   @keyframes menuFadeUp   { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
   @keyframes menuFadeIn   { from{opacity:0} to{opacity:1} }
@@ -55,7 +61,11 @@ const DESIGN_CSS = `
   .menu-root .card-hover { transition:box-shadow 0.2s,transform 0.2s; }
   .menu-root .card-hover:hover { box-shadow:0 8px 28px rgba(0,0,0,0.10); transform:translateY(-2px); }
   .menu-root .btn-add { transition:background 0.15s,transform 0.12s; }
-  .menu-root .btn-add:hover { background: var(--navy) !important; transform:translateY(-1px); }
+  .menu-root .btn-add:hover { background: var(--accent-dark) !important; transform:translateY(-1px); }
+  .menu-root .menu-cat-tabs::-webkit-scrollbar { display: none; }
+  @media (min-width: 768px) {
+    .menu-root .product-grid-section { padding-top: 8px; padding-bottom: 8px; }
+  }
 `;
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -1480,6 +1490,9 @@ export default function MenuPage() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const menuScrollRef = useRef<HTMLDivElement>(null);
+  const catTabsRef = useRef<HTMLDivElement>(null);
+  const catTabBtnRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<"menu" | "cuenta" | "qr">("menu");
@@ -1681,45 +1694,92 @@ export default function MenuPage() {
   // ─────────────────────────────────────────────────────────────────────────
   // Scroll tracking for category tabs
   // ─────────────────────────────────────────────────────────────────────────
+  const selectedCategoryRef = useRef(selectedCategory);
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
+
   useEffect(() => {
     if (products.length === 0 || !hasCheckedSession) return;
     const container = menuScrollRef.current;
     if (!container) return;
-    const handleScroll = () => {
-      const navbarHeight = 130;
-      const scrollPosition = container.scrollTop + navbarHeight;
-      const available = CATEGORIES.filter(
-        (cat) => getProductsByCategory(cat.id).length > 0,
-      );
-      let active = available[0]?.id || "favorites";
-      for (const cat of available) {
-        const el = categoryRefs.current[cat.id];
-        if (el) {
-          const top = el.offsetTop;
-          if (scrollPosition >= top && scrollPosition < top + el.offsetHeight) {
-            active = cat.id;
-            break;
-          }
+
+    const getAvailable = () =>
+      CATEGORIES.filter((cat) => getProductsByCategory(cat.id).length > 0);
+
+    const onScroll = () => {
+      const available = getAvailable();
+      if (!available.length) return;
+
+      const headerHeight = stickyHeaderRef.current?.offsetHeight ?? 100;
+      const atBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        8;
+
+      if (atBottom) {
+        const lastId = available[available.length - 1].id;
+        if (lastId !== selectedCategoryRef.current) setSelectedCategory(lastId);
+        return;
+      }
+
+      // Range-based: cat is active while scrollTop is in [catTop, nextCatTop)
+      let active = available[0].id;
+      for (let i = 0; i < available.length; i++) {
+        const el = categoryRefs.current[available[i].id];
+        if (!el) continue;
+        const sectionTop = el.offsetTop - headerHeight;
+        const nextEl = available[i + 1]
+          ? categoryRefs.current[available[i + 1].id]
+          : null;
+        const sectionBottom = nextEl
+          ? nextEl.offsetTop - headerHeight
+          : Infinity;
+        if (
+          container.scrollTop >= sectionTop &&
+          container.scrollTop < sectionBottom
+        ) {
+          active = available[i].id;
+          break;
         }
       }
-      if (active !== selectedCategory) setSelectedCategory(active);
+
+      if (active !== selectedCategoryRef.current) setSelectedCategory(active);
     };
+
     let ticking = false;
     const throttled = () => {
       if (!ticking) {
         requestAnimationFrame(() => {
-          handleScroll();
+          onScroll();
           ticking = false;
         });
         ticking = true;
       }
     };
+
     container.addEventListener("scroll", throttled, { passive: true });
-    handleScroll();
-    return () => {
-      container.removeEventListener("scroll", throttled);
-    };
-  }, [products, selectedCategory, hasCheckedSession]);
+    onScroll(); // run once on mount
+    return () => container.removeEventListener("scroll", throttled);
+  }, [products, hasCheckedSession]);
+
+  // Auto-scroll the category tab bar to keep the active tab visible
+  useEffect(() => {
+    const tabBar = catTabsRef.current;
+    const btn = catTabBtnRefs.current[selectedCategory];
+    if (!tabBar || !btn) return;
+    const barLeft = tabBar.scrollLeft;
+    const barRight = barLeft + tabBar.clientWidth;
+    const btnLeft = btn.offsetLeft;
+    const btnRight = btnLeft + btn.offsetWidth;
+    if (btnLeft < barLeft + 20) {
+      tabBar.scrollTo({ left: btnLeft - 20, behavior: "smooth" });
+    } else if (btnRight > barRight - 20) {
+      tabBar.scrollTo({
+        left: btnRight - tabBar.clientWidth + 20,
+        behavior: "smooth",
+      });
+    }
+  }, [selectedCategory]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Data loading
@@ -1818,7 +1878,7 @@ export default function MenuPage() {
     setTimeout(() => {
       const el = categoryRefs.current[catId];
       if (el && menuScrollRef.current) {
-        const offset = 130;
+        const offset = stickyHeaderRef.current?.offsetHeight ?? 100;
         menuScrollRef.current.scrollTo({
           top: el.offsetTop - offset,
           behavior: "smooth",
@@ -2260,213 +2320,245 @@ export default function MenuPage() {
     );
     return (
       <>
-        {/* Header */}
-        <header
-          style={{
-            padding: "12px 20px",
-            borderBottom: "1px solid var(--border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "white",
-            flexShrink: 0,
-          }}
-        >
-          <div>
-            <p
-              style={{
-                fontSize: 17,
-                fontWeight: 800,
-                color: "var(--navy)",
-                letterSpacing: "-0.3px",
-              }}
-            >
-              ScanEat
-            </p>
-            <p style={{ fontSize: 11, color: "var(--muted)" }}>
-              Mesa {tableNumber} • {customerName}
-              {currentOrder?.id && ` • #${currentOrder.id.slice(0, 8)}`}
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              onClick={handleAssistanceRequest}
-              disabled={assistanceLoading}
-              style={{
-                background: "var(--amber-light)",
-                color: "var(--amber)",
-                border: "1.5px solid oklch(88% 0.1 70)",
-                borderRadius: 9,
-                padding: "8px 14px",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontFamily: "inherit",
-                opacity: assistanceLoading ? 0.7 : 1,
-              }}
-            >
-              <IHelp /> {assistanceLoading ? "Enviando…" : "Ayuda"}
-            </button>
-            <button
-              onClick={() => setShowCart(true)}
-              style={{
-                background: "var(--navy)",
-                color: "white",
-                border: "none",
-                borderRadius: 9,
-                padding: "8px 14px",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontFamily: "inherit",
-                animation: cartBounce ? "menuBounce 0.4s ease" : "none",
-                position: "relative",
-              }}
-            >
-              <ICart s={16} /> {cartItemsCount} ${cartTotal.toFixed(2)}
-              {cartItemsCount > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -5,
-                    right: -5,
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    background: "var(--red)",
-                    fontSize: 9,
-                    fontWeight: 800,
-                    color: "white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {cartItemsCount > 99 ? "99+" : cartItemsCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </header>
-
-        {/* Cart summary bar */}
-        {cartItemsCount > 0 && (
-          <div
-            className="anim-fadeup"
+        {/* Sticky header wrapper — measured for scrollspy offset */}
+        <div ref={stickyHeaderRef} style={{ flexShrink: 0 }}>
+          {/* Header */}
+          <header
             style={{
-              padding: "9px 20px",
-              background: "var(--green-light)",
-              borderBottom: "1px solid oklch(88% 0.08 145)",
+              padding: "12px 20px",
+              borderBottom: "1px solid var(--border)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              background: "white",
               flexShrink: 0,
             }}
           >
-            <p
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--green)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <ICheck s={12} /> {cartItemsCount}{" "}
-              {cartItemsCount === 1 ? "ítem" : "ítems"} en carrito de{" "}
-              {customerName}
-            </p>
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--muted)",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              <IClock /> ~{Math.round(getEstimatedTime())} min
-            </p>
-          </div>
-        )}
-
-        {lastOrderSent && cartItemsCount === 0 && (
-          <div
-            className="anim-fadeup"
-            style={{
-              padding: "9px 20px",
-              background: "var(--green-light)",
-              borderBottom: "1px solid oklch(88% 0.08 145)",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              flexShrink: 0,
-            }}
-          >
-            <ICheck s={14} />
-            <span
-              style={{ fontSize: 13, fontWeight: 600, color: "var(--green)" }}
-            >
-              ¡Orden enviada a cocina! Puedes seguir agregando ítems.
-            </span>
-          </div>
-        )}
-
-        {/* Category tabs */}
-        <div
-          style={{
-            padding: "12px 20px 0",
-            background: "white",
-            borderBottom: "1px solid var(--border)",
-            flexShrink: 0,
-            display: "flex",
-            gap: 4,
-            overflowX: "auto",
-          }}
-        >
-          {availableCats.map((cat) => {
-            const active = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => scrollToCategory(cat.id)}
+            <div>
+              <p
                 style={{
-                  padding: "8px 14px",
-                  borderRadius: "10px 10px 0 0",
-                  border: active
-                    ? "1.5px solid var(--navy)"
-                    : "1.5px solid transparent",
-                  background: active ? "var(--navy)" : "transparent",
-                  color: active ? "white" : "var(--muted)",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  borderBottom: active
-                    ? "1.5px solid white"
-                    : "1.5px solid transparent",
-                  marginBottom: -1,
-                  fontFamily: "inherit",
-                  transition: "all 0.15s",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  color: "var(--navy)",
+                  letterSpacing: "-0.3px",
                 }}
               >
-                {cat.name}
+                ScanEat
+              </p>
+              <p style={{ fontSize: 11, color: "var(--muted)" }}>
+                Mesa {tableNumber} • {customerName}
+                {currentOrder?.id && ` • #${currentOrder.id.slice(0, 8)}`}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                onClick={handleAssistanceRequest}
+                disabled={assistanceLoading}
+                style={{
+                  background: "var(--amber-light)",
+                  color: "var(--amber)",
+                  border: "1.5px solid oklch(88% 0.1 70)",
+                  borderRadius: 9,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: "inherit",
+                  opacity: assistanceLoading ? 0.7 : 1,
+                }}
+              >
+                <IHelp /> {assistanceLoading ? "Enviando…" : "Ayuda"}
               </button>
-            );
-          })}
+              <button
+                onClick={() => setShowCart(true)}
+                style={{
+                  background: "var(--accent)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 9,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontFamily: "inherit",
+                  animation: cartBounce ? "menuBounce 0.4s ease" : "none",
+                  position: "relative",
+                }}
+              >
+                <ICart s={16} /> {cartItemsCount} ${cartTotal.toFixed(2)}
+                {cartItemsCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -5,
+                      right: -5,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: "var(--red)",
+                      fontSize: 9,
+                      fontWeight: 800,
+                      color: "white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {cartItemsCount > 99 ? "99+" : cartItemsCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </header>
+
+          {/* Cart summary bar */}
+          {cartItemsCount > 0 && (
+            <div
+              className="anim-fadeup"
+              style={{
+                padding: "9px 20px",
+                background: "var(--green-light)",
+                borderBottom: "1px solid oklch(88% 0.08 145)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexShrink: 0,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--green)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <ICheck s={12} /> {cartItemsCount}{" "}
+                {cartItemsCount === 1 ? "ítem" : "ítems"} en carrito de{" "}
+                {customerName}
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <IClock /> ~{Math.round(getEstimatedTime())} min
+              </p>
+            </div>
+          )}
+
+          {lastOrderSent && cartItemsCount === 0 && (
+            <div
+              className="anim-fadeup"
+              style={{
+                padding: "9px 20px",
+                background: "var(--green-light)",
+                borderBottom: "1px solid oklch(88% 0.08 145)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0,
+              }}
+            >
+              <ICheck s={14} />
+              <span
+                style={{ fontSize: 13, fontWeight: 600, color: "var(--green)" }}
+              >
+                ¡Orden enviada a cocina! Puedes seguir agregando ítems.
+              </span>
+            </div>
+          )}
+
+          {/* Category tabs */}
+          <div
+            style={{
+              position: "relative",
+              flexShrink: 0,
+              background: "white",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <div
+              style={
+                {
+                  padding: "12px 20px 0",
+                  display: "flex",
+                  gap: 4,
+                  overflowX: "auto",
+                  WebkitOverflowScrolling: "touch" as never,
+                  scrollbarWidth: "none" as never,
+                  msOverflowStyle: "none" as never,
+                } as React.CSSProperties
+              }
+              className="menu-cat-tabs"
+              ref={catTabsRef}
+            >
+              {availableCats.map((cat) => {
+                const active = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    ref={(el) => {
+                      catTabBtnRefs.current[cat.id] = el;
+                    }}
+                    onClick={() => scrollToCategory(cat.id)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "10px 10px 0 0",
+                      border: active
+                        ? "1.5px solid var(--accent)"
+                        : "1.5px solid transparent",
+                      background: active ? "var(--accent)" : "transparent",
+                      color: active ? "white" : "var(--muted)",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      borderBottom: active
+                        ? "1.5px solid white"
+                        : "1.5px solid transparent",
+                      marginBottom: -1,
+                      fontFamily: "inherit",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
+            {/* fade hint — more tabs to the right */}
+            <div
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: 1,
+                width: 40,
+                background: "linear-gradient(to right, transparent, white)",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
         </div>
+        {/* end stickyHeaderRef */}
 
         {/* Product grid */}
         <main
           ref={menuScrollRef}
-          style={{ flex: 1, overflowY: "auto", padding: "24px 20px" }}
+          style={{ flex: 1, overflowY: "auto", padding: "32px 24px" }}
         >
           {availableCats.map((cat) => {
             const catProducts = getProductsByCategory(cat.id);
@@ -2477,8 +2569,9 @@ export default function MenuPage() {
                 ref={(el) => {
                   categoryRefs.current[cat.id] = el;
                 }}
-                className="anim-fadeup"
-                style={{ marginBottom: 40 }}
+                data-category-id={cat.id}
+                className="anim-fadeup product-grid-section"
+                style={{ marginBottom: 56 }}
               >
                 <div
                   style={{
@@ -2491,7 +2584,7 @@ export default function MenuPage() {
                   <div>
                     <h2
                       style={{
-                        fontSize: 20,
+                        fontSize: 26,
                         fontWeight: 800,
                         color: "var(--text)",
                         letterSpacing: "-0.4px",
@@ -2501,9 +2594,9 @@ export default function MenuPage() {
                     </h2>
                     <p
                       style={{
-                        fontSize: 13,
+                        fontSize: 16,
                         color: "var(--muted)",
-                        marginTop: 2,
+                        marginTop: 4,
                       }}
                     >
                       {catProducts.length} producto
@@ -2512,13 +2605,13 @@ export default function MenuPage() {
                   </div>
                   <span
                     style={{
-                      fontSize: 12,
-                      fontWeight: 600,
+                      fontSize: 14,
+                      fontWeight: 700,
                       color: "var(--muted)",
                       background: "var(--surface)",
                       border: "1.5px solid var(--border)",
                       borderRadius: 20,
-                      padding: "4px 10px",
+                      padding: "6px 14px",
                     }}
                   >
                     {catProducts.length} items
@@ -2528,8 +2621,8 @@ export default function MenuPage() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
-                    gap: 16,
+                    gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))",
+                    gap: 20,
                   }}
                 >
                   {catProducts.map((product) => {
@@ -2558,7 +2651,7 @@ export default function MenuPage() {
                           <div
                             style={{
                               width: "100%",
-                              height: 140,
+                              height: 210,
                               background: "var(--surface)",
                               display: "flex",
                               alignItems: "center",
@@ -2685,7 +2778,7 @@ export default function MenuPage() {
                         {/* Info */}
                         <div
                           style={{
-                            padding: "12px 14px 14px",
+                            padding: "16px 16px 18px",
                             flex: 1,
                             display: "flex",
                             flexDirection: "column",
@@ -2693,20 +2786,20 @@ export default function MenuPage() {
                         >
                           <p
                             style={{
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: 700,
                               color: "var(--text)",
-                              marginBottom: 3,
+                              marginBottom: 6,
                             }}
                           >
                             {product.name}
                           </p>
                           <p
                             style={{
-                              fontSize: 12,
+                              fontSize: 14,
                               color: "var(--muted)",
                               lineHeight: 1.5,
-                              marginBottom: 4,
+                              marginBottom: 8,
                               flex: 1,
                             }}
                           >
@@ -2750,13 +2843,13 @@ export default function MenuPage() {
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "space-between",
-                              marginTop: 8,
+                              marginTop: 10,
                             }}
                           >
                             <div>
                               <p
                                 style={{
-                                  fontSize: 16,
+                                  fontSize: 18,
                                   fontWeight: 800,
                                   color: "var(--navy)",
                                 }}
@@ -2766,12 +2859,12 @@ export default function MenuPage() {
                               {product.preparation_time && (
                                 <p
                                   style={{
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     color: "var(--muted)",
                                     display: "flex",
                                     alignItems: "center",
                                     gap: 3,
-                                    marginTop: 2,
+                                    marginTop: 4,
                                   }}
                                 >
                                   <IClock />
@@ -2859,7 +2952,7 @@ export default function MenuPage() {
                                 }}
                                 disabled={addingProduct === product.id}
                                 style={{
-                                  background: "var(--navy)",
+                                  background: "var(--accent)",
                                   color: "white",
                                   border: "none",
                                   cursor: "pointer",
@@ -3564,7 +3657,7 @@ export default function MenuPage() {
                 padding: 14,
                 borderRadius: 12,
                 border: "none",
-                background: "var(--navy)",
+                background: "var(--accent)",
                 cursor: "pointer",
                 fontSize: 14,
                 fontWeight: 700,
