@@ -194,7 +194,7 @@ export default function HistoryPage() {
         (payload) => {
           console.log(
             "Cambio en estado de mesa en History:",
-            payload.new.status
+            payload.new.status,
           );
           setTableStatus(payload.new.status);
 
@@ -210,7 +210,7 @@ export default function HistoryPage() {
               router.push("/customer");
             }, 300);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -228,7 +228,7 @@ export default function HistoryPage() {
     if (hasPricedExtras) {
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
+        (part) => !part.includes("Extras:") && !part.includes("Total:"),
       );
       const extrasPart = parts.find((part) => part.includes("Extras:"));
       const totalPart = parts.find((part) => part.includes("Total:"));
@@ -340,8 +340,8 @@ export default function HistoryPage() {
           isFullyCancelled
             ? "bg-red-50 border-l-4 border-l-red-400 pl-3 opacity-75"
             : isPartiallyCancelled
-            ? "bg-orange-50 border-l-4 border-l-orange-400 pl-3"
-            : ""
+              ? "bg-orange-50 border-l-4 border-l-orange-400 pl-3"
+              : ""
         }`}
       >
         <div className="flex-1">
@@ -608,7 +608,7 @@ export default function HistoryPage() {
           cancelledUnitsCount: 0,
           activeAmount: 0,
           cancelledAmount: 0,
-        }
+        },
       );
 
       customerSummary.subtotal += orderCalculations.activeAmount;
@@ -619,7 +619,7 @@ export default function HistoryPage() {
       customerSummary.cancelledAmount += orderCalculations.cancelledAmount;
 
       customerSummary.itemsCount += order.order_items.filter(
-        (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0
+        (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0,
       ).length;
 
       if (
@@ -639,7 +639,7 @@ export default function HistoryPage() {
     return Array.from(customerMap.values()).sort(
       (a, b) =>
         new Date(b.latestOrderDate).getTime() -
-        new Date(a.latestOrderDate).getTime()
+        new Date(a.latestOrderDate).getTime(),
     );
   };
 
@@ -737,7 +737,7 @@ export default function HistoryPage() {
       // Crear nueva orden para el nuevo usuario
       const newOrder = await historyService.createOrder(
         parseInt(tableId),
-        userName.trim()
+        userName.trim(),
       );
 
       // Actualizar lista de usuarios
@@ -771,7 +771,7 @@ export default function HistoryPage() {
       await historyService.requestBill(
         parseInt(tableId),
         currentOrder?.id,
-        "ticket"
+        "ticket",
       );
 
       alert("✅ Se ha solicitado la cuenta. El mesero te lo traerá pronto.");
@@ -829,10 +829,10 @@ export default function HistoryPage() {
         async (payload) => {
           console.log(
             "📦 History: Cambio en orden detectado:",
-            payload.eventType
+            payload.eventType,
           );
           debouncedUpdate();
-        }
+        },
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a órdenes:", status);
@@ -850,7 +850,7 @@ export default function HistoryPage() {
         async (payload) => {
           console.log("📦 History: Cambio en items detectado");
           debouncedUpdate();
-        }
+        },
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a items:", status);
@@ -874,7 +874,7 @@ export default function HistoryPage() {
             alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
             window.location.href = "/customer";
           }
-        }
+        },
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a notificaciones:", status);
@@ -1026,15 +1026,15 @@ export default function HistoryPage() {
   // Calcular total general de la mesa
   const mesaTotal = customerSummaries.reduce(
     (total, customer) => total + customer.total,
-    0
+    0,
   );
   const mesaCancelledAmount = customerSummaries.reduce(
     (total, customer) => total + customer.cancelledAmount,
-    0
+    0,
   );
   const mesaCancelledUnits = customerSummaries.reduce(
     (total, customer) => total + customer.cancelledUnitsCount,
-    0
+    0,
   );
 
   return (
@@ -1183,7 +1183,7 @@ export default function HistoryPage() {
                         {/* Items de esta orden */}
                         <div className="space-y-3">
                           {order.order_items.map((item) =>
-                            renderOrderItem(item)
+                            renderOrderItem(item),
                           )}
                         </div>
 

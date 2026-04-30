@@ -72,7 +72,7 @@ export default function NotificationCard({ notification, processing, isAttended,
           <button
             onClick={onAcknowledge}
             disabled={isProcessing}
-            style={{ padding:"8px 14px",borderRadius:9,border:"none",background:"var(--navy)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",opacity:isProcessing?0.6:1,display:"flex",alignItems:"center",gap:5 }}
+            style={{ padding:"8px 14px",borderRadius:9,border:"none",background:"var(--accent)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",opacity:isProcessing?0.6:1,display:"flex",alignItems:"center",gap:5 }}
           >
             {isProcessing
               ? <span style={{ animation:"wr-spin 0.8s linear infinite",display:"inline-block" }}>↻</span>

@@ -13,7 +13,7 @@ export default function Header({ loading, onRefresh }: HeaderProps) {
       <button
         onClick={onRefresh}
         disabled={loading}
-        style={{ background:"var(--navy)",color:"white",border:"none",borderRadius:9,padding:"8px 16px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontFamily:"inherit",opacity:loading?0.7:1,transition:"filter 0.15s" }}
+        style={{ background:"var(--accent)",color:"white",border:"none",borderRadius:9,padding:"8px 16px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontFamily:"inherit",opacity:loading?0.7:1,transition:"filter 0.15s" }}
       >
         <span style={{ display:"inline-block",animation:loading?"wr-spin 0.8s linear infinite":"none" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
