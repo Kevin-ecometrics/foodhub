@@ -50,7 +50,7 @@ export default function NotificationsTab({
           <span style={{ fontSize:12,color:"var(--muted)" }}>Orden:</span>
           <div style={{ display:"flex",border:"1.5px solid var(--border)",borderRadius:9,overflow:"hidden" }}>
             {(["oldest","newest"] as const).map(o => (
-              <button key={o} onClick={() => setSortOrder(o)} style={{ padding:"7px 14px",border:"none",background:sortOrder===o?"var(--navy)":"white",color:sortOrder===o?"white":"var(--muted)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s" }}>
+              <button key={o} onClick={() => setSortOrder(o)} style={{ padding:"7px 14px",border:"none",background:sortOrder===o?"var(--accent)":"white",color:sortOrder===o?"white":"var(--muted)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s" }}>
                 {o === "oldest" ? "↓ Antiguas" : "↑ Nuevas"}
               </button>
             ))}

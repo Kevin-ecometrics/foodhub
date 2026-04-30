@@ -29,7 +29,7 @@ export default function Tabs({ activeTab, onTabChange, notificationsCount, occup
           <button
             key={t.id}
             onClick={() => onTabChange(t.id)}
-            style={{ padding:"12px 16px",border:"none",background:"none",fontSize:13,fontWeight:active?700:500,color:active?"var(--navy)":"var(--muted)",borderBottom:active?"2.5px solid var(--navy)":"2.5px solid transparent",marginBottom:-1,display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s" }}
+            style={{ padding:"12px 16px",border:"none",background:"none",fontSize:13,fontWeight:active?700:500,color:active?"var(--accent)":"var(--muted)",borderBottom:active?"2.5px solid var(--accent)":"2.5px solid transparent",marginBottom:-1,display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s" }}
           >
             {t.label}
             {count !== null && count > 0 && (

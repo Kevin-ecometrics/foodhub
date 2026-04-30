@@ -137,7 +137,7 @@ function PasswordModal({
               transition: "border-color 0.15s",
             }}
             placeholder="Contraseña de autorización"
-            onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
             onBlur={(e) =>
               (e.target.style.borderColor = error
                 ? "var(--red)"
@@ -453,7 +453,7 @@ function PaymentCalculator({
                   outline: "none",
                   background: "var(--surface)",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+                onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                 onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
               />
               <button
@@ -507,7 +507,7 @@ function PaymentCalculator({
                 outline: "none",
                 background: "var(--surface)",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
               onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
             />
           </div>
@@ -583,7 +583,7 @@ function PaymentCalculator({
                       outline: "none",
                     }}
                     onFocus={(e) =>
-                      (e.target.style.borderColor = "var(--navy)")
+                      (e.target.style.borderColor = "var(--accent)")
                     }
                     onBlur={(e) =>
                       (e.target.style.borderColor = "var(--border)")
@@ -595,7 +595,7 @@ function PaymentCalculator({
                       padding: "7px 14px",
                       borderRadius: 7,
                       border: "none",
-                      background: "var(--navy)",
+                      background: "var(--accent)",
                       color: "white",
                       fontSize: 12,
                       fontWeight: 700,
@@ -640,7 +640,7 @@ function PaymentCalculator({
                   outline: "none",
                   background: "var(--surface)",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+                onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                 onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
               />
               <span style={{ fontSize: 12, color: "var(--muted)" }}>USD</span>
@@ -1743,7 +1743,7 @@ function GuestPaymentModal({
                   outline: "none",
                   background: "var(--surface)",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+                onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                 onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
               />
             </div>
@@ -1814,7 +1814,7 @@ function GuestPaymentModal({
                     padding: "7px 14px",
                     borderRadius: 7,
                     border: "none",
-                    background: "var(--navy)",
+                    background: "var(--accent)",
                     color: "white",
                     fontSize: 12,
                     fontWeight: 700,
@@ -1838,7 +1838,7 @@ function GuestPaymentModal({
                 outline: "none",
                 background: "var(--surface)",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--navy)")}
+              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
               onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
             />
             {usdAmount > 0 && (
@@ -1982,7 +1982,7 @@ function TablesOrderSelect({
             style={{
               padding: "7px 14px",
               border: "none",
-              background: value === o.k ? "var(--navy)" : "white",
+              background: value === o.k ? "var(--accent)" : "white",
               color: value === o.k ? "white" : "var(--muted)",
               fontSize: 12,
               fontWeight: 700,

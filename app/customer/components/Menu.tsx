@@ -1395,7 +1395,7 @@ const ProductModal = ({
                   padding: 13,
                   borderRadius: 11,
                   border: "none",
-                  background: "var(--navy)",
+                  background: "var(--accent)",
                   cursor: "pointer",
                   fontSize: 14,
                   fontWeight: 700,
@@ -3063,8 +3063,8 @@ export default function MenuPage() {
               style={{
                 background: historyRefreshed
                   ? "var(--green-light)"
-                  : "var(--navy-light)",
-                color: historyRefreshed ? "var(--green)" : "var(--navy)",
+                  : "var(--accent-light)",
+                color: historyRefreshed ? "var(--green)" : "var(--accent)",
                 border: "1.5px solid var(--border)",
                 borderRadius: 9,
                 padding: "8px 14px",
@@ -3814,7 +3814,7 @@ export default function MenuPage() {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 3,
-                color: active ? "var(--navy)" : "var(--muted)",
+                color: active ? "var(--accent)" : "var(--muted)",
                 fontFamily: "inherit",
                 transition: "color 0.15s",
               }}
@@ -3829,7 +3829,7 @@ export default function MenuPage() {
                     width: 18,
                     height: 2,
                     borderRadius: 1,
-                    background: "var(--navy)",
+                    background: "var(--accent)",
                   }}
                 ></div>
               )}
