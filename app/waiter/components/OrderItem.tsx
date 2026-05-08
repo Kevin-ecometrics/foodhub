@@ -6,6 +6,7 @@ interface OrderItemProps {
   processing: string | null;
   onUpdateStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string, cancelQuantity: number) => void;
+  onCancelModalChange?: (isOpen: boolean) => void;
 }
 
 const STATUS_LABEL: Record<string, string> = { ordered:"Ordenado", preparing:"En Preparación", ready:"Listo", served:"Servido", cancelled:"Cancelado" };
@@ -13,7 +14,7 @@ const STATUS_BG:    Record<string, string> = { ordered:"var(--red-light)", prepa
 const STATUS_COLOR: Record<string, string> = { ordered:"var(--red)", preparing:"var(--amber)", ready:"var(--blue)", served:"var(--green)", cancelled:"var(--muted)" };
 const STATUS_NEXT:  Record<string, string> = { ordered:"preparing", preparing:"ready", ready:"served", served:"served", cancelled:"cancelled" };
 
-export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem }: OrderItemProps) {
+export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem, onCancelModalChange }: OrderItemProps) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelQuantity, setCancelQuantity] = useState(1);
 
@@ -34,11 +35,11 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
     e.preventDefault(); e.stopPropagation();
     if (!canCancel()) return;
     setCancelQuantity(1);
-    setShowCancelModal(true);
+    setShowCancelModal(true); onCancelModalChange?.(true);
   };
 
   const handleConfirmCancel = () => {
-    if (cancelQuantity > 0 && cancelQuantity <= availableToCancel) { onCancelItem(item.id, cancelQuantity); setShowCancelModal(false); }
+    if (cancelQuantity > 0 && cancelQuantity <= availableToCancel) { onCancelItem(item.id, cancelQuantity); setShowCancelModal(false); onCancelModalChange?.(false); }
   };
 
   const formatItemNotes = (notes: string | null) => {
@@ -111,7 +112,7 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
 
       {/* Cancel modal */}
       {showCancelModal && (
-        <div onClick={() => setShowCancelModal(false)} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:800,padding:16,animation:"wr-fadein 0.2s ease" }}>
+        <div onClick={() => { setShowCancelModal(false); onCancelModalChange?.(false); }} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:800,padding:16,animation:"wr-fadein 0.2s ease" }}>
           <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:16,padding:"28px",maxWidth:340,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease" }}>
             {/* Icon */}
             <div style={{ width:48,height:48,borderRadius:14,background:"var(--red-light)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16 }}>
@@ -137,7 +138,7 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
             )}
 
             <div style={{ display:"flex",gap:10 }}>
-              <button onClick={() => setShowCancelModal(false)} style={{ flex:1,padding:"11px 0",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>
+              <button onClick={() => { setShowCancelModal(false); onCancelModalChange?.(false); }} style={{ flex:1,padding:"11px 0",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>
                 Volver
               </button>
               <button onClick={handleConfirmCancel} style={{ flex:1,padding:"11px 0",borderRadius:10,border:"none",background:"var(--red)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit" }}>

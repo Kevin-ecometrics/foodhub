@@ -292,6 +292,9 @@ function PaymentCalculator({
     if (totalPaid === 0) {
       toast("Debe ingresar al menos un monto de pago", "warning"); return;
     }
+    if (totalPaid < totalAmount) {
+      toast(`Falta $${(totalAmount - totalPaid).toFixed(2)} por cubrir`, "warning"); return;
+    }
 
     onConfirm({
       cash: cashAmount,
@@ -791,17 +794,17 @@ function PaymentCalculator({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={totalPaid === 0}
+            disabled={totalPaid === 0 || totalPaid < totalAmount}
             style={{
               flex: 1,
               padding: 12,
               borderRadius: 10,
               border: "none",
-              background: totalPaid === 0 ? "var(--border)" : "var(--green)",
+              background: (totalPaid === 0 || totalPaid < totalAmount) ? "var(--border)" : "var(--green)",
               fontSize: 13,
               fontWeight: 700,
               color: "white",
-              opacity: totalPaid === 0 ? 0.5 : 1,
+              opacity: (totalPaid === 0 || totalPaid < totalAmount) ? 0.5 : 1,
             }}
           >
             Confirmar Pago
@@ -2052,13 +2055,14 @@ export default function WaiterDashboard() {
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
   const isLoadingRef = useRef(false);
+  const modalOpenRef = useRef(false);
 
   useEffect(() => {
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
     const interval = setInterval(() => {
-      if (isUpdatingRef.current) return;
+      if (isUpdatingRef.current || modalOpenRef.current) return;
 
       isUpdatingRef.current = true;
       scrollPositionRef.current =
@@ -2085,6 +2089,11 @@ export default function WaiterDashboard() {
   useEffect(() => {
     localStorage.setItem("waiter_tables_order", tablesOrder);
   }, [tablesOrder]);
+
+  // Bloquea el refresh automático mientras algún modal de pago o de agregar productos esté abierto
+  useEffect(() => {
+    modalOpenRef.current = showPaymentCalculator || showSeparatePayments;
+  }, [showPaymentCalculator, showSeparatePayments]);
 
   const loadData = async () => {
     // Prevenir llamadas simultáneas
@@ -2162,7 +2171,7 @@ export default function WaiterDashboard() {
           table: "waiter_notifications",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2186,7 +2195,7 @@ export default function WaiterDashboard() {
           table: "orders",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2210,7 +2219,7 @@ export default function WaiterDashboard() {
           table: "order_items",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2234,7 +2243,7 @@ export default function WaiterDashboard() {
           table: "tables",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2603,6 +2612,7 @@ export default function WaiterDashboard() {
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
                 tablesOrder={tablesOrder}
+                onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments; }}
               />
             </>
           )}
