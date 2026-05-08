@@ -291,7 +291,9 @@ function PaymentCalculator({
   const handleConfirm = () => {
     if (totalPaid === 0) {
       toast("Debe ingresar al menos un monto de pago", "warning"); return;
-      return;
+    }
+    if (totalPaid < totalAmount) {
+      toast(`Falta $${(totalAmount - totalPaid).toFixed(2)} por cubrir`, "warning"); return;
     }
 
     onConfirm({
@@ -792,17 +794,17 @@ function PaymentCalculator({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={totalPaid === 0}
+            disabled={totalPaid === 0 || totalPaid < totalAmount}
             style={{
               flex: 1,
               padding: 12,
               borderRadius: 10,
               border: "none",
-              background: totalPaid === 0 ? "var(--border)" : "var(--green)",
+              background: (totalPaid === 0 || totalPaid < totalAmount) ? "var(--border)" : "var(--green)",
               fontSize: 13,
               fontWeight: 700,
               color: "white",
-              opacity: totalPaid === 0 ? 0.5 : 1,
+              opacity: (totalPaid === 0 || totalPaid < totalAmount) ? 0.5 : 1,
             }}
           >
             Confirmar Pago

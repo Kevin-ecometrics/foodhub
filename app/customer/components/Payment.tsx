@@ -370,7 +370,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onConfirm,
 export default function PaymentPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { session, isLoading: sessionLoading } = useSession();
+  const { session, isLoading: sessionLoading, clearSession } = useSession();
   const { currentTableId, notificationState, createBillNotification, refreshOrder } = useOrder();
 
   const tableNumber = session?.tableNumber;
@@ -383,7 +383,7 @@ export default function PaymentPage() {
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [surveyCompleted, setSurveyCompleted] = useState(false);
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(10);
   const [loading, setLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderWithItems[]>([]);
   const [error, setError] = useState("");
@@ -392,6 +392,13 @@ export default function PaymentPage() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState({ status: "pending" });
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!paymentConfirmed || showSurvey) return;
+    if (countdown <= 0) { clearSession(); router.push("/customer"); return; }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [paymentConfirmed, showSurvey, countdown]);
 
   const loadOrders = async () => {
     const targetTableId = tableId || currentTableId;
@@ -548,10 +555,11 @@ export default function PaymentPage() {
   }, [tableId, currentTableId, notificationState.hasPendingBill, paymentConfirmed]);
 
   const handleSurveySubmit = async (rating: number, comment: string) => {
+    setCountdown(10);
     try { await saveSurveyToDatabase(rating, comment); } catch (e) { console.error(e); }
     setSurveyCompleted(true); setShowSurvey(false);
   };
-  const handleSurveySkip = () => { setSurveyCompleted(true); setShowSurvey(false); };
+  const handleSurveySkip = () => { setSurveyCompleted(true); setShowSurvey(false); setCountdown(10); };
 
   const handleGeneratePDF = async () => {
     try {
@@ -675,6 +683,17 @@ export default function PaymentPage() {
         </div>
 
         {showSurvey && <SatisfactionSurvey onSubmit={handleSurveySubmit} onSkip={handleSurveySkip} customerName={customerSummaries[0]?.customerName || "Cliente"} />}
+
+        {!showSurvey && (
+          <div style={{ textAlign:"center" }}>
+            <p style={{ fontSize:12,color:"var(--muted)",marginBottom:8 }}>
+              Redirigiendo en <strong style={{ color:"var(--accent)" }}>{countdown}s</strong>…
+            </p>
+            <div style={{ height:3,borderRadius:99,background:"var(--border)",overflow:"hidden" }}>
+              <div style={{ height:"100%",borderRadius:99,background:"var(--accent)",width:`${(countdown/10)*100}%`,transition:"width 1s linear" }} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
