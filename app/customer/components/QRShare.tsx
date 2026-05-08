@@ -11,8 +11,10 @@ import {
   FaExclamationTriangle,
 } from "react-icons/fa";
 import { supabase } from "@/app/lib/supabase/client";
+import { useToast } from "@/app/context/ToastContext";
 
 export default function QRSharePage() {
+  const { toast } = useToast();
   const router = useRouter();
   const { session, isLoading, clearSession } = useSession();
   const [copied, setCopied] = useState(false);
@@ -174,7 +176,7 @@ export default function QRSharePage() {
             clearLocalStorage();
             clearSession();
             setTimeout(() => {
-              alert("👋 La mesa ha sido liberada. Gracias por su visita!");
+              toast("La mesa ha sido liberada. ¡Gracias por su visita!", "success");
               router.push("/customer");
             }, 300);
           }

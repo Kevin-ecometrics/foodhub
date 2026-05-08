@@ -2,6 +2,7 @@
 // app/admin/components/TablesManagement.tsx
 "use client";
 import { useState, useEffect } from "react";
+import { useConfirm } from "@/app/context/ConfirmContext";
 import { supabase } from "@/app/lib/supabase/client";
 import {
   FaPlus,
@@ -21,6 +22,7 @@ interface TablesManagementProps {
 }
 
 export default function TablesManagement({ onError }: TablesManagementProps) {
+  const { confirm } = useConfirm();
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
@@ -146,12 +148,13 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   const handleDeleteTableOrder = async (tableId: string) => {
-    if (
-      !confirm(
-        "¿Estás seguro de que quieres eliminar la orden de esta mesa? Esta acción no se puede deshacer y eliminará todos los pedidos y notificaciones asociadas, y la mesa volverá a estar disponible."
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Eliminar orden de mesa",
+      message: "Esta acción eliminará todos los pedidos y notificaciones asociadas. La mesa volverá a estar disponible. No se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      type: "danger",
+    });
+    if (!ok) return;
 
     setDeletingTable(tableId);
     try {
@@ -375,7 +378,13 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   const handleDeleteTable = async (tableId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar esta mesa?")) return;
+    const ok = await confirm({
+      title: "Eliminar mesa",
+      message: "¿Estás seguro de que quieres eliminar esta mesa? Esta acción no se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      type: "danger",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase

@@ -10,6 +10,7 @@ import { notificationsService } from "@/app/lib/supabase/notifications";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
+import { useToast } from "@/app/context/ToastContext";
 
 // ─── Design Tokens & Animations ─────────────────────────────────────────────
 const DESIGN_CSS = `
@@ -1123,7 +1124,7 @@ const ProductModal = ({
                 >
                   ${product.price.toFixed(2)}
                 </span>
-                {product.preparation_time && (
+                {!!product.preparation_time && product.preparation_time > 0 && (
                   <span
                     style={{
                       fontSize: 12,
@@ -1431,6 +1432,7 @@ const ProductModal = ({
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function MenuPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const { session, clearSession, updateSession } = useSession();
 
@@ -1599,7 +1601,7 @@ export default function MenuPage() {
             clearLocalStorage();
             clearSession();
             setTimeout(() => {
-              alert("👋 La mesa ha sido liberada. Gracias por su visita!");
+              toast("La mesa ha sido liberada. ¡Gracias por su visita!", "success");
               router.push("/customer");
             }, 300);
           }
@@ -1626,7 +1628,7 @@ export default function MenuPage() {
         },
         (payload) => {
           if (payload.new.type === "table_freed") {
-            alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
+            toast("La cuenta ha sido cerrada. ¡Gracias por su visita!", "success");
             clearSession();
             window.location.href = "/customer";
           }
@@ -2702,7 +2704,7 @@ export default function MenuPage() {
                                 Favorito
                               </span>
                             )}
-                            {product.rating && product.rating >= 4.5 && (
+                            {!!product.rating && product.rating >= 4.5 && (
                               <span
                                 style={{
                                   background: "var(--accent)",
@@ -2735,7 +2737,7 @@ export default function MenuPage() {
                               </span>
                             )}
                           </div>
-                          {product.rating && product.rating > 0 && (
+                          {!!product.rating && product.rating > 0 && (
                             <span
                               style={{
                                 position: "absolute",
@@ -2856,7 +2858,7 @@ export default function MenuPage() {
                               >
                                 ${product.price.toFixed(2)}
                               </p>
-                              {product.preparation_time && (
+                              {!!product.preparation_time && product.preparation_time > 0 && (
                                 <p
                                   style={{
                                     fontSize: 13,

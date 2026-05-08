@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { useToast } from "@/app/context/ToastContext";
 import {
   FaHistory,
   FaUtensils,
@@ -54,6 +55,7 @@ interface CustomerOrderSummary {
 }
 
 export default function HistoryPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const {
     session,
@@ -206,7 +208,7 @@ export default function HistoryPage() {
             clearSession();
 
             setTimeout(() => {
-              alert("👋 La mesa ha sido liberada. Gracias por su visita!");
+              toast("La mesa ha sido liberada. ¡Gracias por su visita!", "success");
               router.push("/customer");
             }, 300);
           }
@@ -719,7 +721,7 @@ export default function HistoryPage() {
       });
     } catch (error) {
       console.error("Error switching user:", error);
-      alert("Error al cambiar de usuario");
+      toast("Error al cambiar de usuario", "error");
     }
   };
 
@@ -729,7 +731,7 @@ export default function HistoryPage() {
     if (!userName?.trim()) return;
 
     if (!tableId) {
-      alert("No se encontró la mesa");
+      toast("No se encontró la mesa", "error");
       return;
     }
 
@@ -750,10 +752,10 @@ export default function HistoryPage() {
         customerName: userName.trim(),
       });
 
-      alert(`✅ Bienvenido/a, ${userName.trim()}!`);
+      toast(`Bienvenido/a, ${userName.trim()}!`, "success");
     } catch (error) {
       console.error("Error adding new user:", error);
-      alert("Error al agregar nuevo comensal");
+      toast("Error al agregar nuevo comensal", "error");
     }
   };
 
@@ -774,7 +776,7 @@ export default function HistoryPage() {
         "ticket",
       );
 
-      alert("✅ Se ha solicitado la cuenta. El mesero te lo traerá pronto.");
+      toast("Se ha solicitado la cuenta. El mesero te la traerá pronto.", "success");
 
       setShowPaymentMethodModal(false);
 
@@ -784,7 +786,7 @@ export default function HistoryPage() {
       }, 1000);
     } catch (error) {
       console.error("Error requesting ticket:", error);
-      alert("❌ Error al solicitar el ticket");
+      toast("Error al solicitar el ticket", "error");
     } finally {
       setBillLoading(false);
     }
@@ -871,7 +873,7 @@ export default function HistoryPage() {
 
           if (payload.new.type === "table_freed") {
             console.log("🚨 History: Mesa liberada - Redirigiendo...");
-            alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
+            toast("La cuenta ha sido cerrada. ¡Gracias por su visita!", "success");
             window.location.href = "/customer";
           }
         },
@@ -895,10 +897,10 @@ export default function HistoryPage() {
     setAssistanceLoading(true);
     try {
       await historyService.requestAssistance(parseInt(tableId));
-      alert("✅ El mesero ha sido notificado. Pronto te atenderá.");
+      toast("El mesero ha sido notificado. Pronto te atenderá.", "success");
     } catch (error) {
       console.error("Error requesting assistance:", error);
-      alert("❌ Error al solicitar asistencia");
+      toast("Error al solicitar asistencia", "error");
     } finally {
       setAssistanceLoading(false);
     }

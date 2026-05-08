@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState, useEffect } from "react";
+import { useToast } from "@/app/context/ToastContext";
 import {
   FaUtensils,
   FaTable,
@@ -111,6 +112,7 @@ export default function Dashboard({
   salesSummary,
   salesHistory,
 }: DashboardProps) {
+  const { toast } = useToast();
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateInput, setDateInput] = useState(
     selectedDate.toISOString().split("T")[0],
@@ -167,7 +169,7 @@ export default function Dashboard({
       const endDate = new Date(endYear, endMonth - 1, endDay);
 
       if (startDate > endDate) {
-        alert("La fecha de inicio no puede ser mayor que la fecha final");
+        toast("La fecha de inicio no puede ser mayor que la fecha final", "warning");
         return;
       }
 
@@ -420,7 +422,7 @@ export default function Dashboard({
       setShowTicketModal(true);
     } catch (error) {
       console.error("Error loading ticket items:", error);
-      alert("Error al cargar los detalles del ticket");
+      toast("Error al cargar los detalles del ticket", "error");
     } finally {
       setLoadingTicket(false);
     }
@@ -850,7 +852,7 @@ export default function Dashboard({
     );
 
     if (activeProducts.length === 0) {
-      alert("No hay datos de productos vendidos para exportar");
+      toast("No hay datos de productos vendidos para exportar", "warning");
       return;
     }
 
@@ -1046,7 +1048,7 @@ export default function Dashboard({
     );
 
     if (activeProducts.length === 0) {
-      alert("No hay datos de productos vendidos para generar el reporte");
+      toast("No hay datos de productos vendidos para generar el reporte", "warning");
       return;
     }
 

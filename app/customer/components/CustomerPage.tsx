@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/context/SessionContext";
 import { tablesService, Table } from "@/app/lib/supabase/tables";
+import { useToast } from "@/app/context/ToastContext";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
 import { FaExclamationTriangle } from "react-icons/fa";
@@ -100,6 +101,7 @@ const StepsCard = () => {
 };
 
 export default function CustomerPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const { setSession } = useSession();
   const [tables, setTables] = useState<Table[]>([]);
@@ -127,7 +129,7 @@ export default function CustomerPage() {
     if (redirectedParam) {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
-      setTimeout(() => { alert("¡Gracias por su visita! Esperamos verlo pronto."); }, 500);
+      setTimeout(() => { toast("¡Gracias por su visita! Esperamos verlo pronto.", "info"); }, 500);
     }
   }, []);
 

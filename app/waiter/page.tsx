@@ -8,6 +8,7 @@ import {
   TableWithOrder,
 } from "@/app/lib/supabase/waiter";
 import { supabase } from "@/app/lib/supabase/client";
+import { useToast } from "@/app/context/ToastContext";
 import Header from "./components/Header";
 import Tabs from "./components/Tabs";
 import NotificationsTab from "./components/NotificationsTab";
@@ -215,6 +216,7 @@ function PaymentCalculator({
   totalAmount: number;
   tableNumber: number;
 }) {
+  const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
   const getInitialUsdRate = (): number => {
     if (typeof window !== "undefined") {
@@ -282,13 +284,13 @@ function PaymentCalculator({
       setShowRateInput(false);
     } else {
       setTempRate(usdRate.toString());
-      alert("Por favor ingrese una tasa de cambio válida");
+      toast("Por favor ingrese una tasa de cambio válida", "warning");
     }
   };
 
   const handleConfirm = () => {
     if (totalPaid === 0) {
-      alert("Debe ingresar al menos un monto de pago");
+      toast("Debe ingresar al menos un monto de pago", "warning"); return;
       return;
     }
 
@@ -853,6 +855,7 @@ function SeparatePaymentsModal({
   tableNumber: number;
   totalAmount: number;
 }) {
+  const { toast } = useToast();
   const getInitialUsdRate = (): number => {
     if (typeof window !== "undefined") {
       const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
@@ -996,7 +999,7 @@ function SeparatePaymentsModal({
     });
 
     if (guestsWithDebt.length > 0) {
-      alert(`Faltan pagos de: ${guestsWithDebt.map((g) => g.name).join(", ")}`);
+      toast(`Faltan pagos de: ${guestsWithDebt.map((g) => g.name).join(", ")}`, "warning"); return;
       return;
     }
 
@@ -1549,6 +1552,7 @@ function GuestPaymentModal({
   guest: any;
   tableNumber: number;
 }) {
+  const { toast } = useToast();
   const getInitialUsdRate = (): number => {
     if (typeof window !== "undefined") {
       const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
@@ -1589,7 +1593,7 @@ function GuestPaymentModal({
 
   const handleConfirm = () => {
     if (totalPaid === 0) {
-      alert("Debe ingresar al menos un monto de pago");
+      toast("Debe ingresar al menos un monto de pago", "warning"); return;
       return;
     }
 
@@ -1999,6 +2003,7 @@ function TablesOrderSelect({
 }
 
 export default function WaiterDashboard() {
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -2326,7 +2331,7 @@ export default function WaiterDashboard() {
       );
     } catch (error: any) {
       console.error("Error cancelando producto:", error);
-      alert(`Error al cancelar el producto:\n${error.message}`);
+      toast(`Error al cancelar el producto: ${error.message}`, "error");
       await loadData();
     } finally {
       setProcessing(null);
@@ -2449,30 +2454,11 @@ export default function WaiterDashboard() {
         paymentMethod,
       );
 
-      let successMessage = `✅ Mesa ${selectedTableForSeparate.number} cobrada exitosamente (Pagos Individuales).\n\n`;
-      successMessage += `💰 Total: $${selectedTableForSeparate.total.toFixed(2)}\n`;
-      successMessage += `👥 ${payments.length} comensales\n\n`;
-
-      payments.forEach((payment, idx) => {
-        successMessage += `👤 ${payment.guestName}:\n`;
-        successMessage += `   Productos: $${payment.total.toFixed(2)}\n`;
-        successMessage += `   Pagado: $${(payment.cash + payment.terminal + payment.usd * (payment.usdRate || usdRateUsed)).toFixed(2)}\n`;
-        if (payment.cash > 0)
-          successMessage += `   💵 Efectivo: $${payment.cash.toFixed(2)}\n`;
-        if (payment.terminal > 0)
-          successMessage += `   💳 Terminal: $${payment.terminal.toFixed(2)}\n`;
-        if (payment.usd > 0)
-          successMessage += `   💵 Dólares: $${payment.usd.toFixed(2)} USD\n`;
-        successMessage += `\n`;
-      });
-
-      alert(successMessage);
+      toast(`Mesa ${selectedTableForSeparate.number} cobrada — $${selectedTableForSeparate.total.toFixed(2)} · ${payments.length} comensales`, "success");
       await loadData();
     } catch (error: any) {
       console.error("Error en pagos individuales:", error);
-      alert(
-        `❌ Error al procesar pagos individuales de la mesa ${selectedTableForSeparate.number}:\n${error.message}`,
-      );
+      toast(`Error al procesar pagos de la mesa ${selectedTableForSeparate.number}: ${error.message}`, "error");
     } finally {
       setProcessing(null);
       setShowSeparatePayments(false);
@@ -2510,39 +2496,13 @@ export default function WaiterDashboard() {
         paymentMethod,
       );
 
-      let successMessage = `✅ Mesa ${selectedTableForPayment.number} cobrada exitosamente.\n\n`;
-      successMessage += `💰 Total: $${selectedTableForPayment.total.toFixed(2)}\n`;
-      successMessage += `💵 Pagado: $${paymentData.totalPaid.toFixed(2)}\n`;
-      successMessage += `💳 Método: ${
-        paymentMethod === "cash"
-          ? "EFECTIVO"
-          : paymentMethod === "terminal"
-            ? "TERMINAL"
-            : paymentMethod === "usd"
-              ? "DÓLARES"
-              : "MIXTO"
-      }\n\n`;
-
-      if (paymentData.cash > 0) {
-        successMessage += `💵 Efectivo: $${paymentData.cash.toFixed(2)}\n`;
-      }
-      if (paymentData.terminal > 0) {
-        successMessage += `💳 Terminal: $${paymentData.terminal.toFixed(2)}\n`;
-      }
-      if (paymentData.usd > 0) {
-        successMessage += `💵 Dólares: $${paymentData.usd.toFixed(2)} USD ($${paymentData.usdAmount.toFixed(2)} MXN)\n`;
-      }
-      if (paymentData.change > 0) {
-        successMessage += `\n🔄 Cambio a devolver: $${paymentData.change.toFixed(2)}`;
-      }
-
-      alert(successMessage);
+      const metodoPago = paymentMethod === "cash" ? "Efectivo" : paymentMethod === "terminal" ? "Tarjeta" : paymentMethod === "usd" ? "Dólares" : "Mixto";
+      const cambioMsg = paymentData.change > 0 ? ` · Cambio: $${paymentData.change.toFixed(2)}` : "";
+      toast(`Mesa ${selectedTableForPayment.number} cobrada — $${selectedTableForPayment.total.toFixed(2)} · ${metodoPago}${cambioMsg}`, "success");
       await loadData();
     } catch (error: any) {
       console.error("Error cobrando mesa:", error);
-      alert(
-        `❌ Error al cobrar la mesa ${selectedTableForPayment.number}:\n${error.message}`,
-      );
+      toast(`Error al cobrar la mesa ${selectedTableForPayment.number}: ${error.message}`, "error");
     } finally {
       setProcessing(null);
       setShowPaymentCalculator(false);
@@ -2555,7 +2515,7 @@ export default function WaiterDashboard() {
   };
 
   const handleError = (error: string) => {
-    alert(error);
+    toast(error, "error");
   };
 
   if (loading) {

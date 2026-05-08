@@ -3,6 +3,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
+import { useToast } from "@/app/context/ToastContext";
 import {
   FaChartBar,
   FaTable,
@@ -29,6 +30,7 @@ import TablesManagement from "./components/TablesManagement";
 import ProductsManagement from "./components/ProductsManagement";
 
 export default function AdminPage() {
+  const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
@@ -58,12 +60,12 @@ export default function AdminPage() {
   const handleLogoUpload = async (file: File) => {
     // Validaciones
     if (!file.type.startsWith("image/")) {
-      alert("Por favor selecciona un archivo de imagen válido");
+      toast("Por favor selecciona un archivo de imagen válido", "warning");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("La imagen debe ser menor a 5MB");
+      toast("La imagen debe ser menor a 5MB", "warning");
       return;
     }
 
@@ -97,11 +99,11 @@ export default function AdminPage() {
         setLogoUrl(urlWithTimestamp);
       }
 
-      alert("✅ Logo actualizado exitosamente");
+      toast("Logo actualizado exitosamente", "success");
       setShowUploadModal(false);
     } catch (error: any) {
       console.error("Error subiendo logo:", error);
-      alert("❌ Error al subir el logo: " + error.message);
+      toast("Error al subir el logo: " + error.message, "error");
     } finally {
       setUploading(false);
     }
@@ -820,7 +822,7 @@ export default function AdminPage() {
 
       {/* Contenido principal */}
       <main className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto px-6 py-5">
+        <div className="max-w-7xl mx-auto px-6 py-5 pl-14">
           {error && (
             <div className="mb-5 bg-red-50 border border-red-200 rounded-[14px] p-4">
               <p className="text-red-800 text-sm font-medium">{error}</p>
