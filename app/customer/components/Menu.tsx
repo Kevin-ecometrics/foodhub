@@ -667,6 +667,7 @@ const CartDrawer = ({
   onRemove: (id: string) => void;
   onSend: () => void;
   sending: boolean;
+  estimatedTime: number;
 }) => {
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
   return (
@@ -909,7 +910,7 @@ const CartDrawer = ({
             >
               <IClock />
               <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                Tiempo estimado: ~10 minutos
+                Tiempo estimado: ~{estimatedTime} minutos
               </span>
             </div>
             <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -3885,6 +3886,7 @@ export default function MenuPage() {
           onRemove={(id) => removeFromCart(id)}
           onSend={handleSendOrder}
           sending={sendingOrder}
+          estimatedTime={getEstimatedTime()}
         />
       )}
 
