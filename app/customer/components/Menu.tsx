@@ -658,6 +658,7 @@ const CartDrawer = ({
   onRemove,
   onSend,
   sending,
+  estimatedTime,
 }: {
   items: OrderItem[];
   customerName: string;
