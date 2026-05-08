@@ -15,9 +15,10 @@ interface CustomerOrderSectionProps {
   processing: string | null;
   onUpdateItemStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string) => void;
+  onCancelModalChange?: (isOpen: boolean) => void;
 }
 
-export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem }: CustomerOrderSectionProps) {
+export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem, onCancelModalChange }: CustomerOrderSectionProps) {
   return (
     <div style={{ borderBottom:"1px solid var(--border)" }}>
       {/* Customer header */}
@@ -45,6 +46,7 @@ export default function CustomerOrderSection({ customerSummary, processing, onUp
               processing={processing}
               onUpdateStatus={onUpdateItemStatus}
               onCancelItem={onCancelItem}
+              onCancelModalChange={onCancelModalChange}
             />
           ))
         )}

@@ -12,12 +12,13 @@ interface TablesTabProps {
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
   tablesOrder: string;
+  onAddModalChange?: (isOpen: boolean) => void;
 }
 
 export default function TablesTab({
   tables, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
-  notifications, tablesOrder,
+  notifications, tablesOrder, onAddModalChange,
 }: TablesTabProps) {
   const totalGeneral = tables.reduce((s, t) => s + calculateTableTotal(t), 0);
   const occupiedCount = tables.filter(t => t.status === "occupied").length;
@@ -91,6 +92,7 @@ export default function TablesTab({
                 occupationTime={occupationDisplay}
                 hasNotifications={hasNotifs}
                 isHighlighted={isOldest}
+                onAddModalChange={onAddModalChange}
               />
             </div>
           );

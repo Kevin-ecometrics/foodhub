@@ -16,12 +16,14 @@ interface TableCardProps {
   occupationTime?: string;
   hasNotifications?: boolean;
   isHighlighted?: boolean;
+  onAddModalChange?: (isOpen: boolean) => void;
 }
 
 export default function TableCard({
   table, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
   notifications, occupationTime, hasNotifications, isHighlighted = false,
+  onAddModalChange,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
   const isOccupied = table.status === "occupied";
@@ -56,6 +58,7 @@ export default function TableCard({
         hasNotifications={hasNotifications}
         isHighlighted={isHighlighted}
         occupationTime={occupationTime}
+        onAddModalChange={onAddModalChange}
       />
 
       {customerSummaries.map(cs => (
@@ -65,6 +68,7 @@ export default function TableCard({
           processing={processing}
           onUpdateItemStatus={onUpdateItemStatus}
           onCancelItem={onCancelItem}
+          onCancelModalChange={onAddModalChange}
         />
       ))}
 

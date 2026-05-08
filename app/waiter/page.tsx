@@ -2057,13 +2057,14 @@ export default function WaiterDashboard() {
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
   const isLoadingRef = useRef(false);
+  const modalOpenRef = useRef(false);
 
   useEffect(() => {
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
     const interval = setInterval(() => {
-      if (isUpdatingRef.current) return;
+      if (isUpdatingRef.current || modalOpenRef.current) return;
 
       isUpdatingRef.current = true;
       scrollPositionRef.current =
@@ -2090,6 +2091,10 @@ export default function WaiterDashboard() {
   useEffect(() => {
     localStorage.setItem("waiter_tables_order", tablesOrder);
   }, [tablesOrder]);
+
+  useEffect(() => {
+    modalOpenRef.current = showPaymentCalculator || showSeparatePayments;
+  }, [showPaymentCalculator, showSeparatePayments]);
 
   const loadData = async () => {
     // Prevenir llamadas simultáneas
@@ -2167,7 +2172,7 @@ export default function WaiterDashboard() {
           table: "waiter_notifications",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2191,7 +2196,7 @@ export default function WaiterDashboard() {
           table: "orders",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2215,7 +2220,7 @@ export default function WaiterDashboard() {
           table: "order_items",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2239,7 +2244,7 @@ export default function WaiterDashboard() {
           table: "tables",
         },
         () => {
-          if (isUpdatingRef.current) return;
+          if (isUpdatingRef.current || modalOpenRef.current) return;
           isUpdatingRef.current = true;
           scrollPositionRef.current =
             window.scrollY || document.documentElement.scrollTop;
@@ -2607,6 +2612,7 @@ export default function WaiterDashboard() {
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
                 tablesOrder={tablesOrder}
+                onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments; }}
               />
             </>
           )}
