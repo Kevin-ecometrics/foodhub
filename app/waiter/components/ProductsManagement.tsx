@@ -1,9 +1,7 @@
 // app/waiter/components/ProductsManagement.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/app/lib/supabase/client";
-import { productsService } from "@/app/lib/supabase/products"; // IMPORTAR EL SERVICE
-import { FaSpinner } from "react-icons/fa";
+import { productsService } from "@/app/lib/supabase/products";
 
 interface Product {
   id: number;
@@ -24,25 +22,20 @@ interface ProductsManagementProps {
   onError: (error: string) => void;
 }
 
-export default function ProductsManagement({
-  onError,
-}: ProductsManagementProps) {
+export default function ProductsManagement({ onError }: ProductsManagementProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [updatingProduct, setUpdatingProduct] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  useEffect(() => { loadProducts(); }, []);
 
   const loadProducts = async () => {
     setProductsLoading(true);
     try {
-      // USAR EL SERVICE EN LUGAR DE SUPABASE DIRECTAMENTE
-      const productsData = await productsService.getProducts();
-      setProducts(productsData as never);
-    } catch (error) {
-      console.error("Error loading products:", error);
+      const data = await productsService.getProducts();
+      setProducts(data as never);
+    } catch (e) {
+      console.error(e);
       onError("Error cargando los productos");
     } finally {
       setProductsLoading(false);
@@ -52,156 +45,82 @@ export default function ProductsManagement({
   const toggleProductAvailability = async (product: Product) => {
     setUpdatingProduct(product.id);
     try {
-      // USAR EL SERVICE PARA ACTUALIZAR
-      await productsService.updateProductWithExtras(product.id, {
-        ...product,
-        is_available: !product.is_available,
-        extras: product.extras || [], // INCLUIR LOS EXTRAS
-      });
-
-      // Actualizar el estado local inmediatamente
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === product.id
-            ? { ...p, is_available: !product.is_available }
-            : p
-        )
-      );
-    } catch (error) {
-      console.error("Error updating product availability:", error);
+      await productsService.updateProductWithExtras(product.id, { ...product, is_available: !product.is_available, extras: product.extras || [] });
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_available: !product.is_available } : p));
+    } catch (e) {
+      console.error(e);
       onError("Error actualizando la disponibilidad del producto");
     } finally {
       setUpdatingProduct(null);
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
-  };
+  const formatCurrency = (n: number) => new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" }).format(n);
+  const available = products.filter(p => p.is_available).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">
-          Gestión de Productos
-        </h2>
-        <div className="text-sm text-gray-500">
-          {products.filter((p) => p.is_available).length} de {products.length}{" "}
-          productos disponibles
-        </div>
+    <div style={{ animation:"wr-fadeup 0.3s ease" }}>
+      <div style={{ display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:20 }}>
+        <h2 style={{ fontSize:18,fontWeight:800,color:"var(--text)",margin:0 }}>Gestión de Productos</h2>
+        <span style={{ fontSize:13,color:"var(--muted)" }}>
+          <strong style={{ color:"var(--green)" }}>{available}</strong> de {products.length} disponibles
+        </span>
       </div>
 
       {productsLoading ? (
-        <div className="text-center py-12">
-          <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Cargando productos...</p>
+        <div style={{ textAlign:"center",padding:"48px 0",color:"var(--muted)" }}>
+          <div style={{ width:48,height:48,borderRadius:14,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px" }}>
+            <svg style={{ animation:"wr-spin 0.9s linear infinite" }} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </div>
+          <p style={{ fontSize:14 }}>Cargando productos...</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Producto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoría
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr
-                    key={product.id}
-                    className={`hover:bg-gray-50 ${
-                      !product.is_available ? "bg-red-50" : ""
-                    }`}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        {product.image_url && (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="h-12 w-12 rounded-lg object-cover mr-4"
-                          />
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {product.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {product.description}
-                          </div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {formatCurrency(product.price)}
-                            {product.preparation_time &&
-                              ` • ${product.preparation_time} min`}
-                            {/* MOSTRAR EXTRAS SI EXISTEN */}
-                            {product.extras && product.extras.length > 0 && (
-                              <div className="text-green-600 mt-1">
-                                +{product.extras.length} extras disponibles
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {product.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => toggleProductAvailability(product)}
-                        disabled={updatingProduct === product.id}
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
-                          product.is_available
-                            ? "bg-green-100 text-green-800 hover:bg-green-200"
-                            : "bg-red-100 text-red-800 hover:bg-red-200"
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {updatingProduct === product.id ? (
-                          <FaSpinner className="animate-spin mr-1" />
-                        ) : null}
-                        {product.is_available ? "Disponible" : "No Disponible"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div style={{ border:"1.5px solid var(--border)",borderRadius:14,overflow:"hidden",background:"white" }}>
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 120px 130px",padding:"10px 18px",background:"var(--surface)",borderBottom:"1.5px solid var(--border)" }}>
+            {["Producto","Categoría","Estado"].map(h => (
+              <span key={h} style={{ fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.06em" }}>{h}</span>
+            ))}
           </div>
-
-          {products.length === 0 && !productsLoading && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No hay productos registrados</p>
+          {products.length === 0 ? (
+            <div style={{ textAlign:"center",padding:48,color:"var(--muted)",fontSize:14 }}>No hay productos registrados</div>
+          ) : products.map((p, i) => (
+            <div key={p.id} style={{ display:"grid",gridTemplateColumns:"1fr 120px 130px",padding:"12px 18px",borderBottom:i<products.length-1?"1px solid var(--border)":"none",alignItems:"center",background:p.is_available?"white":"oklch(99% 0.02 20)",transition:"background 0.15s" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+                {p.image_url
+                  ? <img src={p.image_url} alt={p.name} style={{ width:44,height:44,borderRadius:8,objectFit:"cover",flexShrink:0 }} />
+                  : <div style={{ width:44,height:44,borderRadius:8,background:"var(--accent-light)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>🍽️</div>
+                }
+                <div>
+                  <p style={{ fontSize:13,fontWeight:700,color:"var(--text)",margin:0 }}>{p.name}</p>
+                  <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginTop:2 }}>{p.description}</p>
+                  <p style={{ fontSize:12,fontWeight:600,color:"var(--green)",margin:0,marginTop:2 }}>
+                    {formatCurrency(p.price)}
+                    {p.preparation_time && <span style={{ color:"var(--muted)",fontWeight:400 }}> • {p.preparation_time} min</span>}
+                    {p.extras && p.extras.length > 0 && <span style={{ color:"var(--green)",marginLeft:4 }}>+{p.extras.length} extras</span>}
+                  </p>
+                </div>
+              </div>
+              <span style={{ fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:6,background:"var(--navy-light)",color:"var(--navy)",display:"inline-block",width:"fit-content" }}>{p.category}</span>
+              <button
+                onClick={() => toggleProductAvailability(p)}
+                disabled={updatingProduct === p.id}
+                style={{ padding:"6px 14px",borderRadius:8,border:"none",background:p.is_available?"var(--green-light)":"var(--red-light)",color:p.is_available?"var(--green)":"var(--red)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5,width:"fit-content",opacity:updatingProduct===p.id?0.6:1,transition:"filter 0.15s" }}
+              >
+                {updatingProduct === p.id ? "↻" : p.is_available ? "✓ Disponible" : "✕ No disponible"}
+              </button>
             </div>
-          )}
+          ))}
         </div>
       )}
 
-      {/* Información para el mesero */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-800 mb-2">Información</h3>
-        <p className="text-sm text-blue-700">
-          • Haz clic en el estado del producto para cambiar entre Disponible y
-          No Disponible
-        </p>
-        <p className="text-sm text-blue-700">
-          • Los productos marcados como No Disponible no aparecerán en el menú
-          de los clientes
-        </p>
-        <p className="text-sm text-blue-700">
-          • Los productos con extras mostrarán
+      <div style={{ marginTop:16,border:"1.5px solid var(--blue-light)",borderRadius:12,padding:"14px 18px",background:"var(--blue-light)" }}>
+        <p style={{ fontSize:13,fontWeight:700,color:"var(--blue)",marginBottom:6 }}>ℹ️ Información</p>
+        <p style={{ fontSize:12,color:"var(--blue)",margin:0,lineHeight:1.6 }}>
+          • Haz clic en el estado del producto para cambiar entre Disponible y No Disponible<br/>
+          • Los productos marcados como No Disponible no aparecerán en el menú de los clientes<br/>
+          • Los productos con extras mostrarán el contador de extras disponibles
         </p>
       </div>
     </div>

@@ -1,28 +1,20 @@
-import {
-  FaBell,
-  FaUtensils,
-  FaReceipt,
-  FaExclamationTriangle,
-  FaCheckCircle,
-} from "react-icons/fa";
-
 interface NotificationIconProps {
   type: string;
 }
 
+const ICONS: Record<string, { emoji: string; color: string; bg: string }> = {
+  new_order:     { emoji: "🍽️", color: "var(--green)",  bg: "var(--green-light)"  },
+  assistance:    { emoji: "🙋",  color: "var(--amber)",  bg: "var(--amber-light)"  },
+  bill_request:  { emoji: "🧾",  color: "var(--red)",    bg: "var(--red-light)"    },
+  order_updated: { emoji: "🔔",  color: "var(--blue)",   bg: "var(--blue-light)"   },
+  table_freed:   { emoji: "✅",  color: "var(--green)",  bg: "var(--green-light)"  },
+};
+
 export default function NotificationIcon({ type }: NotificationIconProps) {
-  switch (type) {
-    case "new_order":
-      return <FaUtensils className="text-green-500" />;
-    case "assistance":
-      return <FaBell className="text-yellow-500" />;
-    case "bill_request":
-      return <FaReceipt className="text-red-500" />;
-    case "order_updated":
-      return <FaExclamationTriangle className="text-blue-500" />;
-    case "table_freed":
-      return <FaCheckCircle className="text-purple-500" />;
-    default:
-      return <FaBell className="text-gray-500" />;
-  }
+  const cfg = ICONS[type] || { emoji: "🔔", color: "var(--muted)", bg: "var(--surface)" };
+  return (
+    <div style={{ width:42,height:42,borderRadius:12,background:cfg.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0 }}>
+      {cfg.emoji}
+    </div>
+  );
 }

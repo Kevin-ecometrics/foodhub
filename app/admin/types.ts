@@ -32,7 +32,7 @@ export interface SalesHistory {
   order_count: number;
   item_count: number;
   created_at: string;
-  payment_method: 'cash' | 'terminal' | 'ticket' | null;
+  payment_method: 'cash' | 'terminal' | 'ticket' | 'usd' | 'mixed' | null;
   closed_at: string;
 }
 

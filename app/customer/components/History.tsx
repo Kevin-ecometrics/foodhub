@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { useToast } from "@/app/context/ToastContext";
 import {
   FaHistory,
   FaUtensils,
@@ -54,6 +55,7 @@ interface CustomerOrderSummary {
 }
 
 export default function HistoryPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const {
     session,
@@ -194,7 +196,7 @@ export default function HistoryPage() {
         (payload) => {
           console.log(
             "Cambio en estado de mesa en History:",
-            payload.new.status
+            payload.new.status,
           );
           setTableStatus(payload.new.status);
 
@@ -206,11 +208,11 @@ export default function HistoryPage() {
             clearSession();
 
             setTimeout(() => {
-              alert("👋 La mesa ha sido liberada. Gracias por su visita!");
+              toast("La mesa ha sido liberada. ¡Gracias por su visita!", "success");
               router.push("/customer");
             }, 300);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -228,7 +230,7 @@ export default function HistoryPage() {
     if (hasPricedExtras) {
       const parts = notes.split(" | ");
       const mainNotes = parts.find(
-        (part) => !part.includes("Extras:") && !part.includes("Total:")
+        (part) => !part.includes("Extras:") && !part.includes("Total:"),
       );
       const extrasPart = parts.find((part) => part.includes("Extras:"));
       const totalPart = parts.find((part) => part.includes("Total:"));
@@ -340,8 +342,8 @@ export default function HistoryPage() {
           isFullyCancelled
             ? "bg-red-50 border-l-4 border-l-red-400 pl-3 opacity-75"
             : isPartiallyCancelled
-            ? "bg-orange-50 border-l-4 border-l-orange-400 pl-3"
-            : ""
+              ? "bg-orange-50 border-l-4 border-l-orange-400 pl-3"
+              : ""
         }`}
       >
         <div className="flex-1">
@@ -608,7 +610,7 @@ export default function HistoryPage() {
           cancelledUnitsCount: 0,
           activeAmount: 0,
           cancelledAmount: 0,
-        }
+        },
       );
 
       customerSummary.subtotal += orderCalculations.activeAmount;
@@ -619,7 +621,7 @@ export default function HistoryPage() {
       customerSummary.cancelledAmount += orderCalculations.cancelledAmount;
 
       customerSummary.itemsCount += order.order_items.filter(
-        (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0
+        (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0,
       ).length;
 
       if (
@@ -639,7 +641,7 @@ export default function HistoryPage() {
     return Array.from(customerMap.values()).sort(
       (a, b) =>
         new Date(b.latestOrderDate).getTime() -
-        new Date(a.latestOrderDate).getTime()
+        new Date(a.latestOrderDate).getTime(),
     );
   };
 
@@ -719,7 +721,7 @@ export default function HistoryPage() {
       });
     } catch (error) {
       console.error("Error switching user:", error);
-      alert("Error al cambiar de usuario");
+      toast("Error al cambiar de usuario", "error");
     }
   };
 
@@ -729,7 +731,7 @@ export default function HistoryPage() {
     if (!userName?.trim()) return;
 
     if (!tableId) {
-      alert("No se encontró la mesa");
+      toast("No se encontró la mesa", "error");
       return;
     }
 
@@ -737,7 +739,7 @@ export default function HistoryPage() {
       // Crear nueva orden para el nuevo usuario
       const newOrder = await historyService.createOrder(
         parseInt(tableId),
-        userName.trim()
+        userName.trim(),
       );
 
       // Actualizar lista de usuarios
@@ -750,10 +752,10 @@ export default function HistoryPage() {
         customerName: userName.trim(),
       });
 
-      alert(`✅ Bienvenido/a, ${userName.trim()}!`);
+      toast(`Bienvenido/a, ${userName.trim()}!`, "success");
     } catch (error) {
       console.error("Error adding new user:", error);
-      alert("Error al agregar nuevo comensal");
+      toast("Error al agregar nuevo comensal", "error");
     }
   };
 
@@ -771,10 +773,10 @@ export default function HistoryPage() {
       await historyService.requestBill(
         parseInt(tableId),
         currentOrder?.id,
-        "ticket"
+        "ticket",
       );
 
-      alert("✅ Se ha solicitado la cuenta. El mesero te lo traerá pronto.");
+      toast("Se ha solicitado la cuenta. El mesero te la traerá pronto.", "success");
 
       setShowPaymentMethodModal(false);
 
@@ -784,7 +786,7 @@ export default function HistoryPage() {
       }, 1000);
     } catch (error) {
       console.error("Error requesting ticket:", error);
-      alert("❌ Error al solicitar el ticket");
+      toast("Error al solicitar el ticket", "error");
     } finally {
       setBillLoading(false);
     }
@@ -829,10 +831,10 @@ export default function HistoryPage() {
         async (payload) => {
           console.log(
             "📦 History: Cambio en orden detectado:",
-            payload.eventType
+            payload.eventType,
           );
           debouncedUpdate();
-        }
+        },
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a órdenes:", status);
@@ -850,7 +852,7 @@ export default function HistoryPage() {
         async (payload) => {
           console.log("📦 History: Cambio en items detectado");
           debouncedUpdate();
-        }
+        },
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a items:", status);
@@ -871,10 +873,10 @@ export default function HistoryPage() {
 
           if (payload.new.type === "table_freed") {
             console.log("🚨 History: Mesa liberada - Redirigiendo...");
-            alert("✅ La cuenta ha sido cerrada. Gracias por su visita!");
+            toast("La cuenta ha sido cerrada. ¡Gracias por su visita!", "success");
             window.location.href = "/customer";
           }
-        }
+        },
       )
       .subscribe((status) => {
         console.log("History: Estado de suscripción a notificaciones:", status);
@@ -895,10 +897,10 @@ export default function HistoryPage() {
     setAssistanceLoading(true);
     try {
       await historyService.requestAssistance(parseInt(tableId));
-      alert("✅ El mesero ha sido notificado. Pronto te atenderá.");
+      toast("El mesero ha sido notificado. Pronto te atenderá.", "success");
     } catch (error) {
       console.error("Error requesting assistance:", error);
-      alert("❌ Error al solicitar asistencia");
+      toast("Error al solicitar asistencia", "error");
     } finally {
       setAssistanceLoading(false);
     }
@@ -1026,15 +1028,15 @@ export default function HistoryPage() {
   // Calcular total general de la mesa
   const mesaTotal = customerSummaries.reduce(
     (total, customer) => total + customer.total,
-    0
+    0,
   );
   const mesaCancelledAmount = customerSummaries.reduce(
     (total, customer) => total + customer.cancelledAmount,
-    0
+    0,
   );
   const mesaCancelledUnits = customerSummaries.reduce(
     (total, customer) => total + customer.cancelledUnitsCount,
-    0
+    0,
   );
 
   return (
@@ -1183,7 +1185,7 @@ export default function HistoryPage() {
                         {/* Items de esta orden */}
                         <div className="space-y-3">
                           {order.order_items.map((item) =>
-                            renderOrderItem(item)
+                            renderOrderItem(item),
                           )}
                         </div>
 

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { FaUser } from "react-icons/fa";
 import OrderItem from "./OrderItem";
 
 interface CustomerOrderSummary {
@@ -18,40 +17,27 @@ interface CustomerOrderSectionProps {
   onCancelItem: (itemId: string) => void;
 }
 
-export default function CustomerOrderSection({
-  customerSummary,
-  processing,
-  onUpdateItemStatus,
-  onCancelItem,
-}: CustomerOrderSectionProps) {
+export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem }: CustomerOrderSectionProps) {
   return (
-    <div className="mt-4 pt-4 border-t border-gray-200">
-      {/* Header del Cliente */}
-      <div className="flex items-center gap-3 mb-3 p-3 bg-blue-50 rounded-lg">
-        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-          <FaUser className="text-white text-sm" />
+    <div style={{ borderBottom:"1px solid var(--border)" }}>
+      {/* Customer header */}
+      <div style={{ padding:"10px 14px",background:"oklch(97% 0.01 260)",display:"flex",alignItems:"center",gap:8 }}>
+        <div style={{ width:28,height:28,borderRadius:8,background:"var(--navy-light)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--navy)",flexShrink:0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
         </div>
-        <div className="flex-1">
-          <h4 className="font-semibold text-gray-800">
-            {customerSummary.customerName}
-          </h4>
-          <div className="flex items-center gap-3 text-xs text-gray-600">
-            <span>
-              {customerSummary.orders.length} pedido
-              {customerSummary.orders.length > 1 ? "s" : ""}
-            </span>
-            <span>•</span>
-            <span>
-              {customerSummary.itemsCount} producto
-              {customerSummary.itemsCount > 1 ? "s" : ""}
-            </span>
-          </div>
+        <div>
+          <p style={{ fontSize:13,fontWeight:700,color:"var(--text)",margin:0 }}>{customerSummary.customerName}</p>
+          <p style={{ fontSize:11,color:"var(--muted)",margin:0 }}>
+            {customerSummary.orders.length} pedido{customerSummary.orders.length>1?"s":""} • {customerSummary.itemsCount} producto{customerSummary.itemsCount>1?"s":""}
+          </p>
         </div>
       </div>
 
-      {/* Productos */}
-      <div className="space-y-2">
-        {customerSummary.orders.flatMap((order) =>
+      {/* Order items */}
+      <div>
+        {customerSummary.orders.flatMap(order =>
           order.order_items.map((item: any) => (
             <OrderItem
               key={item.id}

@@ -2,6 +2,7 @@
 // app/admin/components/TablesManagement.tsx
 "use client";
 import { useState, useEffect } from "react";
+import { useConfirm } from "@/app/context/ConfirmContext";
 import { supabase } from "@/app/lib/supabase/client";
 import {
   FaPlus,
@@ -10,6 +11,7 @@ import {
   FaCog,
   FaSpinner,
   FaTrash,
+  FaTimes,
 } from "react-icons/fa";
 import { RestaurantTable } from "../types";
 import TableForm from "./TableForm";
@@ -20,6 +22,7 @@ interface TablesManagementProps {
 }
 
 export default function TablesManagement({ onError }: TablesManagementProps) {
+  const { confirm } = useConfirm();
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
@@ -145,12 +148,13 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   const handleDeleteTableOrder = async (tableId: string) => {
-    if (
-      !confirm(
-        "¿Estás seguro de que quieres eliminar la orden de esta mesa? Esta acción no se puede deshacer y eliminará todos los pedidos y notificaciones asociadas, y la mesa volverá a estar disponible."
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Eliminar orden de mesa",
+      message: "Esta acción eliminará todos los pedidos y notificaciones asociadas. La mesa volverá a estar disponible. Esta acción no se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      type: "danger",
+    });
+    if (!ok) return;
 
     setDeletingTable(tableId);
     try {
@@ -374,7 +378,13 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   const handleDeleteTable = async (tableId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar esta mesa?")) return;
+    const ok = await confirm({
+      title: "Eliminar mesa",
+      message: "¿Estás seguro de que quieres eliminar esta mesa? Esta acción no se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      type: "danger",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase
@@ -475,122 +485,129 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: oklch(97% 0.005 80);
             min-height: 100vh;
             display: flex;
-            justify-content: center; 
-            align-items: center; 
-            padding: 20px;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
           }
-          .qr-container {
-            text-align: center;
+          .card {
             background: white;
-            padding: 30px;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            max-width: 400px;
+            border: 1.5px solid oklch(92% 0.01 260);
+            box-shadow: 0 4px 32px oklch(0% 0 0 / 0.08);
+            max-width: 380px;
             width: 100%;
+            overflow: hidden;
           }
-          .header {
+          .card-header {
+            background: oklch(62% 0.18 32);
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .header-icon {
+            width: 38px; height: 38px;
+            background: oklch(96% 0.05 32 / 0.25);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+          }
+          .header-title { color: white; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+          .header-sub { color: oklch(96% 0.05 32 / 0.75); font-size: 12px; margin-top: 1px; }
+          .card-body { padding: 24px; display: flex; flex-direction: column; align-items: center; }
+          .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: oklch(96% 0.05 32); color: oklch(50% 0.18 32);
+            padding: 5px 14px; border-radius: 999px;
+            font-size: 12px; font-weight: 700;
+            margin-bottom: 20px; align-self: center;
+          }
+          .qr-wrap {
+            background: oklch(98.5% 0.005 80);
+            border: 1.5px solid oklch(90% 0.01 260);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
           }
-          .header h1 {
-            color: #333;
-            font-size: 24px;
-            margin-bottom: 5px;
-          }
-          .header p {
-            color: #666;
-            font-size: 16px;
-          }
-          .qr-image {
+          .qr-wrap img { width: 220px; height: 220px; display: block; border-radius: 8px; }
+          .steps {
+            background: oklch(98% 0.005 80);
+            border: 1.5px solid oklch(91% 0.01 260);
+            border-radius: 12px;
+            padding: 14px 16px;
+            text-align: left;
+            margin-bottom: 20px;
             width: 100%;
-            max-width: 300px;
-            height: auto;
-            border: 2px solid #f0f0f0;
-            border-radius: 10px;
-            margin: 0 auto;
           }
-          .instruction {
-            margin-top: 20px;
-            color: #666;
-            font-size: 14px;
-            line-height: 1.5;
+          .steps-title { font-size: 11px; font-weight: 700; color: oklch(45% 0.02 260); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+          .step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+          .step:last-child { margin-bottom: 0; }
+          .step-num {
+            width: 20px; height: 20px; border-radius: 6px;
+            background: oklch(62% 0.18 32); color: white;
+            font-size: 10px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
           }
-          .table-number {
-            background: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            display: inline-block;
-            margin-bottom: 15px;
-          }
-          .actions {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-          }
+          .step-text { font-size: 12px; color: oklch(40% 0.02 260); line-height: 1.5; padding-top: 2px; }
+          .actions { display: flex; gap: 10px; width: 100%; }
           .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
+            flex: 1; padding: 12px; border: none; border-radius: 12px;
+            cursor: pointer; font-size: 13px; font-weight: 700;
+            transition: opacity 0.15s; letter-spacing: -0.1px;
           }
-          .btn-download {
-            background: #2196F3;
-            color: white;
-          }
-          .btn-download:hover {
-            background: #1976D2;
-          }
-          .btn-close {
-            background: #f5f5f5;
-            color: #333;
-          }
-          .btn-close:hover {
-            background: #e0e0e0;
+          .btn:hover { opacity: 0.88; }
+          .btn-primary { background: oklch(62% 0.18 32); color: white; }
+          .btn-secondary {
+            background: oklch(98% 0.005 80);
+            color: oklch(40% 0.02 260);
+            border: 1.5px solid oklch(88% 0.01 260);
           }
         </style>
       </head>
       <body>
-        <div class="qr-container">
-          <div class="header">
-            ${
-              tableNumber
-                ? `<div class="table-number">Mesa ${tableNumber}</div>`
-                : ""
-            }
-            <h1>Código QR</h1>
-            <p>Para pedir desde tu mesa</p>
+        <div class="card">
+          <div class="card-header">
+            <div class="header-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="5" y="5" width="3" height="3" fill="white" stroke="none"/>
+                <rect x="16" y="5" width="3" height="3" fill="white" stroke="none"/>
+                <rect x="5" y="16" width="3" height="3" fill="white" stroke="none"/>
+                <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+              </svg>
+            </div>
+            <div>
+              <div class="header-title">Código QR</div>
+              <div class="header-sub">Casa Jardin Burgers — Escanea para ordenar</div>
+            </div>
           </div>
-          
-          <img src="${imageUrl}" alt="QR Code" class="qr-image" />
-          
-          <div class="instruction">
-            <strong>¿Cómo usar?</strong><br>
-            1. Abre la cámara de tu teléfono<br>
-            2. Escanea el código QR<br>
-            3. Realiza tu pedido directamente
-          </div>
-          
-          <div class="actions">
-            <button class="btn btn-download" onclick="downloadQR()">Descargar QR</button>
-            <button class="btn btn-close" onclick="window.close()">Cerrar</button>
+          <div class="card-body">
+            ${tableNumber ? `<div class="badge">Mesa ${tableNumber}</div>` : ""}
+            <div class="qr-wrap">
+              <img src="${imageUrl}" alt="QR Code" />
+            </div>
+            <div class="steps">
+              <div class="steps-title">¿Cómo usar?</div>
+              <div class="step"><div class="step-num">1</div><div class="step-text">Abre la cámara de tu teléfono</div></div>
+              <div class="step"><div class="step-num">2</div><div class="step-text">Apunta al código QR</div></div>
+              <div class="step"><div class="step-num">3</div><div class="step-text">Realiza tu pedido directamente</div></div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" onclick="downloadQR()">Descargar QR</button>
+              <button class="btn btn-secondary" onclick="window.close()">Cerrar</button>
+            </div>
           </div>
         </div>
-
         <script>
           function downloadQR() {
             const link = document.createElement('a');
@@ -631,16 +648,37 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   // FALLBACK: Mostrar en la misma ventana si no se puede abrir nueva
   const showQRInCurrentWindow = (imageUrl: string, tableNumber?: number) => {
     const htmlContent = `
-    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:10000;">
-      <div style="background:white;padding:30px;border-radius:15px;text-align:center;max-width:400px;margin:20px;">
-        <h2 style="color:#333;margin-bottom:15px;">QR Code - Mesa ${
-          tableNumber || ""
-        }</h2>
-        <img src="${imageUrl}" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:10px;" />
-        <p style="color:#666;margin:15px 0;">Escanea el código QR con tu cámara</p>
-        <button onclick="this.parentElement.parentElement.remove()" style="background:#2196F3;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">
-          Cerrar
-        </button>
+    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:oklch(0% 0 0 / 0.55);backdrop-filter:blur(4px);display:flex;justify-content:center;align-items:center;z-index:10000;padding:20px;" onclick="if(event.target===this)this.remove()">
+      <div style="background:white;border-radius:20px;border:1.5px solid oklch(92% 0.01 260);box-shadow:0 8px 40px oklch(0% 0 0 / 0.14);max-width:360px;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <div style="background:oklch(62% 0.18 32);padding:18px 22px;display:flex;align-items:center;gap:12px;">
+          <div style="width:36px;height:36px;background:oklch(96% 0.05 32 / 0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="5" y="5" width="3" height="3" fill="white" stroke="none"/><rect x="16" y="5" width="3" height="3" fill="white" stroke="none"/><rect x="5" y="16" width="3" height="3" fill="white" stroke="none"/>
+              <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
+            </svg>
+          </div>
+          <div>
+            <div style="color:white;font-size:15px;font-weight:800;letter-spacing:-0.3px;">Código QR${tableNumber ? ` — Mesa ${tableNumber}` : ""}</div>
+            <div style="color:oklch(96% 0.05 32 / 0.75);font-size:11px;margin-top:1px;">Casa Jardin Burgers — Escanea para ordenar</div>
+          </div>
+        </div>
+        <div style="padding:22px;text-align:center;">
+          <div style="background:oklch(98.5% 0.005 80);border:1.5px solid oklch(90% 0.01 260);border-radius:14px;padding:14px;display:inline-block;margin-bottom:18px;">
+            <img src="${imageUrl}" style="width:210px;height:210px;display:block;border-radius:8px;" alt="QR Code" />
+          </div>
+          <div style="background:oklch(98% 0.005 80);border:1.5px solid oklch(91% 0.01 260);border-radius:12px;padding:13px 15px;text-align:left;margin-bottom:18px;">
+            <div style="font-size:10px;font-weight:700;color:oklch(45% 0.02 260);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:9px;">¿Cómo usar?</div>
+            ${["Abre la cámara de tu teléfono","Apunta al código QR","Realiza tu pedido directamente"].map((t,i)=>`
+            <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:${i<2?7:0}px;">
+              <div style="width:19px;height:19px;border-radius:6px;background:oklch(62% 0.18 32);color:white;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</div>
+              <div style="font-size:12px;color:oklch(40% 0.02 260);line-height:1.5;padding-top:2px;">${t}</div>
+            </div>`).join("")}
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button onclick="this.closest('[onclick]').remove()" style="flex:1;padding:11px;border:1.5px solid oklch(88% 0.01 260);border-radius:11px;background:oklch(98% 0.005 80);color:oklch(40% 0.02 260);font-size:13px;font-weight:700;cursor:pointer;">Cerrar</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -718,29 +756,26 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Gestión de Mesas</h2>
-        <div className="flex gap-4">
+    <div className="space-y-5" style={{fontFamily:"var(--font-geist-sans)"}}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[18px] font-extrabold text-slate-900">Gestión de Mesas</h2>
+        <div className="flex gap-2">
           <button
             onClick={loadTables}
-            className="flex items-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
           >
-            <FaSpinner className="text-sm" />
+            <FaSpinner className="text-[11px]" />
             Actualizar
           </button>
           <button
             onClick={() => {
               setEditingTable(null);
-              setTableForm({
-                capacity: "",
-                location: "",
-              });
+              setTableForm({ capacity: "", location: "" });
               setShowTableForm(true);
             }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] bg-[var(--color-accent)] text-white text-xs font-bold hover:brightness-90 transition"
           >
-            <FaPlus />
+            <FaPlus className="text-[11px]" />
             Nueva Mesa
           </button>
         </div>
@@ -761,139 +796,100 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
 
       {tablesLoading ? (
         <div className="text-center py-12">
-          <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Cargando mesas...</p>
+          <div className="w-12 h-12 rounded-[14px] bg-[var(--color-accent)] flex items-center justify-center mx-auto">
+            <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </div>
+          <p className="text-slate-500 mt-4 text-sm font-medium">Cargando mesas...</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b">
-              <h3 className="text-lg font-bold text-gray-800">
-                Todas las Mesas
-              </h3>
-              <p className="text-sm text-gray-600">
-                {tables.length} mesa{tables.length !== 1 ? "s" : ""} en total
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+        <div>
+          <div className="mb-3">
+            <p className="text-sm font-bold text-slate-800">Todas las Mesas</p>
+            <p className="text-xs text-slate-500">{tables.length} mesa{tables.length !== 1 ? "s" : ""} en total</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {[...tables]
                 .sort((a, b) => (a.number ?? a.id) - (b.number ?? b.id))
-                .map((table) => (
-                  <div
-                    key={table.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-800">
-                          Mesa {table.number || table.id}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {table.location}
-                        </p>
+                .map((table, idx) => {
+                  const occ = table.status === "occupied";
+                  const dis = table.status === "maintenance";
+                  return (
+                    <div
+                      key={table.id}
+                      className={`border border-slate-200 rounded-[14px] p-3.5 hover:shadow-sm transition ${dis ? "bg-gray-50" : occ ? "bg-white border-red-200" : "bg-white"}`}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="text-sm font-bold text-slate-900">Mesa {table.number || table.id}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-[6px] ${getStatusColor(table.status)}`}>
+                          {getStatusText(table.status)}
+                        </span>
                       </div>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                          table.status
-                        )}`}
-                      >
-                        {getStatusText(table.status)}
-                      </span>
-                    </div>
+                      <p className="text-[11px] text-slate-500 mb-0.5">{table.location}</p>
+                      <p className="text-[11px] text-slate-500 mb-3">Capacidad: {table.capacity} personas</p>
 
-                    <div className="space-y-2 mb-4">
-                      <p className="text-sm text-gray-600">
-                        <strong>Capacidad:</strong> {table.capacity} personas
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={async () => {
-                          await generateQRCode(
-                            table.number || parseInt(table.id.toString())
-                          );
-                        }}
-                        className="flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition"
-                      >
-                        <FaQrcode />
-                        QR
-                      </button>
-                      <button
-                        onClick={() => handleEditTable(table)}
-                        className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-sm hover:bg-yellow-200 transition"
-                      >
-                        <FaEdit />
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => toggleTableStatus(table)}
-                        className={`flex items-center gap-1 px-3 py-1 rounded text-sm transition ${
-                          table.status === "available"
-                            ? "bg-red-100 text-red-700 hover:bg-red-200"
-                            : "bg-green-100 text-green-700 hover:bg-green-200"
-                        }`}
-                      >
-                        <FaCog />
-                        {table.status === "available" ? "Deshab." : "Habilitar"}
-                      </button>
-
-                      {/* Botón de Eliminar Orden Completa - Solo visible cuando la mesa está ocupada o tiene órdenes */}
-                      {shouldShowDeleteOrderButton(table) && (
+                      <div className="flex gap-1.5 flex-wrap">
                         <button
-                          onClick={() =>
-                            handleDeleteTableOrder(table.id.toString())
-                          }
-                          disabled={deletingTable === table.id.toString()}
-                          className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={async () => await generateQRCode(table.number || parseInt(table.id.toString()))}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[var(--color-accent-light)] text-[var(--color-accent-dark)] text-[11px] font-bold hover:bg-[var(--color-accent-light)] transition"
                         >
-                          {deletingTable === table.id.toString() ? (
-                            <FaSpinner className="animate-spin" />
-                          ) : (
-                            <FaTrash />
-                          )}
-                          Eliminar Orden Completa
+                          <FaQrcode className="text-[10px]" /> QR
                         </button>
-                      )}
+                        <button
+                          onClick={() => handleEditTable(table)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 transition"
+                        >
+                          <FaEdit className="text-[10px]" /> Editar
+                        </button>
+                        <button
+                          onClick={() => toggleTableStatus(table)}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] text-[11px] font-bold transition ${
+                            table.status === "available"
+                              ? "bg-red-50 text-red-600 hover:bg-red-100"
+                              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          }`}
+                        >
+                          <FaCog className="text-[10px]" />
+                          {table.status === "available" ? "Deshab." : "Habilitar"}
+                        </button>
+                        {shouldShowDeleteOrderButton(table) && (
+                          <button
+                            onClick={() => handleDeleteTableOrder(table.id.toString())}
+                            disabled={deletingTable === table.id.toString()}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-red-600 text-white text-[11px] font-bold hover:brightness-90 transition disabled:opacity-50 disabled:cursor-not-allowed w-full justify-center mt-1"
+                          >
+                            {deletingTable === table.id.toString() ? (
+                              <FaSpinner className="animate-spin text-[10px]" />
+                            ) : (
+                              <FaTrash className="text-[10px]" />
+                            )}
+                            Eliminar Orden
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
+                  );
+                })}
           </div>
         </div>
       )}
       {showLogoPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">
-                  Vista Previa del Logo
-                </h2>
-                <button
-                  onClick={() => setShowLogoPreview(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="text-center">
-                {logoUrl ? (
-                  <div>
-                    <img
-                      src={logoUrl}
-                      alt="Logo preview"
-                      className="max-w-full h-auto mx-auto rounded-lg border"
-                    />
-                    <p className="text-sm text-gray-600 mt-2">
-                      URL: {logoUrl.substring(0, 50)}...
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No hay logo cargado</p>
-                )}
-              </div>
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4" onClick={() => setShowLogoPreview(false)}>
+          <div className="bg-white rounded-[18px] shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <p className="text-sm font-extrabold text-slate-900">Vista Previa del Logo</p>
+              <button onClick={() => setShowLogoPreview(false)} className="p-1 text-slate-400 hover:text-slate-600"><FaTimes /></button>
+            </div>
+            <div className="p-5 text-center">
+              {logoUrl ? (
+                <div>
+                  <img src={logoUrl} alt="Logo preview" className="max-w-full h-auto mx-auto rounded-[10px] border border-slate-200" />
+                  <p className="text-[11px] text-slate-500 mt-2">{logoUrl.substring(0, 50)}...</p>
+                </div>
+              ) : (
+                <p className="text-slate-500 text-sm">No hay logo cargado</p>
+              )}
             </div>
           </div>
         </div>
