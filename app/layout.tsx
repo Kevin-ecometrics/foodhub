@@ -4,6 +4,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { OrderProvider } from "@/app/context/OrderContext";
 import { SessionProvider } from "@/app/context/SessionContext";
+import { ToastProvider } from "@/app/context/ToastContext";
+import { ConfirmProvider } from "@/app/context/ConfirmContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,7 +43,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SessionProvider>
-          <OrderProvider>{children}</OrderProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <OrderProvider>{children}</OrderProvider>
+            </ConfirmProvider>
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

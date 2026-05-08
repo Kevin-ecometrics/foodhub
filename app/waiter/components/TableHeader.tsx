@@ -2,6 +2,7 @@
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import { supabase } from "@/app/lib/supabase/client";
 import { useState, useEffect } from "react";
+import { useToast } from "@/app/context/ToastContext";
 
 interface TableHeaderProps {
   table: TableWithOrder;
@@ -27,7 +28,9 @@ export default function TableHeader({
   notifications = [], onOrderAdded, hasNotifications = false,
   isHighlighted = false, occupationTime,
 }: TableHeaderProps) {
+  const { toast } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [successCount, setSuccessCount] = useState<number | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<{ [k: number]: number }>({});
   const [addingOrder, setAddingOrder] = useState(false);
@@ -94,9 +97,10 @@ export default function TableHeader({
         selectedItems.map(i => ({ order_id: (order as any).id, product_id: i.product_id, product_name: i.product_name, price: i.price, quantity: i.quantity, notes: i.notes, status: "ordered" as const, cancelled_quantity: 0 })) as any
       );
       if (itemsError) { await supabase.from("orders").delete().eq("id", (order as any).id); throw new Error(itemsError.message); }
-      setShowAddModal(false); setSelectedProducts({});
+      setSuccessCount(selectedItems.length);
+      setSelectedProducts({});
       if (onOrderAdded) onOrderAdded();
-      alert(`✅ ${selectedItems.length} producto(s) agregado(s) a la mesa ${table.number}`);
+      setTimeout(() => { setShowAddModal(false); setSuccessCount(null); }, 1800);
     } catch (e) { console.error(e); setError(`Error: ${e instanceof Error ? e.message : "Error desconocido"}`); }
     finally { setAddingOrder(false); }
   };
@@ -180,7 +184,7 @@ export default function TableHeader({
 
       {/* Add Products Modal */}
       {showAddModal && (
-        <div onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); }} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
+        <div onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); setSuccessCount(null); }} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
           <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:640,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
             {/* Modal header */}
             <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
@@ -188,13 +192,28 @@ export default function TableHeader({
                 <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Agregar Productos — Mesa {table.number}</p>
                 <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Selecciona los productos que deseas agregar a la orden</p>
               </div>
-              <button onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
+              <button onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); setSuccessCount(null); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
             </div>
 
             {error && <div style={{ margin:"12px 22px 0",padding:"10px 14px",background:"var(--red-light)",borderRadius:10,color:"var(--red)",fontSize:13 }}>{error}</div>}
 
+            {/* Success state */}
+            {successCount !== null && (
+              <div style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"48px 24px",animation:"wr-scalein 0.25s ease" }}>
+                <div style={{ width:64,height:64,borderRadius:20,background:"var(--green-light)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16 }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+                <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",marginBottom:6 }}>¡Productos agregados!</p>
+                <p style={{ fontSize:13,color:"var(--muted)",textAlign:"center" }}>
+                  {successCount} producto{successCount !== 1 ? "s" : ""} agregado{successCount !== 1 ? "s" : ""} a la Mesa {table.number}
+                </p>
+              </div>
+            )}
+
             {/* Product grid */}
-            <div style={{ overflowY:"auto",flex:1,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
+            {successCount === null && <div style={{ overflowY:"auto",flex:1,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
               {productsLoading ? (
                 <div style={{ gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--muted)" }}>
                   <div style={{ width:48,height:48,borderRadius:14,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 8px" }}>
@@ -223,21 +242,23 @@ export default function TableHeader({
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
 
             {/* Footer */}
-            <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
-              <div>
-                <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
-                <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
+            {successCount === null && (
+              <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+                <div>
+                  <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
+                  <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
+                </div>
+                <div style={{ display:"flex",gap:10 }}>
+                  <button onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); setSuccessCount(null); }} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>Cancelar</button>
+                  <button onClick={handleConfirmAddOrder} disabled={addingOrder||getTotalItems()===0} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:getTotalItems()===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
+                    {addingOrder ? "↻ Agregando..." : `+ Agregar a Mesa ${table.number}`}
+                  </button>
+                </div>
               </div>
-              <div style={{ display:"flex",gap:10 }}>
-                <button onClick={() => { setShowAddModal(false); setSelectedProducts({}); setError(null); }} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>Cancelar</button>
-                <button onClick={handleConfirmAddOrder} disabled={addingOrder||getTotalItems()===0} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:getTotalItems()===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
-                  {addingOrder ? "↻ Agregando..." : `+ Agregar a Mesa ${table.number}`}
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}

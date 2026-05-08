@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useToast } from "@/app/context/ToastContext";
+import { useConfirm } from "@/app/context/ConfirmContext";
 import { supabase } from "@/app/lib/supabase/client";
 import { FaPlus, FaEdit, FaSpinner, FaStar, FaSort, FaSortUp, FaSortDown } from "react-icons/fa";
 import { Product, ProductFormData } from "../types";
@@ -21,6 +23,8 @@ interface ProductUpdate {
 export default function ProductsManagement({
   onError,
 }: ProductsManagementProps) {
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [showProductForm, setShowProductForm] = useState(false);
@@ -177,7 +181,7 @@ export default function ProductsManagement({
         extras: [],
       });
       await loadProducts();
-      alert("✅ Producto creado con extras correctamente");
+      toast("Producto creado correctamente", "success");
     } catch (error) {
       console.error("Error creating product:", error);
       onError("Error creando el producto");
@@ -229,7 +233,7 @@ export default function ProductsManagement({
         extras: [],
       });
       await loadProducts();
-      alert("✅ Producto actualizado con extras correctamente");
+      toast("Producto actualizado correctamente", "success");
     } catch (error) {
       console.error("Error updating product:", error);
       onError("Error actualizando el producto");
@@ -299,13 +303,13 @@ export default function ProductsManagement({
 
   // En el componente ProductsManagement, agrega esta función después de las otras funciones
   const handleDeleteProduct = async (productId: number) => {
-    if (
-      !confirm(
-        "¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer."
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Eliminar producto",
+      message: "¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.",
+      confirmLabel: "Sí, eliminar",
+      type: "danger",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase
@@ -322,7 +326,7 @@ export default function ProductsManagement({
       }
 
       await loadProducts();
-      alert("✅ Producto eliminado correctamente");
+      toast("Producto eliminado correctamente", "success");
     } catch (error) {
       console.error("Error deleting product:", error);
       onError("Error eliminando el producto");

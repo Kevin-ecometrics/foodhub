@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "@/app/context/ToastContext";
 
 interface OrderItemProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,6 +15,7 @@ const STATUS_COLOR: Record<string, string> = { ordered:"var(--red)", preparing:"
 const STATUS_NEXT:  Record<string, string> = { ordered:"preparing", preparing:"ready", ready:"served", served:"served", cancelled:"cancelled" };
 
 export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem }: OrderItemProps) {
+  const { toast } = useToast();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelQuantity, setCancelQuantity] = useState(1);
 
@@ -33,15 +35,12 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
   const handleCancelClick = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!canCancel()) {
-      if (item.status === "ready" || item.status === "served") alert("No se puede cancelar un producto que ya está listo o servido");
-      else if (item.status === "cancelled") alert("Este producto ya está cancelado");
+      if (item.status === "ready" || item.status === "served") toast("No se puede cancelar un producto que ya está listo o servido", "warning");
+      else if (item.status === "cancelled") toast("Este producto ya está cancelado", "warning");
       return;
     }
-    if (item.quantity === 1) {
-      if (window.confirm("¿Estás seguro de que quieres cancelar este producto?")) onCancelItem(item.id, 1);
-    } else {
-      setCancelQuantity(1); setShowCancelModal(true);
-    }
+    setCancelQuantity(1);
+    setShowCancelModal(true);
   };
 
   const handleConfirmCancel = () => {

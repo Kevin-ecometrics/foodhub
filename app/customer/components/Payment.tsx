@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { useToast } from "@/app/context/ToastContext";
 import { supabase } from "@/app/lib/supabase/client";
 import axios from "axios";
 
@@ -367,6 +368,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onConfirm,
 
 // ─── PaymentPage ──────────────────────────────────────────────────────────────
 export default function PaymentPage() {
+  const { toast } = useToast();
   const router = useRouter();
   const { session, isLoading: sessionLoading } = useSession();
   const { currentTableId, notificationState, createBillNotification, refreshOrder } = useOrder();
@@ -557,7 +559,7 @@ export default function PaymentPage() {
       const pdfContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket - Mesa ${tableNumber||tableId||currentTableId}</title><style>body{font-family:Arial,sans-serif;margin:20px;color:#333}.header{text-align:center;background:#1f2937;color:white;padding:20px;margin-bottom:20px}.restaurant-name{font-size:24px;font-weight:bold;margin-bottom:5px}.table-info{font-size:14px;color:#d1d5db}.customer-section{margin-bottom:25px;border-bottom:1px solid #e5e7eb;padding-bottom:15px}.customer-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px}.customer-name{font-size:18px;font-weight:bold;color:#1f2937}.item-row{display:flex;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6}.item-name{font-weight:500}.item-details{font-size:12px;color:#6b7280;margin-top:2px}.notes-section{background:#f9fafb;padding:8px;border-radius:4px;margin-top:5px;font-size:11px}.notes-main{color:#92400e;margin-bottom:4px}.extras-section{color:#065f46;margin-top:4px}.extra-item{display:flex;justify-content:space-between;margin-bottom:2px}.summary-row{display:flex;justify-content:space-between;margin-bottom:5px}.final-total{border-top:2px solid #1f2937;padding-top:15px;margin-top:20px}.total-row{display:flex;justify-content:space-between;font-size:18px;font-weight:bold}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px}</style></head><body><div class="header"><div class="restaurant-name">RESTAURANTE</div><div class="table-info">Mesa ${tableNumber||tableId||currentTableId}</div><div class="table-info">${new Date().toLocaleString("es-MX")}</div></div>${mesaCancelledUnits>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:10px;margin:10px 0;font-size:12px;color:#dc2626;"><strong>Nota:</strong> Se excluyen ${mesaCancelledUnits} unidad(es) cancelada(s) por un total de ${formatCurrency(mesaCancelledAmount)}</div>`:``}${customerSummaries.map(cs=>`<div class="customer-section"><div class="customer-header"><div class="customer-name">${cs.customerName}</div><div style="font-size:16px;font-weight:bold;">${formatCurrency(cs.total)}</div></div>${cs.orders.map(order=>`${order.order_items.map(item=>{const cq=item.cancelled_quantity||0;const aq=item.quantity-cq;return`<div class="item-row"><div><div class="item-name">${item.product_name}${aq===0?` (CANCELADO)`:``}</div><div class="item-details">Cant: ${aq}${cq>0?` (de ${item.quantity}, ${cq} cancelada(s))`:``} • ${formatCurrency(item.price)} c/u${item.notes?`<div class="notes-section">${formatNotesForPDF(item.notes)}</div>`:``}</div></div><div>${formatCurrency(item.price*aq)}</div></div>`;}).join("")}`).join("")}<div style="background:#f8fafc;padding:10px;border-radius:6px;margin-top:10px;"><div class="summary-row"><span>Subtotal:</span><span>${formatCurrency(cs.subtotal)}</span></div><div class="summary-row"><span>IVA (8%):</span><span>${formatCurrency(cs.taxAmount)}</span></div><div class="summary-row" style="font-weight:bold;border-top:1px solid #e2e8f0;padding-top:5px;"><span>Total:</span><span>${formatCurrency(cs.total)}</span></div></div></div>`).join("")}<div class="final-total"><div class="summary-row"><span>Subtotal total:</span><span>${formatCurrency(paymentSummary.subtotal)}</span></div><div class="summary-row"><span>Impuestos (8%):</span><span>${formatCurrency(paymentSummary.taxAmount)}</span></div><div class="total-row"><span>TOTAL GENERAL:</span><span>${formatCurrency(paymentSummary.total)}</span></div></div><div class="footer"><p style="font-weight:bold;margin-bottom:5px;">¡Gracias por su preferencia!</p></div></body></html>`;
       const printWindow = window.open("","_blank");
       if (printWindow) { printWindow.document.write(pdfContent); printWindow.document.close(); printWindow.onload = () => printWindow.print(); }
-    } catch (e) { console.error(e); alert("Error al generar el PDF. Intente nuevamente."); }
+    } catch (e) { console.error(e); toast("Error al generar el PDF. Intente nuevamente.", "error"); }
     finally { setGeneratingPdf(false); }
   };
 
@@ -572,15 +574,15 @@ export default function PaymentPage() {
         timestamp: new Date().toISOString(),
       };
       const response = await axios.post("https://e-commetrics.com/api/invoice", invoiceData, { headers:{"Content-Type":"application/json"}, timeout:10000 });
-      if (response.data.success) { alert("✅ Solicitud de factura enviada correctamente. Recibirá un correo con los pasos para completar la facturación."); setIsInvoiceModalOpen(false); }
+      if (response.data.success) { toast("Solicitud de factura enviada. Recibirá un correo con los pasos.", "success"); setIsInvoiceModalOpen(false); }
       else throw new Error(response.data.message || "Error al procesar la factura");
     } catch (e) {
       console.error(e);
       if (axios.isAxiosError(e)) {
-        if (e.response) alert(`❌ Error al solicitar la factura: ${e.response.data?.message || "Error del servidor"}`);
-        else if (e.request) alert("❌ Error de conexión. No se pudo contactar al servidor.");
-        else alert("❌ Error en la solicitud de factura.");
-      } else { alert("❌ Error al solicitar la factura. Por favor, intente nuevamente o contacte al personal."); }
+        if (e.response) toast(`Error al solicitar la factura: ${e.response.data?.message || "Error del servidor"}`, "error");
+        else if (e.request) toast("Error de conexión. No se pudo contactar al servidor.", "error");
+        else toast("Error en la solicitud de factura.", "error");
+      } else { toast("Error al solicitar la factura. Por favor, intente nuevamente.", "error"); }
     } finally { setGeneratingInvoice(false); }
   };
 
@@ -589,7 +591,7 @@ export default function PaymentPage() {
       setPaymentConfirmed(true); setShowSurvey(true);
       const keysToRemove = ["GDPR_REMOVAL_FLAG","app_session","currentOrder","currentOrderId","currentTableId","currentUserId","currentUserName","customerSession","historyUserData","orderItems","photoSphereViewer_touchSupport","restaurant_tableId","restaurant_userId","restaurant_userName",...Object.keys(localStorage).filter(k => k.startsWith("paymentState_")||k.startsWith("paymentStatus_")||k.startsWith("pendingItems_")||k.startsWith("currentOrder-table-")||k.startsWith("currentUser-table-")),"session","session-tableId","session-userId","session-orderId","session-customerName","session-tableNumber","sessionCleanupTimer","sessionExpiryTime"];
       [...new Set(keysToRemove)].forEach(k => { if (localStorage.getItem(k) !== null) localStorage.removeItem(k); });
-    } catch (e) { console.error(e); alert("❌ Error al confirmar el pago. Intenta nuevamente."); }
+    } catch (e) { console.error(e); toast("Error al confirmar el pago. Intenta nuevamente.", "error"); }
   };
 
   // ─── Loading screens (new design) ─────────────────────────────────────────
