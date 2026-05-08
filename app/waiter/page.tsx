@@ -216,6 +216,7 @@ function PaymentCalculator({
   totalAmount: number;
   tableNumber: number;
 }) {
+  const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
   const getInitialUsdRate = (): number => {
     if (typeof window !== "undefined") {
@@ -853,6 +854,7 @@ function SeparatePaymentsModal({
   tableNumber: number;
   totalAmount: number;
 }) {
+  const { toast } = useToast();
   const getInitialUsdRate = (): number => {
     if (typeof window !== "undefined") {
       const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
@@ -1548,6 +1550,7 @@ function GuestPaymentModal({
   guest: any;
   tableNumber: number;
 }) {
+  const { toast } = useToast();
   const getInitialUsdRate = (): number => {
     if (typeof window !== "undefined") {
       const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
