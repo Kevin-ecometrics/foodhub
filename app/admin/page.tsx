@@ -34,6 +34,8 @@ import CategoriesManagement from "./components/CategoriesManagement";
 export default function AdminPage() {
   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -673,6 +675,28 @@ export default function AdminPage() {
     }
   };
 
+  // Verificar sesión existente al cargar
+  useEffect(() => {
+    const saved = localStorage.getItem("adminToken");
+    if (saved) {
+      fetch("/api/admin/verify", {
+        headers: { Authorization: `Bearer ${saved}` },
+      })
+        .then((r) => {
+          if (r.ok) {
+            setAuthToken(saved);
+            setIsAuthenticated(true);
+          } else {
+            localStorage.removeItem("adminToken");
+          }
+        })
+        .catch(() => localStorage.removeItem("adminToken"))
+        .finally(() => setCheckingAuth(false));
+    } else {
+      setCheckingAuth(false);
+    }
+  }, []);
+
   // Cargar logo cuando el usuario se autentique
   useEffect(() => {
     checkExistingLogo();
@@ -687,6 +711,8 @@ export default function AdminPage() {
   }, [isAuthenticated, activeSection, selectedDate]);
 
   const handleLogout = () => {
+    localStorage.removeItem("adminToken");
+    setAuthToken(null);
     setIsAuthenticated(false);
     setDailyStats(null);
     setTodayOrders([]);
@@ -711,8 +737,23 @@ export default function AdminPage() {
     setError(errorMessage);
   };
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-3">
+          <FaSpinner className="animate-spin text-2xl text-[var(--color-accent)]" />
+          <p className="text-sm text-slate-500 font-medium">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-    return <LoginForm onLogin={() => setIsAuthenticated(true)} />;
+    return <LoginForm onLogin={(token) => {
+      localStorage.setItem("adminToken", token);
+      setAuthToken(token);
+      setIsAuthenticated(true);
+    }} />;
   }
 
   return (

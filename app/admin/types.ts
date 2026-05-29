@@ -106,8 +106,3 @@ export interface ProductExtra {
   is_available: boolean;
 }
 
-// Credenciales fijas del administrador
-export const ADMIN_CREDENTIALS = {
-  username: "admin",
-  password: "restaurant",
-};

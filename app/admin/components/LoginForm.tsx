@@ -1,10 +1,9 @@
 // app/admin/components/LoginForm.tsx
 "use client";
 import { useState } from "react";
-import { ADMIN_CREDENTIALS } from "../types";
 
 interface LoginFormProps {
-  onLogin: () => void;
+  onLogin: (token: string) => void;
 }
 
 const IconUser = () => (
@@ -209,8 +208,8 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
   const [shake, setShake] = useState(false);
 
   const fillCreds = () => {
-    setUsername(ADMIN_CREDENTIALS.username);
-    setPassword(ADMIN_CREDENTIALS.password);
+    setUsername("admin");
+    setPassword("restaurant");
     setErrors({});
   };
 
@@ -232,16 +231,26 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     }
     setErrors({});
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1400));
-    if (
-      username === ADMIN_CREDENTIALS.username &&
-      password === ADMIN_CREDENTIALS.password
-    ) {
-      setSuccess(true);
-      setTimeout(() => onLogin(), 800);
-    } else {
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSuccess(true);
+        setTimeout(() => onLogin(data.token), 800);
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setLoading(false);
+        setErrors({ global: data.error || "Credenciales incorrectas" });
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+      }
+    } catch {
       setLoading(false);
-      setErrors({ global: "Credenciales incorrectas. Intenta de nuevo." });
+      setErrors({ global: "Error de conexión con el servidor" });
       setShake(true);
       setTimeout(() => setShake(false), 500);
     }
