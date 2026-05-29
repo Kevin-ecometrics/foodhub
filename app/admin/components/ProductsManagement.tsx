@@ -6,6 +6,7 @@ import { supabase } from "@/app/lib/supabase/client";
 import { FaPlus, FaEdit, FaSpinner, FaStar, FaSort, FaSortUp, FaSortDown } from "react-icons/fa";
 import { Product, ProductFormData } from "../types";
 import ProductForm from "./ProductForm";
+import { categoriesService } from "@/app/lib/supabase/categories";
 import StarRating from "./StarRating";
 
 type SortField = "category" | "price" | "rating" | "is_favorite" | "preparation_time" | "is_available";
@@ -27,6 +28,7 @@ export default function ProductsManagement({
   const { confirm } = useConfirm();
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<{ id: number; name: string }[]>([]);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState<ProductFormData>({
@@ -73,7 +75,17 @@ export default function ProductsManagement({
 
   useEffect(() => {
     loadProducts();
+    loadCategoryOptions();
   }, []);
+
+  const loadCategoryOptions = async () => {
+    try {
+      const cats = await categoriesService.getAllCategories();
+      setCategoryOptions(cats.map((c) => ({ id: c.id, name: c.name })));
+    } catch {
+      // silencioso
+    }
+  };
 
   // Efecto para hacer scroll cuando se muestra el formulario o cambia el producto editado
   useEffect(() => {
@@ -388,6 +400,7 @@ export default function ProductsManagement({
                     handleDeleteProduct(parseInt(productId))
                 : undefined
             }
+            categories={categoryOptions}
           />
         )}
       </div>

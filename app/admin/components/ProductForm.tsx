@@ -5,6 +5,11 @@ import { Product, ProductFormData, ProductExtra } from "../types";
 import StarRating from "./StarRating";
 import { useState } from "react";
 
+interface CategoryOption {
+  id: number;
+  name: string;
+}
+
 interface ProductFormProps {
   editingProduct: Product | null;
   productForm: ProductFormData;
@@ -12,6 +17,7 @@ interface ProductFormProps {
   onCancel: () => void;
   onFormChange: (data: ProductFormData) => void;
   onDelete?: (productId: string) => void;
+  categories: CategoryOption[];
 }
 
 const inputBase =
@@ -28,6 +34,7 @@ export default function ProductForm({
   onCancel,
   onFormChange,
   onDelete,
+  categories,
 }: ProductFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -200,11 +207,9 @@ export default function ProductForm({
               className={`${inputBase} ${errors.category ? inputErr : ""}`}
             >
               <option value="">Seleccionar categoría</option>
-              <option value="Breakfast">Breakfast</option>
-              <option value="Lunch">Lunch</option>
-              <option value="Dinner">Dinner</option>
-              <option value="Combos">Combos</option>
-              <option value="Drinks">Drinks</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>{cat.name}</option>
+              ))}
             </select>
             {errors.category && <p className="text-[11px] text-red-500 mt-1.5">{errors.category}</p>}
           </div>

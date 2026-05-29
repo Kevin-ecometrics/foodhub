@@ -11,6 +11,11 @@ import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
 import { useToast } from "@/app/context/ToastContext";
+import {
+  categoriesService,
+  MenuCategory,
+  Category,
+} from "@/app/lib/supabase/categories";
 
 // ─── Design Tokens & Animations ─────────────────────────────────────────────
 const DESIGN_CSS = `
@@ -353,41 +358,6 @@ const INote = () => (
 );
 
 // ─── Categories ──────────────────────────────────────────────────────────────
-const CATEGORIES = [
-  {
-    id: "favorites",
-    name: "Favoritos",
-    icon: "❤️",
-    description: "Los productos más populares",
-  },
-  {
-    id: "repite-item",
-    name: "Repite Item",
-    icon: "🔄",
-    description: "Tus items recientes de esta orden",
-  },
-  {
-    id: "drinks",
-    name: "Drinks",
-    icon: "🥤",
-    description: "Refill de bebidas",
-  },
-  {
-    id: "combos",
-    name: "Combos",
-    icon: "🍔",
-    description: "Combos especiales",
-  },
-  { id: "breakfast", name: "Breakfast", icon: "🍳", description: "Desayunos" },
-  { id: "lunch", name: "Lunch", icon: "🍱", description: "Almuerzos" },
-  { id: "dinner", name: "Dinner", icon: "🍕", description: "Cenas" },
-  {
-    id: "refill",
-    name: "Refill",
-    icon: "🥤",
-    description: "Refill de bebidas",
-  },
-];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface TableUser {
@@ -1469,10 +1439,11 @@ export default function MenuPage() {
   } = useOrder();
 
   // ── Menu state ──
-  const [selectedCategory, setSelectedCategory] = useState("favorites");
+  const [selectedCategory, setSelectedCategory] = useState<string | number>("favorites");
   const [products, setProducts] = useState<Product[]>([]);
   const [recentItems, setRecentItems] = useState<Product[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
+  const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingProduct, setAddingProduct] = useState<number | null>(null);
@@ -1709,7 +1680,7 @@ export default function MenuPage() {
     if (!container) return;
 
     const getAvailable = () =>
-      CATEGORIES.filter((cat) => getProductsByCategory(cat.id).length > 0);
+      menuCategories.filter((cat) => getProductsByCategory(cat.id).length > 0);
 
     const onScroll = () => {
       const available = getAvailable();
@@ -1802,12 +1773,14 @@ export default function MenuPage() {
     try {
       await setCurrentUserOrder(oid, uid);
       if (currentTableId) await refreshOrder(currentTableId);
-      const [allProducts, recent] = await Promise.all([
+      const [allProducts, recent, cats] = await Promise.all([
         productsService.getProducts(),
         getRecentOrdersItems(tid),
+        categoriesService.getActiveCategories(),
       ]);
       setProducts(allProducts);
       setRecentOrderItems(recent);
+      setDbCategories(cats);
       const favs = allProducts.filter((p) => p.is_favorite);
       setFavoriteItems(favs);
       const recentProds = recent
@@ -1826,27 +1799,18 @@ export default function MenuPage() {
   // ─────────────────────────────────────────────────────────────────────────
   // Product helpers
   // ─────────────────────────────────────────────────────────────────────────
-  const getProductsByCategory = (catId: string) => {
-    switch (catId) {
-      case "favorites":
-        return favoriteItems;
-      case "repite-item":
-        return recentItems;
-      case "popular":
-        return products.filter((p) => p.rating && p.rating >= 4.5).slice(0, 6);
-      default: {
-        const map: { [k: string]: string } = {
-          drinks: "Drinks",
-          combos: "Combos",
-          breakfast: "Breakfast",
-          lunch: "Lunch",
-          dinner: "Dinner",
-          refill: "Refill",
-        };
-        return products.filter((p) => p.category === map[catId]);
-      }
-    }
+  const getProductsByCategory = (catId: string | number) => {
+    if (catId === "favorites") return favoriteItems;
+    if (catId === "repite-item") return recentItems;
+    if (catId === "popular") return products.filter((p) => p.rating && p.rating >= 4.5).slice(0, 6);
+    const name = typeof catId === "string" ? catId : dbCategories.find((c) => c.id === catId)?.name;
+    if (!name) return [];
+    return products.filter((p) => p.category === name);
   };
+
+  const menuCategories: MenuCategory[] = [
+    ...categoriesService.getMenuCategories(dbCategories),
+  ];
 
   const isProductInCart = (pid: number) =>
     orderItems.some((i) => i.product_id === pid);
@@ -1877,7 +1841,7 @@ export default function MenuPage() {
     return Math.min(Math.max(t, 2), 45);
   };
 
-  const scrollToCategory = (catId: string) => {
+  const scrollToCategory = (catId: string | number) => {
     setSelectedCategory(catId);
     setTimeout(() => {
       const el = categoryRefs.current[catId];
@@ -2319,7 +2283,7 @@ export default function MenuPage() {
   // Tab: Menu
   // ─────────────────────────────────────────────────────────────────────────
   const renderMenuTab = () => {
-    const availableCats = CATEGORIES.filter(
+    const availableCats = menuCategories.filter(
       (c) => getProductsByCategory(c.id).length > 0,
     );
     return (

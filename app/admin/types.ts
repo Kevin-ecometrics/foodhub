@@ -78,7 +78,7 @@ export interface Product {
   extras?: ProductExtra[];
 }
 
-export type AdminSection = "dashboard" | "tables" | "products";
+export type AdminSection = "dashboard" | "tables" | "products" | "categories";
 
 export interface TableFormData {
   number: string;

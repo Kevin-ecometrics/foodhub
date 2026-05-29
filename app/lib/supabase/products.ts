@@ -197,18 +197,17 @@ async uploadProductImage(file: File): Promise<string> {
   return data.publicUrl
 }
 ,
-  // Obtener categorías únicas
+  // Obtener categorías activas desde la tabla categories
   async getCategories(): Promise<string[]> {
     const { data, error } = await supabase
-      .from('products')
-      .select('category')
-      .eq('is_available', true)
-      .order('category')
-    
+      .from('categories')
+      .select('name')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     if (error) throw error
-    
-    const categoriesData = data as { category: string }[] | null
-    const uniqueCategories = [...new Set(categoriesData?.map(item => item.category) || [])]
-    return uniqueCategories
+
+    const cats = data as { name: string }[] | null
+    return cats?.map((c) => c.name) || []
   }
 }

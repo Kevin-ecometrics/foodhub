@@ -15,6 +15,7 @@ import {
   FaTimes,
   FaSpinner,
   FaChevronLeft,
+  FaTag,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -28,6 +29,7 @@ import LoginForm from "./components/LoginForm";
 import Dashboard from "./components/Dashboard";
 import TablesManagement from "./components/TablesManagement";
 import ProductsManagement from "./components/ProductsManagement";
+import CategoriesManagement from "./components/CategoriesManagement";
 
 export default function AdminPage() {
   const { toast } = useToast();
@@ -774,6 +776,11 @@ export default function AdminPage() {
               name: "Gestión de Productos",
               icon: FaBox,
             },
+            {
+              id: "categories" as AdminSection,
+              name: "Gestión de Categorías",
+              icon: FaTag,
+            },
           ].map((item) => (
             <button
               key={item.id}
@@ -849,6 +856,10 @@ export default function AdminPage() {
 
           {activeSection === "products" && (
             <ProductsManagement onError={handleError} />
+          )}
+
+          {activeSection === "categories" && (
+            <CategoriesManagement onError={handleError} />
           )}
         </div>
       </main>

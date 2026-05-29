@@ -20,8 +20,34 @@ export const initializeDatabase = async (): Promise<boolean> => {
 }
 
 // Datos de ejemplo para desarrollo
+const SEED_CATEGORIES = [
+  { name: 'Breakfast', slug: 'breakfast', description: 'Desayunos', display_order: 10 },
+  { name: 'Lunch', slug: 'lunch', description: 'Almuerzos', display_order: 20 },
+  { name: 'Dinner', slug: 'dinner', description: 'Cenas', display_order: 30 },
+  { name: 'Combos', slug: 'combos', description: 'Combos especiales', display_order: 40 },
+  { name: 'Drinks', slug: 'drinks', description: 'Bebidas', display_order: 50 },
+  { name: 'Refill', slug: 'refill', description: 'Refill de bebidas', display_order: 60 },
+]
+
 export const seedInitialData = async (): Promise<void> => {
   try {
+    // Insertar categorías si no existen
+    const { data: existingCategories, error: catError } = await supabase
+      .from('categories')
+      .select('id')
+      .limit(1)
+
+    if (catError) throw catError
+
+    if (!existingCategories || existingCategories.length === 0) {
+      const { error: insertCatError } = await supabase
+        .from('categories')
+        .insert(SEED_CATEGORIES as any)
+
+      if (insertCatError) throw insertCatError
+      console.log('✅ Categorías creadas')
+    }
+
     // Insertar mesas si no existen
     const { data: tables, error: tablesError } = await supabase
       .from('tables')

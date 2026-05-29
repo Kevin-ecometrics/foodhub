@@ -143,6 +143,38 @@ export interface Database {
           updated_at?: string
         }
       }
+      categories: {
+        Row: {
+          id: number
+          name: string
+          slug: string
+          description: string
+          display_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          slug: string
+          description?: string
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          slug?: string
+          description?: string
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       waiter_notifications: {
         Row: {
           id: string
