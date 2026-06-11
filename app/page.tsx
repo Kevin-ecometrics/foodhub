@@ -55,13 +55,31 @@ const IconStar = () => (
 );
 
 const IconBolt = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
   </svg>
 );
 
 const IconUtensils = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M16 2v4M8 2v4M3 10h18M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10M8 2h8" />
     <path d="M6 6l1 4M18 6l-1 4" />
   </svg>
@@ -96,9 +114,12 @@ export default function HomePage() {
         </h1>
 
         {/* Description */}
-        <p className="text-base text-[oklch(55%_0.02_260)] font-normal leading-relaxed text-center max-w-[400px] mb-11 animate-fadeUp">
-          Disfruta de una experiencia digital simple, rápida y elegante. Explora
-          nuestro menú desde la comodidad de tu mesa.
+        <p className="text-base text-[oklch(55%_0.02_260)] font-normal leading-relaxed text-center max-w-[400px] mb-4 animate-fadeUp">
+          Agiliza tu restaurante
+        </p>
+
+        <p className="text-lg text-[oklch(55%_0.02_260)] font-semibold leading-relaxed text-center max-w-[400px] mb-11 animate-fadeUp">
+          Escanea- Ordena - Recibe en tu mesa
         </p>
 
         {/* CTA */}
@@ -114,7 +135,10 @@ export default function HomePage() {
         {/* Metrics card */}
         <div className="mt-[72px] w-full max-w-[560px] bg-[oklch(98.5%_0.005_80)] border border-[oklch(88%_0.01_260)] rounded-2xl p-7 flex items-center justify-between gap-6 flex-wrap animate-fadeUp">
           {metrics.map((item, i) => (
-            <div key={i} className="text-center flex-1 min-w-[100px] flex flex-col items-center">
+            <div
+              key={i}
+              className="text-center flex-1 min-w-[100px] flex flex-col items-center"
+            >
               <div className="min-h-[28px] flex items-center justify-center">
                 {item.num && (
                   <span className="text-[22px] font-extrabold text-[oklch(20%_0.02_260)]">
