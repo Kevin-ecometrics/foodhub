@@ -122,6 +122,21 @@ This database schema supports a restaurant management system, including tables f
 
 ---
 
+### `categories`
+
+| Column        | Type         | Constraints / Default          |
+| ------------- | ------------ | ------------------------------ |
+| id            | serial       | PK                             |
+| name          | varchar(100) | NOT NULL                       |
+| slug          | varchar(100) | NOT NULL                       |
+| description   | text         | NULL                           |
+| display_order | integer      | DEFAULT 0                      |
+| is_active     | boolean      | DEFAULT true                   |
+| created_at    | timestamptz  | DEFAULT timezone('utc', now()) |
+| updated_at    | timestamptz  | DEFAULT timezone('utc', now()) |
+
+---
+
 ### `customer_feedback`
 
 | Column        | Type          | Constraints / Default               |
@@ -134,5 +149,28 @@ This database schema supports a restaurant management system, including tables f
 | order_count   | integer       | NOT NULL                            |
 | total_amount  | numeric(10,2) | NOT NULL                            |
 | created_at    | timestamptz   | DEFAULT now()                       |
+
+---
+
+## 🔲 Pending Tables
+
+### `tips` _(por implementar)_
+
+Nueva tabla para registrar propinas dejadas por los clientes. Se integrará en el flujo del cliente entre el paso de pago y el de calificación.
+
+| Column         | Type          | Constraints / Default          |
+| -------------- | ------------- | ------------------------------ |
+| id             | uuid          | PK, DEFAULT gen_random_uuid()  |
+| order_id       | uuid          | FK → orders.id                 |
+| table_id       | integer       | FK → tables.id                 |
+| customer_name  | varchar(100)  | NULL                           |
+| amount         | numeric(10,2) | NOT NULL                       |
+| percentage     | integer       | NULL (10, 15, 20 o custom)     |
+| payment_method | varchar(20)   | NULL                           |
+| created_at     | timestamptz   | DEFAULT timezone('utc', now()) |
+
+**Columnas a agregar en tablas existentes:**
+
+- `sales_history.tip_amount` — `numeric(10,2) DEFAULT 0` para registrar el total de propinas en el historial de ventas
 
 ---
