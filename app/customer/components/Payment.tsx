@@ -7,7 +7,6 @@ import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
 import { useToast } from "@/app/context/ToastContext";
 import { supabase } from "@/app/lib/supabase/client";
-import { tipsService } from "@/app/lib/supabase/tips";
 import axios from "axios";
 
 // ─── Design CSS ──────────────────────────────────────────────────────────────
@@ -103,19 +102,6 @@ const IEnvelope = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
     <polyline points="22,6 12,13 2,6"/>
-  </svg>
-);
-const IPercent = ({ s = 22 }: { s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="19" y1="5" x2="5" y2="19"/>
-    <circle cx="6.5" cy="6.5" r="2.5"/>
-    <circle cx="17.5" cy="17.5" r="2.5"/>
-  </svg>
-);
-const IEdit = ({ s = 13 }: { s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20h9"/>
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
   </svg>
 );
 
@@ -251,99 +237,6 @@ const renderOrderItem = (item: any) => {
   );
 };
 
-// ─── TipStep ─────────────────────────────────────────────────────────────────
-const TIP_OPTIONS = [
-  { label: "Sin propina", pct: 0 },
-  { label: "10%", pct: 0.10 },
-  { label: "15%", pct: 0.15 },
-  { label: "20%", pct: 0.20 },
-];
-
-const TipStep = ({ onConfirm, subtotal }: {
-  onConfirm: (amount: number) => void;
-  subtotal: number;
-}) => {
-  const [selected, setSelected] = useState<number | null>(null);
-  const [custom, setCustom] = useState("");
-  const [mode, setMode] = useState<"preset" | "custom">("preset");
-
-  const presetAmount = selected !== null ? subtotal * TIP_OPTIONS[selected].pct : 0;
-  const customAmount = parseFloat(custom) || 0;
-  const tipAmount = mode === "custom" ? customAmount : presetAmount;
-
-  return (
-    <div style={{ border:"1.5px solid var(--border)",borderRadius:18,padding:"28px 24px",maxWidth:480,width:"100%",margin:"0 auto",background:"white",animation:"pay-fadeup 0.4s ease both" }}>
-      <div style={{ textAlign:"center",marginBottom:24 }}>
-        <div style={{ width:56,height:56,borderRadius:"50%",background:"var(--green-light)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",color:"var(--green)" }}>
-          <IPercent s={26} />
-        </div>
-        <h3 style={{ fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:6 }}>¿Deseas dejar propina?</h3>
-        <p style={{ fontSize:13,color:"var(--muted)" }}>Tu generosidad es muy apreciada</p>
-      </div>
-
-      {/* Preset buttons */}
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16 }}>
-        {TIP_OPTIONS.map((opt, i) => (
-          <button key={i}
-            onClick={() => { setSelected(i); setMode("preset"); }}
-            style={{
-              padding:"12px 6px",borderRadius:11,border:`1.5px solid ${mode==="preset"&&selected===i?"var(--green)":"var(--border)"}`,
-              background:mode==="preset"&&selected===i?"var(--green-light)":"var(--surface)",
-              color:mode==="preset"&&selected===i?"var(--green)":"var(--text)",
-              fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",
-            }}
-          >
-            <div>{opt.label}</div>
-            {opt.pct > 0 && <div style={{ fontSize:11,marginTop:2,opacity:0.8 }}>${(subtotal*opt.pct).toFixed(2)}</div>}
-          </button>
-        ))}
-      </div>
-
-      {/* Custom amount */}
-      <div style={{ marginBottom:20 }}>
-        <button onClick={() => { setMode("custom"); setSelected(null); }}
-          style={{ fontSize:12,color:"var(--blue)",background:"none",border:"none",cursor:"pointer",marginBottom:mode==="custom"?8:0,fontFamily:"inherit",fontWeight:600,display:"flex",alignItems:"center",gap:5 }}
-        >
-          <IEdit s={12} />
-          {mode==="custom" ? "Monto personalizado:" : "Ingresar otro monto"}
-        </button>
-        {mode === "custom" && (
-          <div style={{ display:"flex",alignItems:"center",border:"1.5px solid var(--green)",borderRadius:10,padding:"10px 14px",gap:8,background:"var(--green-light)" }}>
-            <span style={{ fontSize:14,fontWeight:700,color:"var(--green)" }}>$</span>
-            <input type="number" min="0" step="0.50" value={custom}
-              onChange={e => setCustom(e.target.value)}
-              placeholder="0.00"
-              style={{ flex:1,border:"none",outline:"none",background:"transparent",fontSize:15,fontWeight:700,color:"var(--green)",fontFamily:"inherit" }}
-              autoFocus
-            />
-          </div>
-        )}
-      </div>
-
-      {tipAmount > 0 && (
-        <div style={{ background:"var(--green-light)",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-          <span style={{ fontSize:13,color:"var(--green)",fontWeight:600 }}>Propina seleccionada:</span>
-          <span style={{ fontSize:16,fontWeight:800,color:"var(--green)" }}>${tipAmount.toFixed(2)}</span>
-        </div>
-      )}
-
-      <div style={{ display:"flex",gap:12 }}>
-        <button onClick={() => onConfirm(0)}
-          style={{ flex:1,padding:"12px",borderRadius:11,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:14,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}
-        >
-          Omitir
-        </button>
-        <button
-          onClick={() => onConfirm(tipAmount)}
-          disabled={mode === "preset" && selected === null}
-          style={{ flex:1,padding:"12px",borderRadius:11,border:"none",background:(mode==="preset"&&selected===null)?"var(--border)":"var(--green)",fontSize:14,fontWeight:700,color:"white",cursor:(mode==="preset"&&selected===null)?"not-allowed":"pointer",fontFamily:"inherit",opacity:(mode==="preset"&&selected===null)?0.6:1,transition:"background 0.15s" }}
-        >
-          Confirmar
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // ─── SatisfactionSurvey ───────────────────────────────────────────────────────
 const SatisfactionSurvey = ({ onSubmit, onSkip, customerName }: {
@@ -489,7 +382,6 @@ export default function PaymentPage() {
   useEffect(() => { if (tableId && !currentTableId) refreshOrder(parseInt(tableId)); }, [tableId, currentTableId, refreshOrder]);
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [showTip, setShowTip] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [surveyCompleted, setSurveyCompleted] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -503,11 +395,11 @@ export default function PaymentPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!paymentConfirmed || showTip || showSurvey) return;
+    if (!paymentConfirmed || showSurvey) return;
     if (countdown <= 0) { clearSession(); router.push("/customer"); return; }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [paymentConfirmed, showTip, showSurvey, countdown]);
+  }, [paymentConfirmed, showSurvey, countdown]);
 
   const loadOrders = async () => {
     const targetTableId = tableId || currentTableId;
@@ -634,7 +526,7 @@ export default function PaymentPage() {
         if (payload.eventType === "UPDATE") {
           const { status: newStatus, type: notifType } = payload.new;
           if (notifType === "bill_request") {
-            if (newStatus === "completed") { setPaymentStatus({ status:"verified" }); setPaymentConfirmed(true); setShowTip(true); }
+            if (newStatus === "completed") { setPaymentStatus({ status:"verified" }); setPaymentConfirmed(true); setShowSurvey(true); }
             else if (newStatus === "cancelled") setPaymentStatus({ status:"pending" });
           }
         }
@@ -654,7 +546,7 @@ export default function PaymentPage() {
             .order("created_at",{ascending:false}).limit(1);
           if (!error && notifications && notifications.length > 0) {
             const latest = notifications[0] as any;
-            if (latest.status === "completed" && !paymentConfirmed) { setPaymentStatus({ status:"verified" }); setPaymentConfirmed(true); setShowTip(true); }
+            if (latest.status === "completed" && !paymentConfirmed) { setPaymentStatus({ status:"verified" }); setPaymentConfirmed(true); setShowSurvey(true); }
             else if (latest.status === "cancelled") setPaymentStatus({ status:"pending" });
           }
         }
@@ -662,23 +554,6 @@ export default function PaymentPage() {
     }, 5000);
     return () => clearInterval(interval);
   }, [tableId, currentTableId, notificationState.hasPendingBill, paymentConfirmed]);
-
-  const handleTipConfirm = async (amount: number) => {
-    setShowTip(false);
-    if (amount > 0) {
-      try {
-        const tid = tableId || currentTableId;
-        await tipsService.insertTip({
-          order_id: orderId ?? null,
-          table_id: parseInt(tid!.toString()),
-          customer_name: customerSummaries[0]?.customerName || "Cliente",
-          amount,
-          payment_method: null,
-        });
-      } catch (e: any) { console.error("Error guardando propina:", e?.message || e?.code || JSON.stringify(e)); }
-    }
-    setShowSurvey(true);
-  };
 
   const handleSurveySubmit = async (rating: number, comment: string) => {
     setCountdown(10);
@@ -722,7 +597,7 @@ export default function PaymentPage() {
 
   const handlePaymentConfirmation = async () => {
     try {
-      setPaymentConfirmed(true); setShowTip(true);
+      setPaymentConfirmed(true); setShowSurvey(true);
       const keysToRemove = ["GDPR_REMOVAL_FLAG","app_session","currentOrder","currentOrderId","currentTableId","currentUserId","currentUserName","customerSession","historyUserData","orderItems","photoSphereViewer_touchSupport","restaurant_tableId","restaurant_userId","restaurant_userName",...Object.keys(localStorage).filter(k => k.startsWith("paymentState_")||k.startsWith("paymentStatus_")||k.startsWith("pendingItems_")||k.startsWith("currentOrder-table-")||k.startsWith("currentUser-table-")),"session","session-tableId","session-userId","session-orderId","session-customerName","session-tableNumber","sessionCleanupTimer","sessionExpiryTime"];
       [...new Set(keysToRemove)].forEach(k => { if (localStorage.getItem(k) !== null) localStorage.removeItem(k); });
     } catch (e) { console.error(e); toast("Error al confirmar el pago. Intenta nuevamente.", "error"); }
@@ -808,10 +683,9 @@ export default function PaymentPage() {
           )}
         </div>
 
-        {showTip && <TipStep onConfirm={handleTipConfirm} subtotal={paymentSummary.total} />}
         {showSurvey && <SatisfactionSurvey onSubmit={handleSurveySubmit} onSkip={handleSurveySkip} customerName={customerSummaries[0]?.customerName || "Cliente"} />}
 
-        {!showTip && !showSurvey && (
+        {!showSurvey && (
           <div style={{ textAlign:"center" }}>
             <p style={{ fontSize:12,color:"var(--muted)",marginBottom:8 }}>
               Redirigiendo en <strong style={{ color:"var(--accent)" }}>{countdown}s</strong>…

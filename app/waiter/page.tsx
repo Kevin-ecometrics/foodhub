@@ -203,7 +203,6 @@ function PaymentCalculator({
   onConfirm,
   totalAmount,
   tableNumber,
-  tipsTotal = 0,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -215,10 +214,10 @@ function PaymentCalculator({
     usdRate: number;
     totalPaid: number;
     change: number;
+    tip: number;
   }) => void;
   totalAmount: number;
   tableNumber: number;
-  tipsTotal?: number;
 }) {
   const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
@@ -241,9 +240,15 @@ function PaymentCalculator({
   const [usdRate, setUsdRate] = useState<number>(getInitialUsdRate);
   const [showRateInput, setShowRateInput] = useState<boolean>(false);
   const [tempRate, setTempRate] = useState<string>(usdRate.toString());
+  const [tipMode, setTipMode] = useState<"none" | "pct" | "custom">("none");
+  const [tipPct, setTipPct] = useState<number>(0);
+  const [tipCustom, setTipCustom] = useState<string>("");
 
+  const tipAmount = tipMode === "pct" ? totalAmount * tipPct
+    : tipMode === "custom" ? (parseFloat(tipCustom) || 0)
+    : 0;
   const usdToMxn = usdAmount * usdRate;
-  const totalWithTips = totalAmount + tipsTotal;
+  const totalWithTips = totalAmount + tipAmount;
   const totalPaid = cashAmount + terminalAmount + usdToMxn;
   const remainingAmount = totalWithTips - totalPaid;
   const change = totalPaid > totalWithTips ? totalPaid - totalWithTips : 0;
@@ -264,6 +269,9 @@ function PaymentCalculator({
       setUsdRate(currentRate);
       setTempRate(currentRate.toString());
       setShowRateInput(false);
+      setTipMode("none");
+      setTipPct(0);
+      setTipCustom("");
     }
   }, [isOpen]);
 
@@ -309,6 +317,7 @@ function PaymentCalculator({
       usdRate: usdRate,
       totalPaid: totalPaid,
       change: change,
+      tip: tipAmount,
     });
     onClose();
   };
@@ -411,33 +420,18 @@ function PaymentCalculator({
         >
           <div
             style={{
+              display: "flex",
+              justifyContent: "space-between",
               paddingBottom: 14,
               borderBottom: "1px solid var(--border)",
             }}
           >
-            <div style={{ display:"flex",justifyContent:"space-between",marginBottom: tipsTotal > 0 ? 4 : 0 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
-                {tipsTotal > 0 ? "Consumo:" : "Total a pagar"}
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: tipsTotal > 0 ? "var(--muted)" : "var(--green)" }}>
-                ${totalAmount.toFixed(2)}
-              </span>
-            </div>
-            {tipsTotal > 0 && (
-              <>
-                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-                  <span style={{ fontSize:13,color:"var(--green)",fontWeight:600 }}>🙏 Propinas registradas:</span>
-                  <span style={{ fontSize:13,fontWeight:700,color:"var(--green)" }}>+${tipsTotal.toFixed(2)}</span>
-                </div>
-                <div style={{ display:"flex",justifyContent:"space-between",borderTop:"1px dashed var(--border)",paddingTop:6 }}>
-                  <span style={{ fontSize:15,fontWeight:700,color:"var(--text)" }}>Total con propina:</span>
-                  <span style={{ fontSize:17,fontWeight:800,color:"var(--green)" }}>${totalWithTips.toFixed(2)}</span>
-                </div>
-              </>
-            )}
-            {tipsTotal === 0 && (
-              <span style={{ display:"none" }} />
-            )}
+            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
+              Total a pagar
+            </span>
+            <span style={{ fontSize: 17, fontWeight: 800, color: "var(--green)" }}>
+              ${totalAmount.toFixed(2)}
+            </span>
           </div>
 
           {/* Efectivo */}
@@ -678,6 +672,61 @@ function PaymentCalculator({
             )}
           </div>
 
+          {/* Propina */}
+          <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
+            <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>Propina</p>
+            <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:tipMode==="custom"?10:0 }}>
+              {[
+                { label:"Sin propina", mode:"none" as const, pct:0 },
+                { label:"10%", mode:"pct" as const, pct:0.10 },
+                { label:"15%", mode:"pct" as const, pct:0.15 },
+                { label:"20%", mode:"pct" as const, pct:0.20 },
+                { label:"Otro", mode:"custom" as const, pct:0 },
+              ].map((opt) => {
+                const isActive = opt.mode === "none"
+                  ? tipMode === "none"
+                  : opt.mode === "custom"
+                    ? tipMode === "custom"
+                    : tipMode === "pct" && tipPct === opt.pct;
+                return (
+                  <button key={opt.label}
+                    onClick={() => {
+                      if (opt.mode === "none") { setTipMode("none"); setTipPct(0); }
+                      else if (opt.mode === "custom") { setTipMode("custom"); setTipPct(0); }
+                      else { setTipMode("pct"); setTipPct(opt.pct); }
+                    }}
+                    style={{
+                      padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+                      border:`1.5px solid ${isActive?"var(--accent)":"var(--border)"}`,
+                      background:isActive?"var(--accent-light)":"var(--surface)",
+                      color:isActive?"var(--accent)":"var(--muted)",
+                      transition:"all 0.12s",
+                    }}
+                  >
+                    {opt.label}
+                    {opt.pct > 0 && <span style={{ opacity:0.75,marginLeft:3 }}>(${(totalAmount*opt.pct).toFixed(0)})</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {tipMode === "custom" && (
+              <div style={{ display:"flex",alignItems:"center",border:"1.5px solid var(--accent)",borderRadius:8,padding:"8px 12px",gap:8,background:"var(--accent-light)",marginTop:8 }}>
+                <span style={{ fontSize:13,fontWeight:700,color:"var(--accent)" }}>$</span>
+                <input type="number" min="0" step="1" value={tipCustom}
+                  onChange={e => setTipCustom(e.target.value)}
+                  placeholder="0.00"
+                  autoFocus
+                  style={{ flex:1,border:"none",outline:"none",background:"transparent",fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"inherit" }}
+                />
+              </div>
+            )}
+            {tipAmount > 0 && (
+              <p style={{ fontSize:11,color:"var(--accent)",fontWeight:600,marginTop:8,textAlign:"right" }}>
+                Propina: ${tipAmount.toFixed(2)}
+              </p>
+            )}
+          </div>
+
           {/* Summary */}
           <div
             style={{
@@ -690,33 +739,26 @@ function PaymentCalculator({
             {[
               ["💵 Efectivo:", `$${cashAmount.toFixed(2)}`, "var(--green)"],
               ["💳 Terminal:", `$${terminalAmount.toFixed(2)}`, "var(--green)"],
-              [
-                "$ Dólares:",
-                `$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`,
-                "var(--green)",
-              ],
+              ["$ Dólares:", `$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`, "var(--green)"],
             ].map(([label, val, col]) => (
-              <div
-                key={label as string}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 4,
-                }}
-              >
-                <span style={{ color: "var(--muted)" }}>{label}</span>
-                <span style={{ color: col as string, fontWeight: 600 }}>
-                  {val}
-                </span>
+              <div key={label as string} style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+                <span style={{ color:"var(--muted)" }}>{label}</span>
+                <span style={{ color: col as string, fontWeight:600 }}>{val}</span>
               </div>
             ))}
-            <div
-              style={{
-                borderTop: "1px solid var(--border)",
-                paddingTop: 8,
-                marginTop: 4,
-              }}
-            >
+            {tipAmount > 0 && (
+              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+                <span style={{ color:"var(--accent)" }}>Propina:</span>
+                <span style={{ color:"var(--accent)",fontWeight:700 }}>+${tipAmount.toFixed(2)}</span>
+              </div>
+            )}
+            <div style={{ borderTop:"1px solid var(--border)",paddingTop:8,marginTop:4 }}>
+              {tipAmount > 0 && (
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+                  <span style={{ fontSize:11,color:"var(--muted)" }}>Consumo:</span>
+                  <span style={{ fontSize:11,color:"var(--muted)" }}>${totalAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -725,18 +767,15 @@ function PaymentCalculator({
                 }}
               >
                 <span style={{ fontWeight: 700, color: "var(--text)" }}>
-                  Total pagado:
+                  Total {tipAmount > 0 ? "con propina" : "pagado"}:
                 </span>
                 <span
                   style={{
                     fontWeight: 700,
-                    color:
-                      totalPaid >= totalAmount
-                        ? "var(--green)"
-                        : "var(--amber)",
+                    color: totalPaid >= totalWithTips ? "var(--green)" : "var(--amber)",
                   }}
                 >
-                  ${totalPaid.toFixed(2)}
+                  ${tipAmount > 0 ? totalWithTips.toFixed(2) : totalPaid.toFixed(2)}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -2061,8 +2100,6 @@ export default function WaiterDashboard() {
     number: number;
     total: number;
   } | null>(null);
-  const [currentTableTipsTotal, setCurrentTableTipsTotal] = useState(0);
-
   const [showSeparatePayments, setShowSeparatePayments] = useState(false);
   const [selectedTableForSeparate, setSelectedTableForSeparate] = useState<{
     id: number;
@@ -2420,12 +2457,6 @@ export default function WaiterDashboard() {
       number: tableNumber,
       total: tableTotal,
     });
-
-    try {
-      const tips = await tipsService.getTipsTotal(tableId);
-      setCurrentTableTipsTotal(tips);
-    } catch { setCurrentTableTipsTotal(0); }
-
     setShowPaymentCalculator(true);
   };
 
@@ -2509,13 +2540,9 @@ export default function WaiterDashboard() {
       if (paymentData.usd > 0) methodsUsed++;
 
       if (methodsUsed === 1) {
-        if (paymentData.cash > 0) {
-          paymentMethod = "cash";
-        } else if (paymentData.terminal > 0) {
-          paymentMethod = "terminal";
-        } else if (paymentData.usd > 0) {
-          paymentMethod = "usd";
-        }
+        if (paymentData.cash > 0) paymentMethod = "cash";
+        else if (paymentData.terminal > 0) paymentMethod = "terminal";
+        else if (paymentData.usd > 0) paymentMethod = "usd";
       } else if (methodsUsed > 1) {
         paymentMethod = "mixed";
       }
@@ -2526,9 +2553,23 @@ export default function WaiterDashboard() {
         paymentMethod,
       );
 
+      if (paymentData.tip > 0) {
+        try {
+          await tipsService.insertTip({
+            table_id: selectedTableForPayment.id,
+            customer_name: `Mesa ${selectedTableForPayment.number}`,
+            amount: paymentData.tip,
+            payment_method: paymentMethod,
+          });
+        } catch (tipErr) {
+          console.error("Error guardando propina:", tipErr);
+        }
+      }
+
       const metodoPago = paymentMethod === "cash" ? "Efectivo" : paymentMethod === "terminal" ? "Tarjeta" : paymentMethod === "usd" ? "Dólares" : "Mixto";
       const cambioMsg = paymentData.change > 0 ? ` · Cambio: $${paymentData.change.toFixed(2)}` : "";
-      toast(`Mesa ${selectedTableForPayment.number} cobrada — $${selectedTableForPayment.total.toFixed(2)} · ${metodoPago}${cambioMsg}`, "success");
+      const tipMsg = paymentData.tip > 0 ? ` · Propina: $${paymentData.tip.toFixed(2)}` : "";
+      toast(`Mesa ${selectedTableForPayment.number} cobrada — $${selectedTableForPayment.total.toFixed(2)} · ${metodoPago}${tipMsg}${cambioMsg}`, "success");
       await loadData();
     } catch (error: any) {
       console.error("Error cobrando mesa:", error);
@@ -2657,12 +2698,10 @@ export default function WaiterDashboard() {
         onClose={() => {
           setShowPaymentCalculator(false);
           setSelectedTableForPayment(null);
-          setCurrentTableTipsTotal(0);
         }}
         onConfirm={handlePaymentConfirm}
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
-        tipsTotal={currentTableTipsTotal}
       />
 
       <SeparatePaymentsModal

@@ -93,13 +93,14 @@
 
 ## ✅ Tips (Propinas) — Completado
 
-### Tips (Propinas) — Customer Flow + Nueva Tabla Supabase
-- [x] **Nueva tabla `tips`** en Supabase (`id` UUID PK, `order_id` FK, `table_id` FK, `customer_name`, `amount`, `payment_method`, `created_at`) con RLS
+### Tips (Propinas) — Waiter Payment Calculator
+- [x] **Nueva tabla `tips`** en Supabase (`id` UUID PK, `order_id` nullable UUID, `table_id` FK, `customer_name`, `amount`, `payment_method`, `created_at`) con RLS
 - [x] **Service layer** `app/lib/supabase/tips.ts` — `insertTip`, `getTipsTotal`, `getTipsByDateRange`
-- [x] **TipStep** en flujo cliente — aparece entre confirmación de pago y encuesta; opciones 10%/15%/20% + monto custom + sin propina
-- [x] **Payment Calculator del waiter** — muestra propinas registradas para la mesa y las suma al total a cobrar
+- [x] **Propina en PaymentCalculator del waiter** — chips preset (10%/15%/20%) + monto custom; calculada sobre el total; guardada en DB al cobrar mesa
+- [x] `handlePaymentConfirm` guarda propina tras `freeTableAndClean` si `tip > 0`
+- [x] Toast de confirmación incluye monto de propina
 - [x] **Admin Dashboard** — card de "Propinas del Día" con total por rango de fechas; integrado en `DailyStats.totalTips`
-- [x] Guardar propina en tabla `tips` al confirmar el cliente
+- [x] Flujo cliente limpio — sin TipStep; propina se registra en punto real de cobro (waiter)
 
 ---
 
