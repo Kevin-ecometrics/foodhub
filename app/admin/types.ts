@@ -5,6 +5,7 @@ export interface DailyStats {
   totalItemsSold: number;
   activeTables: number;
   averageOrderValue: number;
+  totalTips: number;
 }
 
 export interface OrderSummary {

@@ -28,6 +28,8 @@ import {
   FaUtensils,
 } from "react-icons/fa";
 
+import { tipsService } from "@/app/lib/supabase/tips";
+
 // Clave para localStorage
 const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
 
@@ -201,6 +203,7 @@ function PaymentCalculator({
   onConfirm,
   totalAmount,
   tableNumber,
+  tipsTotal = 0,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -215,6 +218,7 @@ function PaymentCalculator({
   }) => void;
   totalAmount: number;
   tableNumber: number;
+  tipsTotal?: number;
 }) {
   const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
@@ -239,10 +243,11 @@ function PaymentCalculator({
   const [tempRate, setTempRate] = useState<string>(usdRate.toString());
 
   const usdToMxn = usdAmount * usdRate;
+  const totalWithTips = totalAmount + tipsTotal;
   const totalPaid = cashAmount + terminalAmount + usdToMxn;
-  const remainingAmount = totalAmount - totalPaid;
-  const change = totalPaid > totalAmount ? totalPaid - totalAmount : 0;
-  const needsChange = totalPaid > totalAmount;
+  const remainingAmount = totalWithTips - totalPaid;
+  const change = totalPaid > totalWithTips ? totalPaid - totalWithTips : 0;
+  const needsChange = totalPaid > totalWithTips;
 
   useEffect(() => {
     if (typeof window !== "undefined" && usdRate > 0) {
@@ -292,8 +297,8 @@ function PaymentCalculator({
     if (totalPaid === 0) {
       toast("Debe ingresar al menos un monto de pago", "warning"); return;
     }
-    if (totalPaid < totalAmount) {
-      toast(`Falta $${(totalAmount - totalPaid).toFixed(2)} por cubrir`, "warning"); return;
+    if (totalPaid < totalWithTips) {
+      toast(`Falta $${(totalWithTips - totalPaid).toFixed(2)} por cubrir`, "warning"); return;
     }
 
     onConfirm({
@@ -309,7 +314,7 @@ function PaymentCalculator({
   };
 
   const fillRemaining = () => {
-    const remaining = totalAmount - totalPaid;
+    const remaining = totalWithTips - totalPaid;
     if (remaining > 0) {
       setCashAmount(cashAmount + remaining);
     }
@@ -406,22 +411,33 @@ function PaymentCalculator({
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
               paddingBottom: 14,
               borderBottom: "1px solid var(--border)",
             }}
           >
-            <span
-              style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}
-            >
-              Total a pagar
-            </span>
-            <span
-              style={{ fontSize: 17, fontWeight: 800, color: "var(--green)" }}
-            >
-              ${totalAmount.toFixed(2)}
-            </span>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom: tipsTotal > 0 ? 4 : 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
+                {tipsTotal > 0 ? "Consumo:" : "Total a pagar"}
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: tipsTotal > 0 ? "var(--muted)" : "var(--green)" }}>
+                ${totalAmount.toFixed(2)}
+              </span>
+            </div>
+            {tipsTotal > 0 && (
+              <>
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+                  <span style={{ fontSize:13,color:"var(--green)",fontWeight:600 }}>🙏 Propinas registradas:</span>
+                  <span style={{ fontSize:13,fontWeight:700,color:"var(--green)" }}>+${tipsTotal.toFixed(2)}</span>
+                </div>
+                <div style={{ display:"flex",justifyContent:"space-between",borderTop:"1px dashed var(--border)",paddingTop:6 }}>
+                  <span style={{ fontSize:15,fontWeight:700,color:"var(--text)" }}>Total con propina:</span>
+                  <span style={{ fontSize:17,fontWeight:800,color:"var(--green)" }}>${totalWithTips.toFixed(2)}</span>
+                </div>
+              </>
+            )}
+            {tipsTotal === 0 && (
+              <span style={{ display:"none" }} />
+            )}
           </div>
 
           {/* Efectivo */}
@@ -794,17 +810,17 @@ function PaymentCalculator({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={totalPaid === 0 || totalPaid < totalAmount}
+            disabled={totalPaid === 0 || totalPaid < totalWithTips}
             style={{
               flex: 1,
               padding: 12,
               borderRadius: 10,
               border: "none",
-              background: (totalPaid === 0 || totalPaid < totalAmount) ? "var(--border)" : "var(--green)",
+              background: (totalPaid === 0 || totalPaid < totalWithTips) ? "var(--border)" : "var(--green)",
               fontSize: 13,
               fontWeight: 700,
               color: "white",
-              opacity: (totalPaid === 0 || totalPaid < totalAmount) ? 0.5 : 1,
+              opacity: (totalPaid === 0 || totalPaid < totalWithTips) ? 0.5 : 1,
             }}
           >
             Confirmar Pago
@@ -2045,6 +2061,7 @@ export default function WaiterDashboard() {
     number: number;
     total: number;
   } | null>(null);
+  const [currentTableTipsTotal, setCurrentTableTipsTotal] = useState(0);
 
   const [showSeparatePayments, setShowSeparatePayments] = useState(false);
   const [selectedTableForSeparate, setSelectedTableForSeparate] = useState<{
@@ -2403,6 +2420,12 @@ export default function WaiterDashboard() {
       number: tableNumber,
       total: tableTotal,
     });
+
+    try {
+      const tips = await tipsService.getTipsTotal(tableId);
+      setCurrentTableTipsTotal(tips);
+    } catch { setCurrentTableTipsTotal(0); }
+
     setShowPaymentCalculator(true);
   };
 
@@ -2634,10 +2657,12 @@ export default function WaiterDashboard() {
         onClose={() => {
           setShowPaymentCalculator(false);
           setSelectedTableForPayment(null);
+          setCurrentTableTipsTotal(0);
         }}
         onConfirm={handlePaymentConfirm}
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
+        tipsTotal={currentTableTipsTotal}
       />
 
       <SeparatePaymentsModal

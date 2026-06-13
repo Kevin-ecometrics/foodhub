@@ -20,6 +20,7 @@ import {
   FaBan,
   FaMoneyBillWave,
   FaCreditCard,
+  FaPercent,
 } from "react-icons/fa";
 import {
   DailyStats,
@@ -1614,6 +1615,7 @@ export default function Dashboard({
     activeTables: dailyStats?.activeTables || 0,
     cancelledItems: cancelledStats.totalCancelledQuantity,
     cancelledAmount: cancelledStats.totalCancelledAmount,
+    totalTips: dailyStats?.totalTips || 0,
   };
 
   return (
@@ -1779,7 +1781,7 @@ export default function Dashboard({
       </div>
 
       {/* Estadísticas Principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 mb-3.5">
         {[
           {
             label: "Ingresos Totales",
@@ -1811,16 +1813,6 @@ export default function Dashboard({
             iconColor: "text-amber-500",
             icon: <FaUtensils className="text-[18px]" />,
           },
-          {
-            label: "Satisfacción Clientes",
-            value: `${feedbackStats.averageRating.toFixed(1)}/5`,
-            sub: `${feedbackStats.total} encuestas`,
-            note: null,
-            noteColor: "",
-            iconBg: "bg-purple-50",
-            iconColor: "text-purple-600",
-            icon: <FaStar className="text-[18px]" />,
-          },
         ].map((stat, i) => (
           <div key={i} className="bg-white border border-slate-200 rounded-[14px] p-4">
             <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">{stat.label}</p>
@@ -1836,6 +1828,34 @@ export default function Dashboard({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Propinas + Satisfacción */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-5">
+        <div className="bg-white border border-slate-200 rounded-[14px] p-4">
+          <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">Propinas del Día</p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-[9px] bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0">
+              <FaPercent className="text-[16px]" />
+            </div>
+            <div>
+              <p className="text-[22px] font-extrabold text-slate-900 leading-none">{formatCurrency(combinedStats.totalTips)}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Registradas por clientes</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-[14px] p-4">
+          <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">Satisfacción Clientes</p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-[9px] bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+              <FaStar className="text-[18px]" />
+            </div>
+            <div>
+              <p className="text-[22px] font-extrabold text-slate-900 leading-none">{feedbackStats.averageRating.toFixed(1)}/5</p>
+              <p className="text-[11px] text-slate-500 mt-1">{feedbackStats.total} encuestas</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Métodos de Pago */}

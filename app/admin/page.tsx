@@ -3,6 +3,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase/client";
+import { tipsService } from "@/app/lib/supabase/tips";
 import { useToast } from "@/app/context/ToastContext";
 import {
   FaChartBar,
@@ -272,12 +273,16 @@ export default function AdminPage() {
         activeTablesData.map((order: any) => order.table_id),
       );
 
+      const rangeTips = await tipsService.getTipsByDateRange(startISO, endISO);
+      const rangeTotalTips = rangeTips.reduce((s: number, t: any) => s + t.amount, 0);
+
       setDailyStats({
         totalOrders,
         totalRevenue,
         totalItemsSold,
         activeTables: uniqueTables.size,
         averageOrderValue,
+        totalTips: rangeTotalTips,
       });
 
       // Cargar órdenes del rango
@@ -535,12 +540,16 @@ export default function AdminPage() {
         activeTablesData.map((order: any) => order.table_id),
       );
 
+      const tips = await tipsService.getTipsByDateRange(startOfDayISO, endOfDayISO);
+      const totalTips = tips.reduce((s: number, t: any) => s + t.amount, 0);
+
       setDailyStats({
         totalOrders,
         totalRevenue,
         totalItemsSold,
         activeTables: uniqueTables.size,
         averageOrderValue,
+        totalTips,
       });
     } catch (error) {
       console.error("Error in loadDailyStats:", error);
