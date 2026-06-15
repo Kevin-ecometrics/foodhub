@@ -582,7 +582,7 @@ export default function PaymentPage() {
       setGeneratingInvoice(true);
       const invoiceData = {
         tableId: tableId || currentTableId, tableNumber, customerEmail: email,
-        customerSummaries: customerSummaries.map(s => ({ customerName:s.customerName, subtotal:s.subtotal, taxAmount:s.taxAmount, total:s.total, itemsCount:s.itemsCount, cancelledItemsCount:s.cancelledItemsCount, cancelledUnitsCount:s.cancelledUnitsCount, cancelledAmount:s.cancelledAmount })),
+        customerSummaries: customerSummaries.map(s => ({ customerName:s.customerName, subtotal:s.subtotal, taxAmount:s.taxAmount, total:s.total, itemsCount:s.itemsCount, cancelledItemsCount:s.cancelledItemsCount, cancelledUnitsCount:s.cancelledUnitsCount, cancelledAmount:s.cancelledAmount, orders:s.orders.map(o => ({ id:o.id, order_items:o.order_items.map(i => ({ product_name:i.product_name, quantity:i.quantity, price:i.price, notes:i.notes })) })) })),
         paymentSummary: { subtotal:paymentSummary.subtotal, taxAmount:paymentSummary.taxAmount, total:paymentSummary.total, cancelledAmount:paymentSummary.cancelledAmount, cancelledUnitsCount:paymentSummary.cancelledUnitsCount },
         orders: allOrders.map(o => ({ id:o.id, customerName:o.customer_name, items:o.order_items.map(i => ({ productName:i.product_name, quantity:i.quantity, price:i.price, notes:i.notes, cancelled_quantity:i.cancelled_quantity||0, activeQuantity:i.quantity-(i.cancelled_quantity||0) })) })),
         timestamp: new Date().toISOString(),
@@ -610,7 +610,7 @@ export default function PaymentPage() {
     setTipSaved(false);
     setTipSaving(true);
     try {
-      await supabase.from("waiter_notifications").update({ tip_amount: amount } as any).eq("id", notifId);
+      await supabase.from("waiter_notifications").update({ tip_amount: amount } as never).eq("id", notifId);
       setTipSaved(true);
     } catch (e) { console.error(e); }
     finally { setTipSaving(false); }

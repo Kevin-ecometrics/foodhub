@@ -183,7 +183,10 @@ export interface Database {
           type: 'new_order' | 'refill' | 'assistance' | 'bill_request'
           message: string
           status: 'pending' | 'acknowledged' | 'completed'
+          payment_method: string | null
+          tip_amount: number | null
           created_at: string
+          updated_at: string | null
         }
         Insert: {
           id?: string
@@ -192,7 +195,10 @@ export interface Database {
           type: 'new_order' | 'refill' | 'assistance' | 'bill_request'
           message: string
           status?: 'pending' | 'acknowledged' | 'completed'
+          payment_method?: string | null
+          tip_amount?: number | null
           created_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: string
@@ -201,7 +207,10 @@ export interface Database {
           type?: 'new_order' | 'refill' | 'assistance' | 'bill_request'
           message?: string
           status?: 'pending' | 'acknowledged' | 'completed'
+          payment_method?: string | null
+          tip_amount?: number | null
           created_at?: string
+          updated_at?: string | null
         }
       }
     }
