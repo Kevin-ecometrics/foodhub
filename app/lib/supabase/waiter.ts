@@ -258,11 +258,11 @@ export const waiterService = {
     tableId: number,
     tableNumber: number,
     paymentMethod: PaymentMethod = null
-  ): Promise<void> {
+  ): Promise<string> {
     try {
       console.log(`🔄 Iniciando proceso completo para mesa ${tableNumber}, método: ${paymentMethod}`)
 
-      await this.saveSalesHistory(tableId, tableNumber, paymentMethod)
+      const saleId = await this.saveSalesHistory(tableId, tableNumber, paymentMethod)
 
       const { error: notifError } = await supabase
         .from('waiter_notifications')
@@ -300,6 +300,7 @@ export const waiterService = {
       if (tableError) throw tableError
 
       console.log(`✅ Mesa ${tableNumber} procesada completamente`)
+      return saleId
     } catch (err) {
       console.error('❌ Error en proceso completo:', err)
       throw err

@@ -28,6 +28,7 @@ import {
   PopularProduct,
   SalesSummary,
   SalesHistory,
+  TipDetail,
 } from "../types";
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -41,6 +42,7 @@ interface DashboardProps {
   selectedDate: Date;
   salesSummary: SalesSummary | null;
   salesHistory: SalesHistory[];
+  tipsDetail: TipDetail[];
 }
 
 // Interfaz para items de venta basada en tu tabla sales_items
@@ -102,6 +104,72 @@ interface GroupedProduct {
 
 type FilterMode = "single" | "range";
 
+function TipsBreakdown({
+  tips,
+  total,
+  formatCurrency,
+  formatDateTime,
+}: {
+  tips: TipDetail[];
+  total: number;
+  formatCurrency: (n: number) => string;
+  formatDateTime: (s: string) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const payMethodLabel = (m: string | null) => {
+    if (m === "cash") return "Efectivo";
+    if (m === "terminal") return "Tarjeta";
+    if (m === "usd") return "Dólares";
+    if (m === "mixed") return "Mixto";
+    return "—";
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-[14px] p-4">
+      <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">Propinas del Período</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-[9px] bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0">
+            <FaPercent className="text-[16px]" />
+          </div>
+          <div>
+            <p className="text-[22px] font-extrabold text-slate-900 leading-none">{formatCurrency(total)}</p>
+            <p className="text-[11px] text-slate-500 mt-1">{tips.length} propina{tips.length !== 1 ? "s" : ""} registrada{tips.length !== 1 ? "s" : ""}</p>
+          </div>
+        </div>
+        {tips.length > 0 && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="text-[11px] font-bold text-[var(--color-accent)] hover:underline"
+          >
+            {expanded ? "Ocultar" : "Ver detalle"}
+          </button>
+        )}
+      </div>
+
+      {expanded && tips.length > 0 && (
+        <div className="mt-3 border-t border-slate-100 pt-3 max-h-52 overflow-y-auto space-y-1.5">
+          {tips.map((tip) => (
+            <div key={tip.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-[8px] hover:bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-[6px] bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0 text-[10px]">
+                  <FaPercent />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-800">{tip.customer_name}</p>
+                  <p className="text-slate-500 text-[10px]">{payMethodLabel(tip.payment_method)} · {formatDateTime(tip.created_at)}</p>
+                </div>
+              </div>
+              <p className="font-extrabold text-green-600">{formatCurrency(tip.amount)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard({
   dailyStats,
   todayOrders,
@@ -112,6 +180,7 @@ export default function Dashboard({
   selectedDate,
   salesSummary,
   salesHistory,
+  tipsDetail,
 }: DashboardProps) {
   const { toast } = useToast();
   const [showDateFilter, setShowDateFilter] = useState(false);
@@ -907,6 +976,24 @@ export default function Dashboard({
     csvContent += `\n"","","TOTALES","","${totalQuantity}","${formatCurrency(
       totalSales,
     )}",""`;
+
+    // Sección de propinas
+    if (tipsDetail.length > 0) {
+      const payMethodLabel = (m: string | null) => {
+        if (m === "cash") return "Efectivo";
+        if (m === "terminal") return "Tarjeta";
+        if (m === "usd") return "Dólares";
+        if (m === "mixed") return "Mixto";
+        return "—";
+      };
+      csvContent += `\n\n"PROPINAS DEL PERÍODO"\n`;
+      csvContent += `"Fecha","Mesa","Método de Pago","Monto"\n`;
+      tipsDetail.forEach((tip) => {
+        csvContent += `"${formatDateTime(tip.created_at)}","${tip.customer_name}","${payMethodLabel(tip.payment_method)}","${formatCurrency(tip.amount)}"\n`;
+      });
+      const totalTips = tipsDetail.reduce((s, t) => s + t.amount, 0);
+      csvContent += `"","","TOTAL PROPINAS","${formatCurrency(totalTips)}"\n`;
+    }
 
     // Generar nombre de archivo
     const fileName =
@@ -1832,18 +1919,7 @@ export default function Dashboard({
 
       {/* Propinas + Satisfacción */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-5">
-        <div className="bg-white border border-slate-200 rounded-[14px] p-4">
-          <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">Propinas del Día</p>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-[9px] bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0">
-              <FaPercent className="text-[16px]" />
-            </div>
-            <div>
-              <p className="text-[22px] font-extrabold text-slate-900 leading-none">{formatCurrency(combinedStats.totalTips)}</p>
-              <p className="text-[11px] text-slate-500 mt-1">Registradas por clientes</p>
-            </div>
-          </div>
-        </div>
+        <TipsBreakdown tips={tipsDetail} total={combinedStats.totalTips} formatCurrency={formatCurrency} formatDateTime={formatDateTime} />
         <div className="bg-white border border-slate-200 rounded-[14px] p-4">
           <p className="text-[11px] text-slate-500 font-semibold mb-2 uppercase tracking-wide">Satisfacción Clientes</p>
           <div className="flex items-center gap-2.5">
@@ -2047,29 +2123,35 @@ export default function Dashboard({
 
           <p className="text-xs font-semibold text-slate-600 mb-2">Detalle de Ventas (click para ver ticket):</p>
           <div className="space-y-1.5 max-h-60 overflow-y-auto">
-            {salesHistory.map((sale) => (
-              <button
-                key={sale.id}
-                onClick={() => loadTicketItems(sale)}
-                disabled={loadingTicket}
-                className="w-full text-left flex justify-between items-center p-3 border border-slate-200 rounded-[10px] hover:bg-[var(--color-accent-light)] hover:border-[var(--color-accent-light)] transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-[8px] flex items-center justify-center border ${getPaymentMethodColor(sale.payment_method)}`}>
-                    {getPaymentMethodIcon(sale.payment_method)}
+            {salesHistory.map((sale) => {
+              const saleTip = tipsDetail.find(t => t.order_id === sale.id);
+              return (
+                <button
+                  key={sale.id}
+                  onClick={() => loadTicketItems(sale)}
+                  disabled={loadingTicket}
+                  className="w-full text-left flex justify-between items-center p-3 border border-slate-200 rounded-[10px] hover:bg-[var(--color-accent-light)] hover:border-[var(--color-accent-light)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-[8px] flex items-center justify-center border ${getPaymentMethodColor(sale.payment_method)}`}>
+                      {getPaymentMethodIcon(sale.payment_method)}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Mesa {sale.table_number}</p>
+                      <p className="text-[11px] text-slate-500">{sale.customer_name || "Invitado"} · {sale.order_count} órd. · {sale.item_count} items</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Mesa {sale.table_number}</p>
-                    <p className="text-[11px] text-slate-500">{sale.customer_name || "Invitado"} · {sale.order_count} órd. · {sale.item_count} items</p>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-emerald-600">{formatCurrency(sale.total_amount)}</p>
+                    {saleTip && (
+                      <p className="text-[10px] font-bold text-green-600">+ {formatCurrency(saleTip.amount)} propina</p>
+                    )}
+                    <p className="text-[10px] text-slate-500">{new Date(sale.closed_at).toLocaleTimeString("es-MX")}</p>
+                    <p className="text-[10px] font-semibold text-slate-600 mt-0.5">{getPaymentMethodText(sale.payment_method)}</p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-emerald-600">{formatCurrency(sale.total_amount)}</p>
-                  <p className="text-[10px] text-slate-500">{new Date(sale.closed_at).toLocaleTimeString("es-MX")}</p>
-                  <p className="text-[10px] font-semibold text-slate-600 mt-0.5">{getPaymentMethodText(sale.payment_method)}</p>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

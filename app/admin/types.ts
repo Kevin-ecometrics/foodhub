@@ -1,4 +1,14 @@
 // app/admin/types.ts
+export interface TipDetail {
+  id: string;
+  order_id: string | null;
+  table_id: number;
+  customer_name: string;
+  amount: number;
+  payment_method: string | null;
+  created_at: string;
+}
+
 export interface DailyStats {
   totalOrders: number;
   totalRevenue: number;

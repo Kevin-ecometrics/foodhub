@@ -2582,7 +2582,7 @@ export default function WaiterDashboard() {
         paymentMethod = "mixed";
       }
 
-      await waiterService.freeTableAndClean(
+      const saleId = await waiterService.freeTableAndClean(
         selectedTableForPayment.id,
         selectedTableForPayment.number,
         paymentMethod,
@@ -2591,6 +2591,7 @@ export default function WaiterDashboard() {
       if (paymentData.tip > 0) {
         try {
           await tipsService.insertTip({
+            order_id: saleId,
             table_id: selectedTableForPayment.id,
             customer_name: `Mesa ${selectedTableForPayment.number}`,
             amount: paymentData.tip,

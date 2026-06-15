@@ -25,6 +25,7 @@ import {
   PopularProduct,
   SalesHistory,
   SalesSummary,
+  TipDetail,
 } from "./types";
 import LoginForm from "./components/LoginForm";
 import Dashboard from "./components/Dashboard";
@@ -51,6 +52,7 @@ export default function AdminPage() {
   // NUEVOS ESTADOS PARA VENTAS
   const [salesHistory, setSalesHistory] = useState<SalesHistory[]>([]);
   const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
+  const [tipsDetail, setTipsDetail] = useState<TipDetail[]>([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Estado para fecha seleccionada
@@ -276,6 +278,7 @@ export default function AdminPage() {
       const rangeTips = await tipsService.getTipsByDateRange(startISO, endISO);
       const rangeTotalTips = rangeTips.reduce((s: number, t: any) => s + t.amount, 0);
 
+      setTipsDetail(rangeTips as TipDetail[]);
       setDailyStats({
         totalOrders,
         totalRevenue,
@@ -543,6 +546,7 @@ export default function AdminPage() {
       const tips = await tipsService.getTipsByDateRange(startOfDayISO, endOfDayISO);
       const totalTips = tips.reduce((s: number, t: any) => s + t.amount, 0);
 
+      setTipsDetail(tips as TipDetail[]);
       setDailyStats({
         totalOrders,
         totalRevenue,
@@ -897,6 +901,7 @@ export default function AdminPage() {
               selectedDate={selectedDate}
               salesSummary={salesSummary}
               salesHistory={salesHistory}
+              tipsDetail={tipsDetail}
             />
           )}
 
