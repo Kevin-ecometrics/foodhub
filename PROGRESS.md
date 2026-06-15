@@ -324,6 +324,13 @@ app/
 - [x] `notifications.ts` — creación de alertas
 - [x] Todos los servicios CRUD de entidades
 
+### TypeScript & Code Quality (2026-06-15)
+- [x] **T1** — `types.ts` reescrito: columnas faltantes añadidas (`rating`, `rating_count`, `is_favorite`, `extras`, `cancelled_quantity`, `tip_amount`, `payment_method`, `updated_at`)
+- [x] **T2** — Tablas nuevas en `types.ts`: `tips`, `sales_history`, `sales_items`, `customer_feedback`
+- [x] **T3** — Enums de dominio centralizados: `NotificationType`, `NotificationStatus`, `TableStatus`, `OrderItemStatus`, `OrderStatus`, `PaymentMethod` — exportados desde `types.ts`
+- [x] **T5** — 0 errores TypeScript en todos los archivos `lib/supabase/`: `waiter.ts`, `history.ts`, `orders.ts`, `order-items.ts`, `products.ts`, `categories.ts`, `notifications.ts`, `tips.ts`
+- [x] **TablesTab.tsx** — `Date.now()` movido a `useState` + `setInterval` (fix React purity warning)
+
 ---
 
 ## Migraciones Aplicadas
@@ -375,40 +382,7 @@ app/
 
 ---
 
-## 🔴 Pendiente — Prioridad Alta: Optimización de Types
-
-> Cada paso desbloquea el siguiente. Resolver esto elimina todos los `as any` / `as never` del codebase y da seguridad de tipos real en toda la app.
-
-### T1. Completar `app/lib/supabase/types.ts` — Columnas faltantes
-
-**Tabla `products`** — agregar en Row / Insert / Update:
-- [ ] `rating: number` (default 0)
-- [ ] `rating_count: number` (default 0)
-- [ ] `is_favorite: boolean` (default false)
-- [ ] `extras: Json` (JSONB array `[{ name, price }]`)
-
-**Tabla `order_items`** — agregar en Row / Insert / Update:
-- [ ] `cancelled_quantity: number` (default 0)
-
-**Tabla `orders`** — reconciliar status union:
-- [ ] Verificar en DB qué valores existen realmente y unificar a `'active' | 'sent' | 'completed' | 'cancelled' | 'paid'`
-
-### T2. Completar `types.ts` — Tablas faltantes
-
-- [ ] Agregar tabla `tips` (actualmente solo definida localmente en `tips.ts`)
-- [ ] Agregar tabla `sales_history` (actualmente en `admin/types.ts` local)
-- [ ] Agregar tabla `sales_items` (actualmente en `Dashboard.tsx` local)
-- [ ] Agregar tabla `customer_feedback` (usada en `Payment.tsx` sin tipo)
-
-### T3. Mover tipos de estado a `types.ts` como exports centrales
-
-Actualmente definidos solo en `waiter.ts` — moverlos a `types.ts`:
-- [ ] `NotificationType = 'new_order' | 'refill' | 'assistance' | 'bill_request'`
-- [ ] `NotificationStatus = 'pending' | 'acknowledged' | 'completed'`
-- [ ] `TableStatus = 'available' | 'occupied' | 'reserved' | 'cleaning'`
-- [ ] `OrderItemStatus = 'ordered' | 'preparing' | 'ready' | 'served' | 'cancelled'`
-- [ ] `OrderStatus = 'active' | 'sent' | 'completed' | 'cancelled' | 'paid'`
-- [ ] `PaymentMethod = 'cash' | 'terminal' | 'usd' | 'mixed'`
+## 🔴 Pendiente — Prioridad Alta
 
 ### T4. Eliminar interfaces locales duplicadas
 
@@ -416,22 +390,10 @@ Actualmente definidos solo en `waiter.ts` — moverlos a `types.ts`:
 |---|---|---|
 | `Product` | `order-items.ts`, `products.ts`, `admin/types.ts`, `TableHeader.tsx` | Una sola en `types.ts`, importar en todos |
 | `Order` / `OrderWithItems` | `orders.ts`, `waiter.ts`, `history.ts`, `admin/types.ts` x2 | Merge en `types.ts` |
-| `OrderItem` | `order-items.ts`, `waiter.ts`, `history.ts`, `types.ts` (incompleta) | Una sola con `cancelled_quantity` |
-| `WaiterNotification` | `waiter.ts` (con relaciones), `types.ts` (sin relaciones) | Merge: agregar `tables?` y `orders?` opcionales |
+| `OrderItem` | `order-items.ts`, `waiter.ts`, `history.ts` | Una sola con `cancelled_quantity` |
+| `WaiterNotification` | `waiter.ts` (con relaciones), tipos locales | Merge: agregar `tables?` y `orders?` opcionales |
 | `Category` | `categories.ts` (idéntica a `types.ts`) | Eliminar la de `categories.ts`, importar de `types.ts` |
-| `SalesHistory` / `SalesItem` | `admin/types.ts`, `Dashboard.tsx`, `waiter.ts` | Mover a Database en `types.ts` |
-
-### T5. Eliminar casteos `as any` / `as never` en servicios
-
-Resueltos automáticamente al completar T1 y T2:
-- [ ] `products.ts` — 6 casteos `as any` para `rating`, `extras` (líneas 33, 55, 77, 113–115, 147–149, 164–166)
-- [ ] `order-items.ts` — `updateData as never` (línea 68)
-- [ ] `history.ts` — 3 inserciones `as any` / `as never` (líneas 58, 223, 253)
-- [ ] `notifications.ts` — insert `as any` (línea 15)
-- [ ] `waiter.ts` — casteos en inserts a `sales_history` y `sales_items` (líneas 340–390)
-- [ ] `lib/supabase/config.ts` — 3 seeds con `as any` (líneas 45, 68, 106)
-- [ ] `waiter/page.tsx` — `_notif as any` (temporal hasta T1 completo)
-- [ ] `Payment.tsx` — `as any` en update de `tip_amount` (temporal hasta T1 completo)
+| `SalesHistory` / `SalesItem` | `admin/types.ts`, `Dashboard.tsx`, `waiter.ts` | Usar tipos del `Database` en `types.ts` |
 
 ### T6. Tipar props de componentes
 
@@ -440,7 +402,7 @@ Resueltos automáticamente al completar T1 y T2:
 - [ ] `TableCard.tsx` — `i: any` en reduce → `i: OrderItem`; `Map<string, any>` → `Map<string, OrderGroup>`
 - [ ] `TableHeader.tsx` — `Product` local con `extras?: never[]` → importar `Product` central
 - [ ] `History.tsx` — `item: any` en renderOrderItem → `item: OrderItem`
-- [ ] `Menu.tsx` — `item: any` en map de order_items (líneas 1989, 2986, 3250, 3418)
+- [ ] `Menu.tsx` — `item: any` en map de order_items
 - [ ] `admin/page.tsx` — reducers con `sale: any`, `order: any` → tipos reales
 
 ---
