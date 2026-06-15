@@ -372,3 +372,41 @@ app/
 - `cancelled_quantity` en `order_items` soporta cancelaciones parciales sin eliminar el registro
 - `extras` en `products` es JSONB con formato `[{ name, price }]`
 - Notas de items incluyen extras formateados: `"Nota | Extras: X (+$Y) | Total: $Z"`
+
+---
+
+## ⏳ Pendiente
+
+### 1. Kitchen Display System (KDS) — `/kitchen`
+- [ ] Nueva ruta `/kitchen` con vista en tiempo real de pedidos activos
+- [ ] Ordenado por mesa y tiempo de entrada (FCFS)
+- [ ] Botones para avanzar estado de items: ordered → preparing → ready
+- [ ] Suscripción Realtime a `order_items` y `orders`
+- [ ] Sin autenticación (pantalla fija en cocina) o PIN simple
+
+### 2. "Pedir algo más" en Customer
+- [ ] Permitir al customer añadir items a una orden ya enviada (status `active` o `sent`)
+- [ ] Botón en `/customer/menu` o `/customer/history` para reabrir el carrito sobre la orden activa
+- [ ] Los nuevos items se agregan como `order_items` adicionales a la misma `order_id`
+- [ ] INSERT `waiter_notifications` (type: `new_order`) para alertar al mesero
+
+### 3. PWA + Notificaciones Push para Mesero
+- [ ] Agregar `manifest.json` y Service Worker para convertir a PWA
+- [ ] Implementar Web Push API — suscripción desde `/waiter`
+- [ ] Guardar suscripciones push en Supabase
+- [ ] Disparar notificaciones desde Edge Function al recibir INSERT en `waiter_notifications`
+- [ ] Funciona con browser en segundo plano o pantalla apagada
+
+### 4. Múltiples Meseros / Gestión de Personal
+- [ ] Tabla `staff` en Supabase (id, name, pin, role: waiter/manager)
+- [ ] Login por PIN en `/waiter` — sesión en `localStorage`
+- [ ] Asignación de mesas a mesero (`tables.assigned_staff_id`)
+- [ ] Tracking en `orders` y `sales_history` de qué mesero atendió
+- [ ] Vista en Admin de rendimiento por mesero (órdenes, propinas, ventas)
+
+### 5. Sistema de Reservaciones
+- [ ] Tabla `reservations` (id, table_id, customer_name, phone, date, time, party_size, status)
+- [ ] Vista en Admin para crear/ver/cancelar reservaciones
+- [ ] Vista en Waiter — agenda del día con reservas pendientes
+- [ ] Al llegar la hora, cambiar mesa a `occupied` automáticamente
+- [ ] Opcional: link público para que el cliente reserve sin QR
