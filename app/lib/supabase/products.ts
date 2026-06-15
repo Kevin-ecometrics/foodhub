@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
-import { ProductExtra } from '@/app/admin/types'
+import type { Json, ProductExtra } from './types'
 
 export interface Product {
   id: number
@@ -13,201 +13,177 @@ export interface Product {
   is_favorite: boolean
   preparation_time: number | null
   rating: number
-  extras?: ProductExtra[]
+  rating_count?: number
+  extras: ProductExtra[]
+}
+
+function parseProduct(raw: Record<string, unknown>): Product {
+  return {
+    ...raw,
+    rating: Number(raw.rating) || 0,
+    extras: Array.isArray(raw.extras) ? (raw.extras as unknown as ProductExtra[]) : [],
+  } as Product
 }
 
 export const productsService = {
-  // Obtener todos los productos disponibles
   async getProducts(): Promise<Product[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('products')
       .select('*')
       .eq('is_available', true)
       .order('is_favorite', { ascending: false })
       .order('category')
-      .order('name')
-    
+      .order('name') as { data: Record<string, unknown>[] | null; error: Error | null }
+
     if (error) throw error
-    
-    // Convertir el rating de string a number si es necesario
-    const products = (data as any[] || []).map(product => ({
-      ...product,
-      rating: parseFloat(product.rating) || 0,
-      extras: product.extras || [],
-    })) as Product[]
-    
-    return products
+    return (data || []).map(p => parseProduct(p))
   },
 
-  // Obtener productos por categoría
   async getProductsByCategory(category: string): Promise<Product[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('products')
       .select('*')
       .eq('category', category)
       .eq('is_available', true)
-      .order('is_favorite', { ascending: false }) 
-      .order('name')
-    
+      .order('is_favorite', { ascending: false })
+      .order('name') as { data: Record<string, unknown>[] | null; error: Error | null }
+
     if (error) throw error
-    
-    // Convertir el rating de string a number si es necesario
-    const products = (data as any[] || []).map(product => ({
-      ...product,
-      rating: parseFloat(product.rating) || 0,
-      extras: product.extras || [],
-    })) as Product[]
-    
-    return products
+    return (data || []).map(p => parseProduct(p))
   },
 
-  // Obtener productos favoritos
   async getFavoriteProducts(): Promise<Product[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('products')
       .select('*')
       .eq('is_favorite', true)
       .eq('is_available', true)
       .order('rating', { ascending: false })
-      .order('name')
-    
+      .order('name') as { data: Record<string, unknown>[] | null; error: Error | null }
+
     if (error) throw error
-    
-    // Convertir el rating de string a number si es necesario
-    const products = (data as any[] || []).map(product => ({
-      ...product,
-      rating: parseFloat(product.rating) || 0,
-      extras: product.extras || [],
-    })) as Product[]
-    
-    return products
+    return (data || []).map(p => parseProduct(p))
   },
 
+  async createProductWithExtras(productData: {
+    name: string
+    description?: string | null
+    price: string | number
+    category: string
+    image_url?: string | null
+    is_available: boolean
+    is_favorite: boolean
+    preparation_time?: string | number | null
+    rating?: string | number
+    extras?: ProductExtra[]
+  }): Promise<Product> {
+    const productPayload = {
+      name: productData.name,
+      description: productData.description ?? null,
+      price: parseInt(String(productData.price)) || 0,
+      category: productData.category,
+      image_url: typeof productData.image_url === 'string' ? productData.image_url : null,
+      is_available: productData.is_available,
+      is_favorite: productData.is_favorite,
+      preparation_time: productData.preparation_time ? parseInt(String(productData.preparation_time)) : null,
+      rating: Number(productData.rating) || 0,
+      rating_count: 0,
+      extras: (productData.extras || []) as unknown as Json,
+    }
 
-async createProductWithExtras(productData: any): Promise<Product> {
-  // Preparar datos del producto incluyendo extras
-  const productPayload = {
-    name: productData.name,
-    description: productData.description,
-    price: parseInt(productData.price) || 0,
-    category: productData.category,
-    image_url: typeof productData.image_url === 'string' ? productData.image_url : null,
-    is_available: productData.is_available,
-    is_favorite: productData.is_favorite,
-    preparation_time: parseInt(productData.preparation_time) || null,
-    rating: parseFloat(productData.rating) || 0,
-    rating_count: 0,
-    extras: productData.extras || [] 
-  }
+    const { data: product, error } = await (supabase as any)
+      .from('products')
+      .insert(productPayload)
+      .select()
+      .single() as { data: Record<string, unknown> | null; error: Error | null }
 
-  // Crear producto (los extras se guardan automáticamente)
-  const { data: product, error } = await supabase
-    .from('products')
-    .insert(productPayload as never)
-    .select()
-    .single()
+    if (error) throw error
+    return parseProduct(product as Record<string, unknown>)
+  },
 
-  if (error) throw error
+  async updateProductWithExtras(productId: number, productData: {
+    name: string
+    description?: string | null
+    price: string | number
+    category: string
+    image_url?: string | null
+    is_available: boolean
+    is_favorite: boolean
+    preparation_time?: string | number | null
+    rating?: string | number
+    extras?: ProductExtra[]
+  }): Promise<Product> {
+    const productPayload = {
+      name: productData.name,
+      description: productData.description ?? null,
+      price: parseInt(String(productData.price)) || 0,
+      category: productData.category,
+      image_url: typeof productData.image_url === 'string' ? productData.image_url : undefined,
+      is_available: productData.is_available,
+      is_favorite: productData.is_favorite,
+      preparation_time: productData.preparation_time ? parseInt(String(productData.preparation_time)) : null,
+      rating: Number(productData.rating) || 0,
+      updated_at: new Date().toISOString(),
+      extras: (productData.extras || []) as unknown as Json,
+    }
 
-  return {
-    ...(product as any),
-    rating: parseFloat((product as any).rating) || 0,
-    extras: (product as any).extras || []
-  } as Product
-},
+    const { data: product, error } = await (supabase as any)
+      .from('products')
+      .update(productPayload)
+      .eq('id', productId)
+      .select()
+      .single() as { data: Record<string, unknown> | null; error: Error | null }
 
-// Actualizar producto con extras
-async updateProductWithExtras(productId: number, productData: any): Promise<Product> {
-  // Preparar datos del producto incluyendo extras
-  const productPayload = {
-    name: productData.name,
-    description: productData.description,
-    price: parseInt(productData.price) || 0,
-    category: productData.category,
-    image_url: typeof productData.image_url === 'string' ? productData.image_url : undefined,
-    is_available: productData.is_available,
-    is_favorite: productData.is_favorite,
-    preparation_time: parseInt(productData.preparation_time) || null,
-    rating: parseFloat(productData.rating) || 0,
-    updated_at: new Date().toISOString(),
-    extras: productData.extras || [] // ← ESTA ES LA LÍNEA CLAVE
-  }
+    if (error) throw error
+    return parseProduct(product as Record<string, unknown>)
+  },
 
-  // Actualizar producto (los extras se actualizan automáticamente)
-  const { data: product, error } = await supabase
-    .from('products')
-    .update(productPayload as never)
-    .eq('id', productId)
-    .select()
-    .single()
+  async getProductById(productId: number): Promise<Product> {
+    const { data, error } = await (supabase as any)
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single() as { data: Record<string, unknown> | null; error: Error | null }
 
-  if (error) throw error
+    if (error) throw error
+    return parseProduct(data as Record<string, unknown>)
+  },
 
-  return {
-    ...(product as any),
-    rating: parseFloat((product as any).rating) || 0,
-    extras: (product as any).extras || []
-  } as Product
-},
+  async deleteProduct(productId: number): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('products')
+      .delete()
+      .eq('id', productId) as { error: Error | null }
 
-// Obtener producto por ID (para admin)
-async getProductById(productId: number): Promise<Product> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', productId)
-    .single()
+    if (error) throw error
+  },
 
-  if (error) throw error
+  async uploadProductImage(file: File): Promise<string> {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random()}.${fileExt}`
+    const filePath = `product-images/${fileName}`
 
-  return {
-    ...(data as any),
-    rating: parseFloat((data as any).rating) || 0,
-    extras: (data as any).extras || []
-  } as Product
-},
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file)
 
-// Eliminar producto
-async deleteProduct(productId: number): Promise<void> {
-  const { error } = await supabase
-    .from('products')
-    .delete()
-    .eq('id', productId)
+    if (uploadError) throw uploadError
 
-  if (error) throw error
-},
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath)
 
-// Subir imagen de producto
-async uploadProductImage(file: File): Promise<string> {
-  const fileExt = file.name.split('.').pop()
-  const fileName = `${Math.random()}.${fileExt}`
-  const filePath = `product-images/${fileName}`
+    return data.publicUrl
+  },
 
-  const { error: uploadError } = await supabase.storage
-    .from('product-images')
-    .upload(filePath, file)
-
-  if (uploadError) throw uploadError
-
-  // Obtener URL pública
-  const { data } = supabase.storage
-    .from('product-images')
-    .getPublicUrl(filePath)
-
-  return data.publicUrl
-}
-,
-  // Obtener categorías activas desde la tabla categories
   async getCategories(): Promise<string[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .select('name')
       .eq('is_active', true)
-      .order('display_order', { ascending: true })
+      .order('display_order', { ascending: true }) as { data: { name: string }[] | null; error: Error | null }
 
     if (error) throw error
-
-    const cats = data as { name: string }[] | null
-    return cats?.map((c) => c.name) || []
-  }
+    return (data || []).map(c => c.name)
+  },
 }

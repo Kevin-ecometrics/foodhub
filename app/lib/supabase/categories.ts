@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
 
 export interface Category {
@@ -73,7 +74,7 @@ export const categoriesService = {
     display_order?: number
     is_active?: boolean
   }): Promise<Category> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .insert([{
         name: category.name,
@@ -81,9 +82,9 @@ export const categoriesService = {
         description: category.description || '',
         display_order: category.display_order ?? 0,
         is_active: category.is_active ?? true,
-      }] as never)
+      }])
       .select()
-      .single()
+      .single() as { data: Category | null; error: Error | null }
 
     if (error) throw error
     return data as Category
@@ -97,12 +98,12 @@ export const categoriesService = {
     is_active: boolean
   }>): Promise<Category> {
     const payload = { ...updates, updated_at: new Date().toISOString() }
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
-      .update(payload as never)
+      .update(payload)
       .eq('id', id)
       .select()
-      .single()
+      .single() as { data: Category | null; error: Error | null }
 
     if (error) throw error
     return data as Category

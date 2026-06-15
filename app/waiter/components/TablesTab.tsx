@@ -1,6 +1,6 @@
 import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
 import TableCard from "./TableCard";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TablesTabProps {
   tables: TableWithOrder[];
@@ -20,6 +20,12 @@ export default function TablesTab({
   onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
   notifications, tablesOrder, onAddModalChange,
 }: TablesTabProps) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const totalGeneral = tables.reduce((s, t) => s + calculateTableTotal(t), 0);
   const occupiedCount = tables.filter(t => t.status === "occupied").length;
 
@@ -34,7 +40,7 @@ export default function TablesTab({
   const getOccupationDisplay = (table: TableWithOrder): string => {
     const t = getOccupationTime(table);
     if (!t) return "Sin pedidos";
-    const mins = Math.floor((Date.now() - t.getTime()) / 60000);
+    const mins = Math.floor((now - t.getTime()) / 60000);
     if (mins < 1) return "Recién";
     if (mins < 60) return `${mins} min`;
     return `${Math.floor(mins / 60)} h`;

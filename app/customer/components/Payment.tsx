@@ -239,10 +239,10 @@ const renderOrderItem = (item: any) => {
 
 
 // ─── SatisfactionSurvey ───────────────────────────────────────────────────────
-const SatisfactionSurvey = ({ onSubmit, onSkip, customerName }: {
+const SatisfactionSurvey = ({ onSubmit, onSkip }: {
   onSubmit: (rating: number, comment: string) => void;
   onSkip: () => void;
-  customerName: string;
+  customerName?: string;
 }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -372,12 +372,10 @@ export default function PaymentPage() {
   const { toast } = useToast();
   const router = useRouter();
   const { session, isLoading: sessionLoading, clearSession } = useSession();
-  const { currentTableId, notificationState, createBillNotification, refreshOrder } = useOrder();
+  const { currentTableId, notificationState, refreshOrder } = useOrder();
 
   const tableNumber = session?.tableNumber;
   const tableId = session?.tableId;
-  const userId = session?.userId;
-  const orderId = session?.orderId;
 
   useEffect(() => { if (tableId && !currentTableId) refreshOrder(parseInt(tableId)); }, [tableId, currentTableId, refreshOrder]);
 
@@ -391,7 +389,7 @@ export default function PaymentPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState({ status: "pending" });
+  const [, setPaymentStatus] = useState({ status: "pending" });
   const [refreshing, setRefreshing] = useState(false);
   const [tipMode, setTipMode] = useState<"none" | "pct" | "custom">("none");
   const [tipPct, setTipPct] = useState<number>(0);
@@ -404,6 +402,7 @@ export default function PaymentPage() {
     if (countdown <= 0) { clearSession(); router.push("/customer"); return; }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentConfirmed, showSurvey, countdown]);
 
   const loadOrders = async () => {
@@ -521,6 +520,7 @@ export default function PaymentPage() {
       .on("postgres_changes", { event:"*", schema:"public", table:"orders", filter:`table_id=eq.${tid}` }, () => loadOrders())
       .subscribe();
     return () => { sub.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, currentTableId]);
 
   useEffect(() => {
