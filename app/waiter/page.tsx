@@ -203,6 +203,7 @@ function PaymentCalculator({
   onConfirm,
   totalAmount,
   tableNumber,
+  initialTip = 0,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -218,6 +219,7 @@ function PaymentCalculator({
   }) => void;
   totalAmount: number;
   tableNumber: number;
+  initialTip?: number;
 }) {
   const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
@@ -269,9 +271,15 @@ function PaymentCalculator({
       setUsdRate(currentRate);
       setTempRate(currentRate.toString());
       setShowRateInput(false);
-      setTipMode("none");
-      setTipPct(0);
-      setTipCustom("");
+      if (initialTip > 0) {
+        setTipMode("custom");
+        setTipCustom(initialTip.toFixed(2));
+        setTipPct(0);
+      } else {
+        setTipMode("none");
+        setTipPct(0);
+        setTipCustom("");
+      }
     }
   }, [isOpen]);
 
@@ -674,7 +682,14 @@ function PaymentCalculator({
 
           {/* Propina */}
           <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
-            <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",marginBottom:8 }}>Propina</p>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
+              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>Propina</p>
+              {initialTip > 0 && (
+                <span style={{ fontSize:10,fontWeight:700,color:"var(--blue)",background:"var(--blue-light)",padding:"2px 8px",borderRadius:6 }}>
+                  💬 Cliente sugirió ${initialTip.toFixed(2)}
+                </span>
+              )}
+            </div>
             <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:tipMode==="custom"?10:0 }}>
               {[
                 { label:"Sin propina", mode:"none" as const, pct:0 },
@@ -2099,6 +2114,7 @@ export default function WaiterDashboard() {
     id: number;
     number: number;
     total: number;
+    customerTip?: number;
   } | null>(null);
   const [showSeparatePayments, setShowSeparatePayments] = useState(false);
   const [selectedTableForSeparate, setSelectedTableForSeparate] = useState<{
@@ -2452,10 +2468,23 @@ export default function WaiterDashboard() {
     const table = tables.find((t) => t.id === tableId);
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
+    let customerTip = 0;
+    try {
+      const { data: billNotif } = await supabase
+        .from("waiter_notifications")
+        .select("tip_amount")
+        .eq("table_id", tableId)
+        .eq("type", "bill_request")
+        .eq("status", "pending")
+        .maybeSingle();
+      if (billNotif?.tip_amount) customerTip = parseFloat(billNotif.tip_amount) || 0;
+    } catch (e) { console.error(e); }
+
     setSelectedTableForPayment({
       id: tableId,
       number: tableNumber,
       total: tableTotal,
+      customerTip,
     });
     setShowPaymentCalculator(true);
   };
@@ -2702,6 +2731,7 @@ export default function WaiterDashboard() {
         onConfirm={handlePaymentConfirm}
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
+        initialTip={selectedTableForPayment?.customerTip ?? 0}
       />
 
       <SeparatePaymentsModal

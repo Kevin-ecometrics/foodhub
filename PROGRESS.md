@@ -2,110 +2,373 @@
 
 > Restaurant management platform with real-time ordering, table management, and payment processing.
 > Stack: Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4 · Supabase (PostgreSQL + Realtime)
+> Package manager: **Bun** · Project codename in package.json: `menu-jp` · Brand: **ScanEat**
 
 ---
 
-## ✅ Completed
+## Database Schema (Supabase PostgreSQL)
 
-### Infrastructure & Tech Stack
-- [x] Next.js 16 App Router project setup with TypeScript
-- [x] Tailwind CSS 4 with custom design system (OKLCH colors, Plus Jakarta Sans)
-- [x] Supabase client configured with SSR support
-- [x] Context providers: OrderContext, SessionContext, ToastContext, ConfirmContext
-- [x] Admin JWT authentication (`/api/admin/login`, `/api/admin/verify`)
-- [x] Environment variable configuration for Supabase and admin credentials
+All tables have RLS enabled.
+
+### `tables`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | integer PK | auto-increment | |
+| number | integer | — | mesa número |
+| status | varchar | `'available'` | available / occupied |
+| capacity | integer | — | |
+| location | varchar | — | nullable |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | |
+
+### `categories`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | integer PK | auto-increment | |
+| name | varchar | — | |
+| slug | varchar UNIQUE | — | |
+| description | text | `''` | nullable |
+| display_order | integer | 0 | |
+| is_active | boolean | true | |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | |
+
+### `products`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | integer PK | auto-increment | |
+| name | varchar | — | |
+| description | text | — | nullable |
+| price | integer | — | en centavos MXN |
+| category | varchar | — | FK reference |
+| image_url | varchar | — | nullable |
+| is_available | boolean | true | |
+| preparation_time | integer | — | nullable, minutos |
+| rating | numeric | 0.0 | promedio acumulado |
+| rating_count | integer | 0 | número de ratings |
+| is_favorite | boolean | false | |
+| extras | jsonb | `[]` | add-ons con precio |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | |
+
+### `orders`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| table_id | integer FK→tables | — | |
+| customer_name | varchar | — | nullable |
+| status | varchar | `'active'` | active / sent / closed |
+| total_amount | numeric | 0 | |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | |
+
+### `order_items`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| order_id | uuid FK→orders | — | |
+| product_id | integer FK→products | — | |
+| product_name | varchar | — | snapshot del nombre |
+| price | numeric | — | snapshot del precio |
+| quantity | integer | 1 | |
+| notes | text | — | nullable, notas + extras |
+| status | varchar | `'ordered'` | ordered→preparing→ready→served / cancelled |
+| cancelled_quantity | integer | 0 | cancelaciones parciales |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | |
+
+### `waiter_notifications`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| table_id | integer FK→tables | — | |
+| order_id | uuid FK→orders | — | nullable |
+| type | varchar | — | new_order / refill / assistance / bill_request |
+| message | text | — | |
+| status | varchar | `'pending'` | pending / completed / cancelled |
+| payment_method | varchar | — | nullable: cash / terminal / usd / mixed |
+| tip_amount | numeric | 0 | **propina sugerida por el cliente** (nullable) |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | nullable |
+
+### `tips`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| order_id | uuid | — | nullable FK→orders |
+| table_id | integer FK→tables | — | |
+| customer_name | text | — | ej. "Mesa 5" |
+| amount | numeric | 0 | monto final de propina cobrada |
+| payment_method | text | — | nullable |
+| created_at | timestamptz | now() | |
+
+### `sales_history`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| table_id | integer FK→tables | — | |
+| table_number | integer | — | snapshot |
+| customer_name | varchar | — | nullable |
+| total_amount | numeric | 0 | |
+| order_count | integer | 0 | |
+| item_count | integer | 0 | |
+| payment_method | varchar | — | nullable |
+| created_at | timestamptz | now() | |
+| closed_at | timestamptz | now() | |
+
+### `sales_items`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| sale_id | uuid FK→sales_history | — | |
+| product_name | varchar | — | |
+| price | numeric | — | |
+| quantity | integer | 1 | |
+| subtotal | numeric | — | |
+| notes | text | — | nullable |
+
+### `customer_feedback`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| table_id | text | — | |
+| customer_name | text | — | |
+| rating | integer | — | CHECK 1–5 |
+| comment | text | — | nullable |
+| order_count | integer | — | |
+| total_amount | numeric | — | |
+| created_at | timestamptz | now() | nullable |
 
 ---
 
-### Database Schema (Supabase PostgreSQL)
-- [x] `tables` — restaurant seating (number, status, capacity, location)
-- [x] `categories` — product grouping (name, slug, display_order, is_active)
-- [x] `products` — menu items (name, price, category FK, image_url, is_available, rating, extras JSONB)
-- [x] `orders` — customer orders (table_id FK, customer_name, status, total_amount)
-- [x] `order_items` — items per order with status lifecycle (ordered → preparing → ready → served / cancelled)
-- [x] `waiter_notifications` — alerts to waiter (new_order, refill, assistance, bill_request)
-- [x] `sales_history` — archived closed orders (table_number, total_amount, payment_method, closed_at)
-- [x] `sales_items` — archived items per closed sale
-- [x] `customer_feedback` — ratings and reviews (1–5 stars, comment, order summary)
+## Realtime Channels
+
+| Canal | Escucha | Usado en |
+|---|---|---|
+| `table-{id}-notifications` | INSERT/UPDATE `waiter_notifications` | OrderContext (customer) |
+| `table-{id}-orders` | `*` en `orders` | Payment.tsx |
+| `table-{id}-payments` | `*` en `waiter_notifications` | Payment.tsx |
+| waiter subscriptions | `orders`, `order_items`, `tables`, `waiter_notifications` | waiter/page.tsx |
 
 ---
 
-### Customer Portal (`/customer/*`)
-- [x] QR code entry — table discovery via scanned QR
-- [x] Menu page — browse by category, view products, add to cart with custom notes
-- [x] Per-customer ordering — multiple diners per table each with their own session
-- [x] Real-time order status tracking
-- [x] Product ratings and favorites
-- [x] Order history page — view past orders for the session
-- [x] Payment page — view full bill, send payment request notification to waiter
-- [x] QR Share page — display/share table QR code with other diners
+## Flujo General del Sistema
+
+```
+Customer (QR scan)
+  └─ /customer → ingresa nombre
+  └─ /customer/menu → navega categorías, agrega items al carrito
+       → confirma pedido → INSERT orders + order_items
+       → INSERT waiter_notifications (type: new_order)
+  └─ /customer/history → historial de órdenes de la sesión
+  └─ /customer/payment → ticket completo
+       → selector de propina (10%/15%/20%/custom)
+           → UPDATE waiter_notifications.tip_amount
+       → botón "Solicitar Cuenta"
+           → INSERT waiter_notifications (type: bill_request)
+       → escucha realtime: cuando waiter marca completed → muestra encuesta → redirige
+
+Waiter (/waiter)
+  └─ Tab Notificaciones → feed en tiempo real de todos los eventos
+  └─ Tab Mesas → estado por mesa, controles de items
+       → botón "Cobrar" → handleCobrarMesa
+           → fetcha tip_amount del bill_request pendiente
+           → abre PaymentCalculator pre-llenado con propina del cliente
+           → badge "💬 Cliente sugirió $X.XX"
+           → waiter confirma pago
+           → freeTableAndClean (archiva en sales_history / sales_items)
+           → INSERT tips si tip > 0
+           → UPDATE waiter_notifications.status = 'completed'
+           → customer recibe confirmación realtime
+  └─ Tab Productos → toggle disponibilidad rápido
+
+Admin (/admin)
+  └─ Login JWT
+  └─ Dashboard con métricas diarias (ingresos, propinas, órdenes, productos top)
+  └─ CRUD: Mesas / Productos / Categorías
+  └─ Upload logo (Supabase Storage bucket: logo)
+```
 
 ---
 
-### Waiter Dashboard (`/waiter`)
-- [x] Tab navigation: Notifications · Tables · Products
-- [x] **Notifications tab** — live feed of: new orders, refill requests, assistance calls, bill requests
-- [x] Real-time subscriptions via Supabase (orders, order_items, tables, waiter_notifications)
-- [x] Auto-refresh every 2 minutes as fallback
-- [x] **Tables tab** — grid of all tables with per-customer order breakdown
-  - [x] Item status controls: ordered → preparing → ready → served
-  - [x] Password-protected item cancellation
-  - [x] Table sorting by number or occupation time
-  - [x] FCFS (First-Come-First-Served) filter
-- [x] **Unified Payment Calculator** — single total with:
-  - [x] Cash (MXN)
-  - [x] Terminal / Card (MXN)
-  - [x] USD with configurable exchange rate
-  - [x] Mixed payment methods
-  - [x] Automatic change calculation
-- [x] **Split Payments modal** — per-customer payment breakdown with individual payment modals
-- [x] **Products tab** — quick availability toggle for inventory management
+## Arquitectura de Archivos
+
+```
+app/
+├── layout.tsx                      # Root layout + providers
+├── page.tsx                        # Landing / redirect
+├── not-found.tsx
+│
+├── admin/
+│   ├── page.tsx                    # Admin shell + routing
+│   └── components/
+│       ├── LoginForm.tsx
+│       ├── Dashboard.tsx           # Analytics, stats, tips del día
+│       ├── TablesManagement.tsx    # CRUD mesas
+│       ├── TableForm.tsx
+│       ├── ProductsManagement.tsx  # CRUD productos
+│       ├── ProductForm.tsx
+│       ├── CategoriesManagement.tsx
+│       └── StarRating.tsx
+│
+├── customer/
+│   ├── page.tsx                    # Entry → nombre de cliente
+│   ├── menu/page.tsx               # Menú principal
+│   ├── payment/page.tsx            # Ticket + selector propina
+│   ├── history/page.tsx            # Historial de órdenes
+│   ├── qr/page.tsx                 # QR Share
+│   └── components/
+│       ├── CustomerPage.tsx        # Onboarding / nombre
+│       ├── Menu.tsx                # Catálogo + carrito + solicitar cuenta
+│       ├── Payment.tsx             # Ticket + propina customer + encuesta
+│       ├── History.tsx             # Historial sesión
+│       └── QRShare.tsx
+│
+├── waiter/
+│   ├── page.tsx                    # Dashboard principal + PaymentCalculator
+│   └── components/
+│       ├── Header.tsx
+│       ├── Tabs.tsx
+│       ├── LoadingScreen.tsx
+│       ├── NotificationsTab.tsx
+│       ├── NotificationCard.tsx
+│       ├── NotificationIcon.tsx
+│       ├── TablesTab.tsx
+│       ├── TableCard.tsx
+│       ├── TableHeader.tsx         # Botones Cobrar / Separado
+│       ├── TableSummary.tsx
+│       ├── CustomerOrderSection.tsx
+│       ├── OrderItem.tsx           # Estado por item + cancelación
+│       └── ProductsManagement.tsx  # Toggle disponibilidad
+│
+├── context/
+│   ├── OrderContext.tsx            # Estado global de orden + bill notification polling
+│   ├── SessionContext.tsx          # Sesión del customer (tableId, userId, etc.)
+│   ├── ToastContext.tsx
+│   └── ConfirmContext.tsx
+│
+├── lib/supabase/
+│   ├── client.ts                   # Supabase client singleton
+│   ├── config.ts                   # URL + anon key
+│   ├── types.ts                    # Tipos TypeScript de DB
+│   ├── orders.ts                   # CRUD órdenes
+│   ├── order-items.ts              # CRUD items de orden
+│   ├── products.ts                 # Catálogo
+│   ├── tables.ts                   # Gestión de mesas
+│   ├── categories.ts               # Categorías
+│   ├── waiter.ts                   # freeTableAndClean, notif management
+│   ├── notifications.ts            # Crear notificaciones
+│   ├── history.ts                  # requestBill, sales archival, historial
+│   └── tips.ts                     # insertTip, getTipsTotal, getTipsByDateRange
+│
+└── api/
+    ├── admin/login/route.ts        # JWT login
+    ├── admin/verify/route.ts       # JWT verify
+    └── invoice/route.ts            # Envío de factura por email
+```
 
 ---
 
-### Admin Dashboard (`/admin`)
-- [x] Login page with JWT session (persisted in localStorage)
-- [x] Collapsible sidebar navigation
-- [x] **Dashboard / Analytics**
-  - [x] Daily stats cards: total orders, revenue, items sold, active tables, avg order value
-  - [x] Date range filtering for historical analysis
-  - [x] Top 10 popular products by quantity sold
-  - [x] Sales history table with payment method tracking
-- [x] **Tables Management** — full CRUD (create, edit, delete tables; set capacity & location; manage status)
-- [x] **Products Management** — full CRUD (add/edit/delete, image upload, pricing, prep time, availability, extras/add-ons)
-- [x] **Categories Management** — create/edit/delete, set display order, activate/deactivate
-- [x] Logo upload — store restaurant branding in Supabase Storage (`logo` bucket)
-- [x] Direct link to Waiter portal from admin sidebar
+## ✅ Completado
+
+### Infrastructure
+- [x] Next.js 16 App Router + TypeScript
+- [x] Tailwind CSS 4 con colores OKLCH + fuente Plus Jakarta Sans
+- [x] Supabase client con SSR
+- [x] Providers: OrderContext, SessionContext, ToastContext, ConfirmContext
+- [x] Admin JWT auth (`/api/admin/login` + `/api/admin/verify`)
+
+### Customer Portal
+- [x] Entrada por QR — descubrimiento de mesa
+- [x] Menú por categorías con carrito y notas por item
+- [x] Extras con precio adicional (JSONB en productos)
+- [x] Sesiones multi-comensal por mesa
+- [x] Tracking de estado de orden en tiempo real
+- [x] Ratings y favoritos de productos
+- [x] Historial de órdenes de la sesión
+- [x] QR Share — compartir mesa con otros comensales
+- [x] Página de pago — ticket completo con totales por comensal
+- [x] **Selector de propina para el cliente** — 10%/15%/20%/personalizado; se guarda en `waiter_notifications.tip_amount` vía realtime; visible para el mesero al cobrar
+- [x] Encuesta de satisfacción post-pago (1–5 estrellas + comentario → `customer_feedback`)
+- [x] Solicitud de factura por email (`/api/invoice`)
+- [x] Generación de ticket PDF
+
+### Waiter Dashboard
+- [x] Tab Notificaciones — feed realtime: new_order, refill, assistance, bill_request
+- [x] Tab Mesas — grid con desglose por comensal
+  - [x] Controles de estado por item (ordered→preparing→ready→served)
+  - [x] Cancelación con contraseña (parcial o total)
+  - [x] Ordenado por número o tiempo de ocupación
+  - [x] Filtro FCFS
+- [x] PaymentCalculator — efectivo + terminal + USD (tasa configurable) + mixto + cambio automático
+- [x] **Propina en calculadora pre-llenada desde sugerencia del cliente**
+- [x] **Badge "💬 Cliente sugirió $X.XX"** cuando hay propina del customer
+- [x] Split Payments — pago individual por comensal
+- [x] Tab Productos — toggle disponibilidad rápido
+
+### Admin Dashboard
+- [x] Login JWT con sesión en localStorage
+- [x] Sidebar colapsable
+- [x] Dashboard con stats diarias (órdenes, ingresos, propinas, mesas activas, ticket promedio)
+- [x] Filtro por rango de fechas
+- [x] Top 10 productos por cantidad vendida
+- [x] CRUD Mesas (capacidad, ubicación, estado)
+- [x] CRUD Productos (imagen, precio, tiempo prep, disponibilidad, extras)
+- [x] CRUD Categorías (orden de display, activo/inactivo)
+- [x] Upload de logo (Supabase Storage bucket `logo`)
+
+### Service Layer
+- [x] `tips.ts` — insertTip, getTipsTotal, getTipsByDateRange
+- [x] `history.ts` — requestBill (con tip_amount), archival de ventas
+- [x] `waiter.ts` — freeTableAndClean
+- [x] `notifications.ts` — creación de alertas
+- [x] Todos los servicios CRUD de entidades
 
 ---
 
-### Service Layer (`/app/lib/supabase/`)
-- [x] `orders.ts` — order CRUD and status updates
-- [x] `order-items.ts` — order item operations
-- [x] `products.ts` — product catalog queries
-- [x] `tables.ts` — table management queries
-- [x] `categories.ts` — category operations
-- [x] `waiter.ts` — notification fetching and table subscriptions
-- [x] `notifications.ts` — bill/alert notification creation
-- [x] `history.ts` — sales history archival on table close
+## Migraciones Aplicadas
+
+| Fecha | Nombre | Descripción |
+|---|---|---|
+| 2026-06-15 | `add_tip_amount_to_waiter_notifications` | Columna `tip_amount numeric DEFAULT 0` en `waiter_notifications` para comunicar propina del cliente al mesero |
 
 ---
 
-## ✅ Tips (Propinas) — Completado
+## Flujo de Propina (Implementado 2026-06-15)
 
-### Tips (Propinas) — Waiter Payment Calculator
-- [x] **Nueva tabla `tips`** en Supabase (`id` UUID PK, `order_id` nullable UUID, `table_id` FK, `customer_name`, `amount`, `payment_method`, `created_at`) con RLS
-- [x] **Service layer** `app/lib/supabase/tips.ts` — `insertTip`, `getTipsTotal`, `getTipsByDateRange`
-- [x] **Propina en PaymentCalculator del waiter** — chips preset (10%/15%/20%) + monto custom; calculada sobre el total; guardada en DB al cobrar mesa
-- [x] `handlePaymentConfirm` guarda propina tras `freeTableAndClean` si `tip > 0`
-- [x] Toast de confirmación incluye monto de propina
-- [x] **Admin Dashboard** — card de "Propinas del Día" con total por rango de fechas; integrado en `DailyStats.totalTips`
-- [x] Flujo cliente limpio — sin TipStep; propina se registra en punto real de cobro (waiter)
+**Problema resuelto:** El mesero tenía que adivinar o preguntar verbalmente la propina. Ahora el cliente la elige desde su pantalla y el mesero la recibe pre-cargada.
+
+```
+1. Customer solicita cuenta (Menu.tsx → history.requestBill)
+   → INSERT waiter_notifications { type: 'bill_request', tip_amount: 0, status: 'pending' }
+
+2. Customer va a /customer/payment
+   → Ve selector de propina (Sin propina / 10% / 15% / 20% / Personalizado)
+   → Al elegir: UPDATE waiter_notifications SET tip_amount = X WHERE id = notif.id
+   → Muestra confirmación: "Propina guardada: $X.XX — el mesero la verá al cobrar"
+
+3. Waiter hace click en "Cobrar" (handleCobrarMesa)
+   → SELECT tip_amount FROM waiter_notifications WHERE table_id = X AND type = 'bill_request' AND status = 'pending'
+   → Abre PaymentCalculator con initialTip pre-llenado
+   → Badge azul: "💬 Cliente sugirió $X.XX"
+   → Waiter puede aceptar, modificar o borrar la propina
+
+4. Waiter confirma pago (handlePaymentConfirm)
+   → freeTableAndClean() → archiva en sales_history + sales_items
+   → Si tip > 0: INSERT tips { table_id, amount, payment_method }
+   → UPDATE waiter_notifications.status = 'completed'
+
+5. Customer recibe confirmación realtime → encuesta → redirect
+```
 
 ---
 
-## 🗒️ Notes
+## Notas Técnicas
 
-- Project name in codebase: `menu-jp` (package.json), branded as **ScanEat**
-- Package manager: Bun
-- All monetary values are in MXN by default; USD exchange rate is configurable per payment
+- Todos los montos monetarios en **MXN** por defecto
+- Tasa USD/MXN configurable por sesión del waiter (guardada en `localStorage`)
+- Colores con **OKLCH** para mejor consistencia en pantallas
+- Polling de respaldo cada 3–5 segundos en cliente además de Realtime para garantizar entrega
+- `cancelled_quantity` en `order_items` soporta cancelaciones parciales sin eliminar el registro
+- `extras` en `products` es JSONB con formato `[{ name, price }]`
+- Notas de items incluyen extras formateados: `"Nota | Extras: X (+$Y) | Total: $Z"`
