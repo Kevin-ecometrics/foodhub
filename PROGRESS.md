@@ -330,6 +330,12 @@ app/
 - [x] **T3** — Enums de dominio centralizados: `NotificationType`, `NotificationStatus`, `TableStatus`, `OrderItemStatus`, `OrderStatus`, `PaymentMethod` — exportados desde `types.ts`
 - [x] **T5** — 0 errores TypeScript en todos los archivos `lib/supabase/`: `waiter.ts`, `history.ts`, `orders.ts`, `order-items.ts`, `products.ts`, `categories.ts`, `notifications.ts`, `tips.ts`
 - [x] **TablesTab.tsx** — `Date.now()` movido a `useState` + `setInterval` (fix React purity warning)
+- [x] **T4** — Interfaces duplicadas eliminadas: `OrderItem` consolidado en `order-items.ts` + re-exportado desde `waiter.ts`; `TableOrder` separado de `Order`; `Product` central en `products.ts` usado por `TableHeader.tsx` y `ProductsManagement.tsx`; interfaces locales `CustomerGroupSummary` tipadas
+- [x] **T6** — Props `any` reemplazados con tipos concretos: `OrderItemWithProduct` en `Payment.tsx`, `History.tsx`, `Menu.tsx`; `Guest`, `TableOrder[]`, `OrderItem`, `SeparatePayment`, `PaymentData` en `waiter/page.tsx`; `SalesItem` en `admin/components/Dashboard.tsx`; `Product` array cast en `admin/components/ProductsManagement.tsx`; interfaces `Guest`/`SeparatePayment`/`PaymentData` movidas a scope de módulo
+- [x] **TableHeader.tsx** — `supabase` import faltante añadido; `calculateTotalItems`, `toast`, `tableTotal`, `hasNotifications`, `totalItems` removidos (muertos); `eslint-disable any` añadido para casts de Supabase
+- [x] **waiter/page.tsx** — `PaymentData` ampliado con campo `change`; 10 íconos react-icons no usados eliminados; `setFcfsFilter` y `usdRateUsed` removidos
+- [x] **waiter.ts** — `OrderItemRow` expandido con `order_id`, `product_id`, `created_at`; query `getTablesWithOrders` actualizado para seleccionar esos campos — `TableOrder.order_items` ahora satisface `OrderItem[]` correctamente
+- [x] **admin/components/ProductsManagement.tsx** — `parseFloat(product.rating)` → `product.rating` (era `number`, no `string`); `FaSpinner` y `ProductUpdate` no usados eliminados
 
 ---
 
@@ -381,29 +387,6 @@ app/
 - Notas de items incluyen extras formateados: `"Nota | Extras: X (+$Y) | Total: $Z"`
 
 ---
-
-## 🔴 Pendiente — Prioridad Alta
-
-### T4. Eliminar interfaces locales duplicadas
-
-| Tipo | Archivos con duplicado | Acción |
-|---|---|---|
-| `Product` | `order-items.ts`, `products.ts`, `admin/types.ts`, `TableHeader.tsx` | Una sola en `types.ts`, importar en todos |
-| `Order` / `OrderWithItems` | `orders.ts`, `waiter.ts`, `history.ts`, `admin/types.ts` x2 | Merge en `types.ts` |
-| `OrderItem` | `order-items.ts`, `waiter.ts`, `history.ts` | Una sola con `cancelled_quantity` |
-| `WaiterNotification` | `waiter.ts` (con relaciones), tipos locales | Merge: agregar `tables?` y `orders?` opcionales |
-| `Category` | `categories.ts` (idéntica a `types.ts`) | Eliminar la de `categories.ts`, importar de `types.ts` |
-| `SalesHistory` / `SalesItem` | `admin/types.ts`, `Dashboard.tsx`, `waiter.ts` | Usar tipos del `Database` en `types.ts` |
-
-### T6. Tipar props de componentes
-
-- [ ] `OrderItem.tsx` — `item: any` → `item: OrderItem`
-- [ ] `CustomerOrderSection.tsx` — `orders: any[]` → `orders: OrderWithItems[]`
-- [ ] `TableCard.tsx` — `i: any` en reduce → `i: OrderItem`; `Map<string, any>` → `Map<string, OrderGroup>`
-- [ ] `TableHeader.tsx` — `Product` local con `extras?: never[]` → importar `Product` central
-- [ ] `History.tsx` — `item: any` en renderOrderItem → `item: OrderItem`
-- [ ] `Menu.tsx` — `item: any` en map de order_items
-- [ ] `admin/page.tsx` — reducers con `sale: any`, `order: any` → tipos reales
 
 ---
 

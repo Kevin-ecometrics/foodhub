@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
+import { TableWithOrder, WaiterNotification, OrderItem } from "@/app/lib/supabase/waiter";
+import { productsService, Product } from "@/app/lib/supabase/products";
 import { supabase } from "@/app/lib/supabase/client";
 import { useState, useEffect } from "react";
-import { useToast } from "@/app/context/ToastContext";
 
 interface TableHeaderProps {
   table: TableWithOrder;
@@ -18,18 +18,12 @@ interface TableHeaderProps {
   occupationTime?: string;
 }
 
-interface Product {
-  id: number; name: string; description: string; price: number;
-  category: string; image_url: string | null; preparation_time: number | null;
-  is_available: boolean; is_favorite: boolean; rating: number; rating_count: number; extras?: never[];
-}
 
 export default function TableHeader({
-  table, tableTotal, processing, onCobrarMesa, onPagarPorSeparado,
-  notifications = [], onOrderAdded, onAddModalChange, hasNotifications = false,
+  table, processing, onCobrarMesa, onPagarPorSeparado,
+  notifications = [], onOrderAdded, onAddModalChange,
   isHighlighted = false, occupationTime,
 }: TableHeaderProps) {
-  const { toast } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const openAddModal = () => { setShowAddModal(true); onAddModalChange?.(true); };
@@ -45,24 +39,20 @@ export default function TableHeader({
   const loadProducts = async () => {
     setProductsLoading(true); setError(null);
     try {
-      const { data, error } = await supabase.from("products").select("*").eq("is_available", true).order("name", { ascending: true });
-      if (error) throw new Error(error.message);
-      setProducts(data || []);
+      const data = await productsService.getProducts();
+      setProducts(data);
     } catch (e) { console.error(e); setError("Error cargando los productos"); }
     finally { setProductsLoading(false); }
   };
 
-  const calculateTotalItems = (t: TableWithOrder) =>
-    t.orders.reduce((s, o) => s + o.order_items.reduce((ss: number, i: any) => ss + i.quantity, 0), 0);
-
   const calculateItemsByStatus = (t: TableWithOrder) => {
-    const pending = t.orders.reduce((s, o) => s + o.order_items.filter((i: any) => i.status==="ordered"||i.status==="preparing").length, 0);
-    const ready   = t.orders.reduce((s, o) => s + o.order_items.filter((i: any) => i.status==="ready").length, 0);
-    const served  = t.orders.reduce((s, o) => s + o.order_items.filter((i: any) => i.status==="served").length, 0);
+    const pending = t.orders.reduce((s, o) => s + o.order_items.filter((i: OrderItem) => i.status==="ordered"||i.status==="preparing").length, 0);
+    const ready   = t.orders.reduce((s, o) => s + o.order_items.filter((i: OrderItem) => i.status==="ready").length, 0);
+    const served  = t.orders.reduce((s, o) => s + o.order_items.filter((i: OrderItem) => i.status==="served").length, 0);
     return { pending, ready, served };
   };
 
-  const billRequestNotifs = notifications.filter((n: any) => n.table_id === table.id && n.type === "bill_request");
+  const billRequestNotifs = notifications.filter(n => n.table_id === table.id && n.type === "bill_request");
   const latestBillRequest = billRequestNotifs.length > 0 ? billRequestNotifs[billRequestNotifs.length - 1] : null;
   const showPaymentButtons = latestBillRequest?.type === "bill_request";
 
@@ -108,7 +98,6 @@ export default function TableHeader({
     finally { setAddingOrder(false); }
   };
 
-  const totalItems = calculateTotalItems(table);
   const statusCounts = calculateItemsByStatus(table);
   const getTimeColor = () => {
     if (!occupationTime) return "var(--muted)";

@@ -1,22 +1,6 @@
-// app/waiter/components/ProductsManagement.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { productsService } from "@/app/lib/supabase/products";
-
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  image_url: string | null;
-  preparation_time: number | null;
-  is_available: boolean;
-  is_favorite: boolean;
-  rating: number;
-  rating_count: number;
-  extras?: never[];
-}
+import { productsService, Product } from "@/app/lib/supabase/products";
 
 interface ProductsManagementProps {
   onError: (error: string) => void;
@@ -33,7 +17,7 @@ export default function ProductsManagement({ onError }: ProductsManagementProps)
     setProductsLoading(true);
     try {
       const data = await productsService.getProducts();
-      setProducts(data as never);
+      setProducts(data);
     } catch (e) {
       console.error(e);
       onError("Error cargando los productos");

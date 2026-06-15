@@ -7,7 +7,7 @@ import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
-import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { historyService, OrderWithItems, OrderItemWithProduct } from "@/app/lib/supabase/history";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
 import { useToast } from "@/app/context/ToastContext";
@@ -1986,7 +1986,7 @@ export default function MenuPage() {
       setOrderHistory(
         history.map((o) => ({
           ...o,
-          order_items: o.order_items.map((item: any) => ({
+          order_items: o.order_items.map((item: OrderItemWithProduct) => ({
             ...item,
             cancelled_quantity: item.cancelled_quantity || 0,
             ...(item.status === "cancelled" &&
@@ -2983,7 +2983,7 @@ export default function MenuPage() {
           map.set(name, { name, orders: [], subtotal: 0, items: 0 });
         const g = map.get(name)!;
         g.orders.push(order);
-        order.order_items.forEach((item: any) => {
+        order.order_items.forEach((item: OrderItemWithProduct) => {
           const cancelled = item.cancelled_quantity || 0;
           const active = item.quantity - cancelled;
           g.subtotal += item.price * active;
@@ -3247,7 +3247,7 @@ export default function MenuPage() {
                         >
                           {new Date(order.created_at).toLocaleString("es-MX")}
                         </p>
-                        {order.order_items.map((item: any, ii: number) => {
+                        {order.order_items.map((item: OrderItemWithProduct, ii: number) => {
                           const cancelled = item.cancelled_quantity || 0;
                           const active = item.quantity - cancelled;
                           const isFullCancelled = active === 0 && cancelled > 0;
@@ -3415,7 +3415,7 @@ export default function MenuPage() {
                           >
                             $
                             {order.order_items
-                              .reduce((s: number, i: any) => {
+                              .reduce((s: number, i: OrderItemWithProduct) => {
                                 const c = i.cancelled_quantity || 0;
                                 return s + i.price * (i.quantity - c);
                               }, 0)

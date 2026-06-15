@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import { useConfirm } from "@/app/context/ConfirmContext";
 import { supabase } from "@/app/lib/supabase/client";
-import { FaPlus, FaEdit, FaSpinner, FaStar, FaSort, FaSortUp, FaSortDown } from "react-icons/fa";
+import { FaPlus, FaEdit, FaStar, FaSort, FaSortUp, FaSortDown } from "react-icons/fa";
 import { Product, ProductFormData } from "../types";
 import ProductForm from "./ProductForm";
 import { categoriesService } from "@/app/lib/supabase/categories";
@@ -16,10 +16,6 @@ interface ProductsManagementProps {
   onError: (error: string) => void;
 }
 
-interface ProductUpdate {
-  is_available?: boolean;
-  is_favorite?: boolean;
-}
 
 export default function ProductsManagement({
   onError,
@@ -116,10 +112,9 @@ export default function ProductsManagement({
       if (error) throw error;
 
       // Mapear los datos para asegurar que tengan la estructura correcta
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mappedProducts = (data || []).map((product: any) => ({
+      const mappedProducts = ((data || []) as Product[]).map((product) => ({
         ...product,
-        rating: parseFloat(product.rating) || 0,
+        rating: product.rating || 0,
         rating_count: product.rating_count || 0,
         created_at: product.created_at || new Date().toISOString(),
         updated_at: product.updated_at || new Date().toISOString(),

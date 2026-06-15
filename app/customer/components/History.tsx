@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
-import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { historyService, OrderWithItems, OrderItemWithProduct } from "@/app/lib/supabase/history";
 import { useToast } from "@/app/context/ToastContext";
 import {
   FaHistory,
@@ -327,7 +327,7 @@ export default function HistoryPage() {
   };
 
   // Función para renderizar items de orden
-  const renderOrderItem = (item: any) => {
+  const renderOrderItem = (item: OrderItemWithProduct) => {
     const isCancelled = item.status === "cancelled";
     const cancelledQty = item.cancelled_quantity || 0;
     const activeQuantity = item.quantity - cancelledQty;
@@ -621,7 +621,7 @@ export default function HistoryPage() {
       customerSummary.cancelledAmount += orderCalculations.cancelledAmount;
 
       customerSummary.itemsCount += order.order_items.filter(
-        (item: any) => item.quantity - (item.cancelled_quantity || 0) > 0,
+        (item: OrderItemWithProduct) => item.quantity - (item.cancelled_quantity || 0) > 0,
       ).length;
 
       if (

@@ -302,7 +302,7 @@ export default function Dashboard({
         .from("sales_items")
         .select("*")
         .in("sale_id", saleIds)
-        .order("product_name")) as { data: any[] | null; error: any };
+        .order("product_name")) as { data: SalesItem[] | null; error: Error | null };
 
       if (error) {
         console.error("Error fetching sales items from Supabase:", error);
@@ -310,7 +310,7 @@ export default function Dashboard({
       }
 
       // Procesar items para asegurar consistencia en cancelled_quantity
-      const processedItems = (data || []).map((item: any) => ({
+      const processedItems = (data || []).map((item: SalesItem) => ({
         ...item,
         cancelled_quantity: item.cancelled_quantity || 0,
         // Si el item está marcado como 'cancelled' pero no tiene cancelled_quantity,

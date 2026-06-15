@@ -6,7 +6,9 @@ import {
   waiterService,
   WaiterNotification,
   TableWithOrder,
+  TableOrder,
 } from "@/app/lib/supabase/waiter";
+import type { OrderItem } from "@/app/lib/supabase/order-items";
 import { supabase } from "@/app/lib/supabase/client";
 import { useToast } from "@/app/context/ToastContext";
 import Header from "./components/Header";
@@ -15,23 +17,44 @@ import NotificationsTab from "./components/NotificationsTab";
 import TablesTab from "./components/TablesTab";
 import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
-import {
-  FaMoneyBillWave,
-  FaCreditCard,
-  FaDollarSign,
-  FaExchangeAlt,
-  FaTimes,
-  FaUsers,
-  FaUserPlus,
-  FaTrash,
-  FaCheck,
-  FaUtensils,
-} from "react-icons/fa";
 
 import { tipsService } from "@/app/lib/supabase/tips";
 
 // Clave para localStorage
 const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
+
+interface Guest {
+  id: string;
+  name: string;
+  items: Array<{
+    itemId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    subtotal: number;
+  }>;
+  cashAmount: number;
+  terminalAmount: number;
+  usdAmount: number;
+  usdRate: number;
+  orderId: string;
+}
+
+interface SeparatePayment {
+  cash: number;
+  terminal: number;
+  usd: number;
+  usdRate: number;
+}
+
+interface PaymentData {
+  cash: number;
+  terminal: number;
+  usd: number;
+  tip: number;
+  change: number;
+  usdRate?: number;
+}
 
 // Modal de confirmación con contraseña - SIMPLIFICADO
 function PasswordModal({
@@ -941,23 +964,6 @@ function SeparatePaymentsModal({
     return 18.5;
   };
 
-  interface Guest {
-    id: string;
-    name: string;
-    items: Array<{
-      itemId: string;
-      productName: string;
-      quantity: number;
-      price: number;
-      subtotal: number;
-    }>;
-    cashAmount: number;
-    terminalAmount: number;
-    usdAmount: number;
-    usdRate: number;
-    orderId: string;
-  }
-
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -1621,7 +1627,7 @@ function GuestPaymentModal({
       usdRate: number;
     },
   ) => void;
-  guest: any;
+  guest: Guest;
   tableNumber: number;
 }) {
   const { toast } = useToast();
@@ -1646,7 +1652,7 @@ function GuestPaymentModal({
   const [tempRate, setTempRate] = useState<string>(usdRate.toString());
 
   const itemsTotal =
-    guest?.items.reduce((sum: number, item: any) => sum + item.subtotal, 0) ||
+    guest?.items.reduce((sum, item) => sum + item.subtotal, 0) ||
     0;
   const usdToMxn = usdAmount * usdRate;
   const totalPaid = cashAmount + terminalAmount + usdToMxn;
@@ -2087,7 +2093,7 @@ export default function WaiterDashboard() {
     Set<string>
   >(new Set());
 
-  const [fcfsFilter, setFcfsFilter] = useState(() => {
+  const [fcfsFilter] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("waiter_fcfs_filter");
       return saved === "true";
@@ -2121,7 +2127,7 @@ export default function WaiterDashboard() {
     id: number;
     number: number;
     total: number;
-    orders: any[];
+    orders: TableOrder[];
   } | null>(null);
 
   const scrollPositionRef = useRef(0);
@@ -2447,7 +2453,7 @@ export default function WaiterDashboard() {
     return table.orders.reduce((total, order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
         const orderTotal = order.order_items.reduce(
-          (orderSum: number, item: any) => {
+          (orderSum: number, item: OrderItem) => {
             const cancelledQty = item.cancelled_quantity || 0;
             const activeQuantity = item.quantity - cancelledQty;
 
@@ -2510,7 +2516,7 @@ export default function WaiterDashboard() {
     setShowSeparatePayments(true);
   };
 
-  const handleSeparatePaymentsConfirm = async (payments: any[]) => {
+  const handleSeparatePaymentsConfirm = async (payments: SeparatePayment[]) => {
     if (!selectedTableForSeparate) return;
 
     setProcessing(`separate-${selectedTableForSeparate.id}`);
@@ -2518,13 +2524,10 @@ export default function WaiterDashboard() {
       let totalCash = 0;
       let totalTerminal = 0;
       let totalUsd = 0;
-      let usdRateUsed = 18.5;
-
       payments.forEach((payment) => {
         totalCash += payment.cash;
         totalTerminal += payment.terminal;
         totalUsd += payment.usd;
-        if (payment.usdRate) usdRateUsed = payment.usdRate;
       });
 
       let paymentMethod: "cash" | "terminal" | "mixed" | "usd" | null = null;
@@ -2559,7 +2562,7 @@ export default function WaiterDashboard() {
     }
   };
 
-  const handlePaymentConfirm = async (paymentData: any) => {
+  const handlePaymentConfirm = async (paymentData: PaymentData) => {
     if (!selectedTableForPayment) return;
 
     setProcessing(`cobrar-${selectedTableForPayment.id}`);

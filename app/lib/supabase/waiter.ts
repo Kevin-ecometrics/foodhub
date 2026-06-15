@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
+import type { OrderItem } from './order-items'
 import type {
   Database,
   NotificationType,
@@ -8,6 +9,8 @@ import type {
   OrderItemStatus,
   PaymentMethod,
 } from './types'
+
+export type { OrderItem }
 
 // ─── DB shorthand types ───────────────────────────────────────────────────────
 type WaiterNotifUpdate  = Database['public']['Tables']['waiter_notifications']['Update']
@@ -22,12 +25,15 @@ type SalesItemInsert    = Database['public']['Tables']['sales_items']['Insert']
 
 interface OrderItemRow {
   id: string
+  order_id: string
+  product_id: number
   product_name: string
   quantity: number
   status: string
   price: number
   notes: string | null
   cancelled_quantity: number
+  created_at: string
 }
 
 interface OrderRow {
@@ -65,18 +71,7 @@ export interface WaiterNotification {
   table_number?: number
 }
 
-export interface OrderItem {
-  id: string
-  product_name: string
-  quantity: number
-  status: OrderItemStatus
-  price: number
-  notes?: string | null
-  order_id?: string
-  cancelled_quantity: number
-}
-
-export interface Order {
+export interface TableOrder {
   id: string
   total_amount: number
   customer_name: string | null
@@ -91,7 +86,7 @@ export interface TableWithOrder {
   status: TableStatus
   capacity: number
   location: string | null
-  orders: Order[]
+  orders: TableOrder[]
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -124,7 +119,7 @@ export const waiterService = {
         *,
         orders (
           id, total_amount, customer_name, created_at, status,
-          order_items ( id, product_name, quantity, status, price, notes, cancelled_quantity )
+          order_items ( id, order_id, product_id, product_name, quantity, status, price, notes, cancelled_quantity, created_at )
         )
       `)
       .order('number')
@@ -149,12 +144,15 @@ export const waiterService = {
           status: o.status as 'sent' | 'completed',
           order_items: (o.order_items || []).map(it => ({
             id: it.id,
+            order_id: it.order_id,
+            product_id: it.product_id,
             product_name: it.product_name,
             quantity: it.quantity,
             status: it.status as OrderItemStatus,
             price: it.price,
-            notes: it.notes ?? undefined,
+            notes: it.notes ?? null,
             cancelled_quantity: it.cancelled_quantity || 0,
+            created_at: it.created_at,
           })),
         })),
     }))

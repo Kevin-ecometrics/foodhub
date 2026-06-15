@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useToast } from "@/app/context/ToastContext";
+import type { OrderItem } from "@/app/lib/supabase/order-items";
 
 interface OrderItemProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  item: any;
+  item: OrderItem;
   processing: string | null;
   onUpdateStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string, cancelQuantity: number) => void;

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/context/SessionContext";
 import { useOrder } from "@/app/context/OrderContext";
-import { historyService, OrderWithItems } from "@/app/lib/supabase/history";
+import { historyService, OrderWithItems, OrderItemWithProduct } from "@/app/lib/supabase/history";
 import { useToast } from "@/app/context/ToastContext";
 import { supabase } from "@/app/lib/supabase/client";
 import axios from "axios";
@@ -200,7 +200,7 @@ const formatNotesForPDF = (notes: string) => {
   return `<div class="notes-main"><strong>Nota:</strong> ${notes}</div>`;
 };
 
-const renderOrderItem = (item: any) => {
+const renderOrderItem = (item: OrderItemWithProduct) => {
   const cancelledQty = item.cancelled_quantity || 0;
   const activeQuantity = item.quantity - cancelledQty;
   const isCancelled = activeQuantity === 0;

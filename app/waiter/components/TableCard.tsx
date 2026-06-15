@@ -1,8 +1,17 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { TableWithOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
+import { TableWithOrder, TableOrder, WaiterNotification } from "@/app/lib/supabase/waiter";
+import type { OrderItem } from "@/app/lib/supabase/order-items";
 import CustomerOrderSection from "./CustomerOrderSection";
 import TableHeader from "./TableHeader";
 import TableSummary from "./TableSummary";
+
+interface CustomerGroupSummary {
+  customerName: string;
+  orders: TableOrder[];
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  itemsCount: number;
+}
 
 interface TableCardProps {
   table: TableWithOrder;
@@ -28,14 +37,14 @@ export default function TableCard({
   const tableTotal = calculateTableTotal(table);
   const isOccupied = table.status === "occupied";
 
-  const groupOrdersByCustomer = (t: TableWithOrder) => {
-    const map = new Map<string, any>();
+  const groupOrdersByCustomer = (t: TableWithOrder): CustomerGroupSummary[] => {
+    const map = new Map<string, CustomerGroupSummary>();
     t.orders.forEach(order => {
       const name = order.customer_name || "Cliente";
       if (!map.has(name)) map.set(name, { customerName: name, orders: [], subtotal: 0, taxAmount: 0, total: 0, itemsCount: 0 });
       const g = map.get(name)!;
       g.orders.push(order);
-      const sub = order.order_items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+      const sub = order.order_items.reduce((s: number, i: OrderItem) => s + i.price * i.quantity, 0);
       g.subtotal += sub;
       g.itemsCount += order.order_items.length;
     });

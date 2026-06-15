@@ -1,9 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import OrderItem from "./OrderItem";
+import type { TableOrder } from "@/app/lib/supabase/waiter";
+import type { OrderItem as OrderItemType } from "@/app/lib/supabase/order-items";
 
 interface CustomerOrderSummary {
   customerName: string;
-  orders: any[];
+  orders: TableOrder[];
   subtotal: number;
   taxAmount: number;
   total: number;
@@ -39,7 +40,7 @@ export default function CustomerOrderSection({ customerSummary, processing, onUp
       {/* Order items */}
       <div>
         {customerSummary.orders.flatMap(order =>
-          order.order_items.map((item: any) => (
+          order.order_items.map((item: OrderItemType) => (
             <OrderItem
               key={item.id}
               item={item}
