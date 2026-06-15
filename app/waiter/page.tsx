@@ -2477,7 +2477,10 @@ export default function WaiterDashboard() {
         .eq("type", "bill_request")
         .eq("status", "pending")
         .maybeSingle();
-      if (billNotif?.tip_amount) customerTip = parseFloat(billNotif.tip_amount) || 0;
+      const _notif = billNotif as any;
+      if (_notif?.tip_amount != null) {
+        customerTip = parseFloat(String(_notif.tip_amount)) || 0;
+      }
     } catch (e) { console.error(e); }
 
     setSelectedTableForPayment({
