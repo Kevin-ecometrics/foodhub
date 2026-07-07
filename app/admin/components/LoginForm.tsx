@@ -413,7 +413,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
               </button>
             </form>
 
-            <div className="mt-9 border-t border-[oklch(88%_0.01_260)] pt-6">
+            <div className="hidden mt-9 border-t border-[oklch(88%_0.01_260)] pt-6">
               <p className="text-xs text-[oklch(55%_0.02_260)] text-center mb-3 font-medium tracking-widest uppercase">
                 Credenciales de prueba
               </p>
