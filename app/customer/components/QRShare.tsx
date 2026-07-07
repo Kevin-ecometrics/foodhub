@@ -229,8 +229,8 @@ export default function QRSharePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Únete a mi mesa - ScanEat",
-          text: `Únete a mi mesa ${tableNumber} en ScanEat`,
+          title: "Únete a mi mesa - RioChia7CafeBistro",
+          text: `Únete a mi mesa ${tableNumber} en RioChia7CafeBistro`,
           url: currentUrl,
         });
       } catch (err) {

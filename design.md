@@ -1,4 +1,4 @@
-# ScanEat — Design System
+# RioChia7CafeBistro — Design System
 
 Sistema de diseño oficial del proyecto. Toda contribución visual debe seguir estas especificaciones.
 

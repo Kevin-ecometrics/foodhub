@@ -110,7 +110,7 @@ export default function HomePage() {
         <h1 className="text-[clamp(36px,6vw,64px)] font-extrabold text-[oklch(20%_0.02_260)] tracking-tight leading-tight text-center max-w-[640px] mb-5 animate-fadeUp">
           Bienvenido a
           <br />
-          <span className="text-[oklch(62%_0.18_32)]">ScanEat</span>
+          <span className="text-[oklch(62%_0.18_32)]">RioChia7CafeBistro</span>
         </h1>
 
         {/* Description */}
@@ -159,7 +159,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-5 px-10 border-t border-[oklch(88%_0.01_260)] flex items-center justify-center gap-1.5">
         <span className="text-xs text-[oklch(55%_0.02_260)]">
-          © 2026 ScanEat — Todos los derechos reservados.
+          © 2026 RioChia7CafeBistro — Todos los derechos reservados.
         </span>
       </footer>
     </div>

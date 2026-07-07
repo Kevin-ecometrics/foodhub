@@ -2,7 +2,7 @@
 
 ## Overview
 
-Database schema for ScanEat — restaurant management system with real-time ordering, table management, tips, and payment processing. All tables have **RLS enabled**.
+Database schema for RioChia7CafeBistro — restaurant management system with real-time ordering, table management, tips, and payment processing. All tables have **RLS enabled**.
 
 ---
 

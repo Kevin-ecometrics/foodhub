@@ -1,4 +1,4 @@
-# ScanEat — Wireframes v2
+# RioChia7CafeBistro — Wireframes v2
 
 Actualizaciones y adiciones respecto al wireframe v1.
 
@@ -389,7 +389,7 @@ El nombre de archivo incluye timestamp para evitar cache del navegador.
 
 **Header — estado cargando:**
 ```
-│  ■  ScanEat — Panel del Mesero        [ ↻ ] Actualizando... │
+│  ■  RioChia7CafeBistro — Panel del Mesero        [ ↻ ] Actualizando... │
 ```
 
 **Estilos de tabs:**
@@ -735,4 +735,4 @@ ConfirmContext  → { confirm(message) → Promise<boolean> }
 
 ---
 
-*Wireframes v2 — ScanEat · Última actualización: 2026-05-15*
+*Wireframes v2 — RioChia7CafeBistro · Última actualización: 2026-05-15*

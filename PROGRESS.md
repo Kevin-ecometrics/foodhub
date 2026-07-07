@@ -1,8 +1,8 @@
-# ScanEat — Progress Tracker
+# RioChia7CafeBistro — Progress Tracker
 
 > Restaurant management platform with real-time ordering, table management, and payment processing.
 > Stack: Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4 · Supabase (PostgreSQL + Realtime)
-> Package manager: **Bun** · Project codename in package.json: `menu-jp` · Brand: **ScanEat**
+> Package manager: **Bun** · Project codename in package.json: `menu-jp` · Brand: **RioChia7CafeBistro**
 
 ---
 

@@ -1,4 +1,4 @@
-# ScanEat — Type System Reference
+# RioChia7CafeBistro — Type System Reference
 
 > Fuente de verdad: `app/lib/supabase/types.ts`
 > El cliente Supabase está tipado con `createClient<Database>()` — todos los queries heredan los tipos automáticamente.

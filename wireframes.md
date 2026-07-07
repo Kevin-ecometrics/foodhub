@@ -1,4 +1,4 @@
-# ScanEat — Wireframes
+# RioChia7CafeBistro — Wireframes
 
 Wireframes ASCII de todas las páginas del proyecto. Representan estructura y jerarquía visual, no estilos finales.
 
@@ -58,7 +58,7 @@ Página pública de entrada. Centrada, minimalista. Font: Plus Jakarta Sans.
 │              ★  MENÚ DIGITAL  (badge)               │
 │                                                     │
 │            Bienvenido a                             │
-│               ScanEat          (accent, 64px)       │
+│               RioChia7CafeBistro          (accent, 64px)       │
 │                                                     │
 │       Disfruta de una experiencia digital           │
 │       simple, rápida y elegante. Explora            │
@@ -80,7 +80,7 @@ Página pública de entrada. Centrada, minimalista. Font: Plus Jakarta Sans.
 - Fondo `bg-white`, sin header/footer
 - Badge superior: `bg-accent-light`, texto `text-accent`, `rounded-full`
 - Headline: `clamp(36px, 6vw, 64px)` `font-extrabold`
-- "ScanEat" en `text-accent`
+- "RioChia7CafeBistro" en `text-accent`
 - CTA: `bg-accent`, hover eleva + sombra accent
 - Metrics card: `bg-surface`, `border`, `rounded-2xl`
 
@@ -95,7 +95,7 @@ Pantalla de autenticación. Diseño independiente, no usa sidebar.
 │                                                     │
 │                                                     │
 │         ┌───────────────────────────────┐           │
-│         │   ■■  ScanEat                 │           │
+│         │   ■■  RioChia7CafeBistro                 │           │
 │         │   logo + nombre               │           │
 │         │   ─────────────────────────── │           │
 │         │   Panel Administrativo        │           │
@@ -365,7 +365,7 @@ Página de entrada del cliente al escanear el QR.
 
 ```
 ┌─────────────────────────────────────────────┐
-│  ■QR  ScanEat            ● Mesa 3 — Ocupada │  ← header
+│  ■QR  RioChia7CafeBistro            ● Mesa 3 — Ocupada │  ← header
 │ ─────────────────────────────────────────── │
 │                                             │
 │         ┌──────────────────────────┐        │
@@ -385,14 +385,14 @@ Página de entrada del cliente al escanear el QR.
 │  │  3. Ingresa tu nombre y ordena      │   │
 │  └─────────────────────────────────────┘   │
 │                                             │
-│       © 2026 ScanEat (footer)               │
+│       © 2026 RioChia7CafeBistro (footer)               │
 └─────────────────────────────────────────────┘
 ```
 
 **Estado sin QR (acceso directo sin mesa):**
 ```
 ┌─────────────────────────────────────────────┐
-│  ■QR  ScanEat               ○ Sin mesa      │
+│  ■QR  RioChia7CafeBistro               ○ Sin mesa      │
 │ ─────────────────────────────────────────── │
 │                                             │
 │         ┌──────────────────────────┐        │
@@ -417,7 +417,7 @@ Vista principal de catálogo. Layout: header fijo + tabs categorías + grid prod
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  ■QR  ScanEat              Mesa 3  [🛒 2]  [?] │  ← header fijo
+│  ■QR  RioChia7CafeBistro              Mesa 3  [🛒 2]  [?] │  ← header fijo
 │ ─────────────────────────────────────────────── │
 │                                                 │
 │  [ Buscar producto... ]                         │
@@ -500,7 +500,7 @@ Panel deslizante desde la derecha (slide-in).
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  ■QR  ScanEat              Mesa 3               │
+│  ■QR  RioChia7CafeBistro              Mesa 3               │
 │ ─────────────────────────────────────────────── │
 │                                                 │
 │  Mis Pedidos                                    │
@@ -525,7 +525,7 @@ Panel deslizante desde la derecha (slide-in).
 │                                                 │
 │  [ Ver mi cuenta / Pagar ]                      │
 │                                                 │
-│       © 2026 ScanEat                            │
+│       © 2026 RioChia7CafeBistro                            │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -537,7 +537,7 @@ Resumen de cuenta y métodos de pago.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  ■QR  ScanEat              Mesa 3               │
+│  ■QR  RioChia7CafeBistro              Mesa 3               │
 │ ─────────────────────────────────────────────── │
 │                                                 │
 │  Tu Cuenta — Mesa 3                             │
@@ -584,7 +584,7 @@ QR de la mesa para compartir con otros comensales.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  ■QR  ScanEat              Mesa 3               │
+│  ■QR  RioChia7CafeBistro              Mesa 3               │
 │ ─────────────────────────────────────────────── │
 │                                                 │
 │         Comparte esta mesa                      │
@@ -766,7 +766,7 @@ Página 404 con brand completo.
 │                                                     │
 │              ┌────────────────────┐                 │
 │              │                    │                 │
-│              │   ■■  ScanEat      │                 │
+│              │   ■■  RioChia7CafeBistro      │                 │
 │              │   logo 40×40       │                 │
 │              │                    │                 │
 │              │   404              │  (accent, 64px) │

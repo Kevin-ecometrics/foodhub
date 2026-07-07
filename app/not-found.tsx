@@ -19,7 +19,7 @@ export default function NotFound() {
             className="text-2xl font-extrabold tracking-tight"
             style={{ color: "oklch(62% 0.18 32)" }}
           >
-            ScanEat
+            RioChia7CafeBistro
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export default function NotFound() {
 
           {/* Footer */}
           <div className="px-8 py-3.5 bg-gray-50 border-t border-slate-200 flex items-center justify-between">
-            <p className="text-[11px] text-slate-400">ScanEat</p>
+            <p className="text-[11px] text-slate-400">RioChia7CafeBistro</p>
             <p className="text-[11px] text-slate-400">
               Error 404 — recurso no disponible
             </p>

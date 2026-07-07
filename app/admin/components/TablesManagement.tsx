@@ -588,7 +588,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
             </div>
             <div>
               <div class="header-title">Código QR</div>
-              <div class="header-sub">ScanEat — Escanea para ordenar</div>
+              <div class="header-sub">RioChia7CafeBistro — Escanea para ordenar</div>
             </div>
           </div>
           <div class="card-body">
@@ -660,7 +660,7 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
           </div>
           <div>
             <div style="color:white;font-size:15px;font-weight:800;letter-spacing:-0.3px;">Código QR${tableNumber ? ` — Mesa ${tableNumber}` : ""}</div>
-            <div style="color:oklch(96% 0.05 32 / 0.75);font-size:11px;margin-top:1px;">ScanEat — Escanea para ordenar</div>
+            <div style="color:oklch(96% 0.05 32 / 0.75);font-size:11px;margin-top:1px;">RioChia7CafeBistro — Escanea para ordenar</div>
           </div>
         </div>
         <div style="padding:22px;text-align:center;">
