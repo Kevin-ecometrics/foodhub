@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   authors: [{ name: "Ecommetrica" }],
   publisher: "Ecommetrica",
   robots: "index, follow",
-  metadataBase: new URL("https://riochia7cafebistro.e-commetrics.com/"),
+  metadataBase: new URL("https://riochia7cafebistro.scaneat.ai/"),
   alternates: {
     canonical: "/",
   },
