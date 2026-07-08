@@ -1301,7 +1301,7 @@ export default function Dashboard({
   </head>
   <body>
     <div class="header">
-      <div class="restaurant-name">RIOCHIA7CAFEBISTRO</div>
+      <div class="restaurant-name">RIOCHIA7</div>
       <div class="report-title">REPORTE DE PRODUCTOS VENDIDOS - ACTIVOS</div>
       <div class="date-info">
         <div><strong>Fecha del Reporte:</strong> ${reportDate}</div>
@@ -1402,7 +1402,7 @@ export default function Dashboard({
 
     <div class="footer">
       <div>*** REPORTE DE PRODUCTOS ACTIVOS - GENERADO AUTOMÁTICAMENTE ***</div>
-      <div>RioChia7CafeBistro - Sistema de Gestión</div>
+      <div>RioChia7 - Sistema de Gestión</div>
       <div>${window.location.hostname}</div>
     </div>
   </body>
@@ -1535,7 +1535,7 @@ export default function Dashboard({
     </head>
     <body>
       <div class="header">
-        <div class="restaurant-name">RIOCHIA7CAFEBISTRO</div>
+        <div class="restaurant-name">RIOCHIA7</div>
         <div>*** TICKET DE VENTA ***</div>
       </div>
       
@@ -1611,7 +1611,7 @@ export default function Dashboard({
       
       <div class="footer">
         <div>*** GRACIAS POR SU VISITA ***</div>
-        <div>RioChia7CafeBistro</div>
+        <div>RioChia7</div>
         <div>${window.location.hostname}</div>
       </div>
     </body>

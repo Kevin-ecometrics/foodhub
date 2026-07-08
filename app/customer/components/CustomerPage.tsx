@@ -24,7 +24,7 @@ const PageShell = ({ children, tableInfo }: { children: React.ReactNode; tableIn
             <path d="M14 14h3v3"/><path d="M21 14v.01"/><path d="M21 21v-4"/><path d="M14 21h7"/>
           </svg>
         </div>
-        <span className="text-[oklch(62%_0.18_32)] font-extrabold text-lg tracking-tight">RioChia7CafeBistro</span>
+        <span className="text-[oklch(62%_0.18_32)] font-extrabold text-lg tracking-tight">RioChia7</span>
       </div>
       {tableInfo ? (
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${tableInfo.status === 'available' ? 'bg-[oklch(96%_0.05_32)]' : 'bg-[oklch(92%_0.06_40)]'}`}>
@@ -48,7 +48,7 @@ const PageShell = ({ children, tableInfo }: { children: React.ReactNode; tableIn
     </main>
 
     <footer className="px-10 py-4 border-t border-[oklch(88%_0.01_260)] flex items-center justify-center">
-      <span className="text-xs text-[oklch(62%_0.18_32)]">© 2026 RioChia7CafeBistro — Todos los derechos reservados.</span>
+      <span className="text-xs text-[oklch(62%_0.18_32)]">© 2026 RioChia7 — Todos los derechos reservados.</span>
     </footer>
   </div>
 );
@@ -208,7 +208,7 @@ export default function CustomerPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-extrabold text-[oklch(20%_0.02_260)] tracking-tight mb-2">
-              Bienvenido a <span className="text-[oklch(62%_0.18_32)]">RioChia7CafeBistro</span>
+              Bienvenido a <span className="text-[oklch(62%_0.18_32)]">RioChia7</span>
             </h1>
             <p className="text-sm text-[oklch(55%_0.02_260)] leading-relaxed">
               Escanea el código QR de tu mesa para comenzar

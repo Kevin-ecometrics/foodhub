@@ -424,7 +424,7 @@ const CustomAlert = ({
         </div>
         <div>
           <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>
-            RioChia7CafeBistro
+            RioChia7
           </p>
           <p
             style={{
@@ -2097,8 +2097,8 @@ export default function MenuPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Únete a mi mesa - RioChia7CafeBistro",
-          text: `Únete a mi mesa ${tableNumber} en RioChia7CafeBistro`,
+          title: "Únete a mi mesa - RioChia7",
+          text: `Únete a mi mesa ${tableNumber} en RioChia7`,
           url: currentUrl,
         });
       } catch {
@@ -2311,7 +2311,7 @@ export default function MenuPage() {
                   letterSpacing: "-0.3px",
                 }}
               >
-                RioChia7CafeBistro
+                RioChia7
               </p>
               <p style={{ fontSize: 11, color: "var(--muted)" }}>
                 Mesa {tableNumber} • {customerName}

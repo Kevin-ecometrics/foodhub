@@ -293,7 +293,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
                 <IconQR />
               </div>
               <span className="text-[oklch(22%_0.04_260)] font-bold text-4xl tracking-tight">
-                RioChia7CafeBistro
+                RioChia7
               </span>
             </div>
 
