@@ -340,22 +340,6 @@ const IFire = () => (
     <path d="M12 1.5C8.5 5 6 8 7.5 12c.5 1.5-.5 3-2 3.5C7 18 9.5 20 12 22.5c2.5-2.5 5-4.5 6.5-7-.5-.5-1.5-2-2-3.5C18 8 15.5 5 12 1.5z" />
   </svg>
 );
-const INote = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-  >
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-  </svg>
-);
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
@@ -936,7 +920,6 @@ const ProductModal = ({
   adding: boolean;
 }) => {
   const [qty, setQty] = useState(1);
-  const [notes, setNotes] = useState("");
   const [selectedExtras, setSelectedExtras] = useState<{
     [k: string]: boolean;
   }>({});
@@ -1281,44 +1264,6 @@ const ProductModal = ({
                 </button>
               </div>
             </div>
-            <label
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--text)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 8,
-              }}
-            >
-              <INote /> Instrucciones especiales (opcional):
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value.slice(0, 200))}
-              placeholder="Ej: Sin tomate, extra queso, bien cocido…"
-              style={{
-                width: "100%",
-                border: "1.5px solid var(--border)",
-                borderRadius: 10,
-                padding: "12px 14px",
-                fontSize: 13,
-                color: "var(--text)",
-                resize: "none",
-                height: 80,
-                fontFamily: "inherit",
-                lineHeight: 1.6,
-                background: "var(--surface)",
-                outline: "none",
-                transition: "border-color 0.15s",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-            />
-            <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-              {notes.length}/200 caracteres
-            </p>
           </div>
 
           {/* Total + CTA */}
@@ -1361,7 +1306,7 @@ const ProductModal = ({
                 Cancelar
               </button>
               <button
-                onClick={() => onAdd(notes, qty, selectedExtras)}
+                onClick={() => onAdd("", qty, selectedExtras)}
                 disabled={adding}
                 style={{
                   flex: 2,
@@ -2615,6 +2560,7 @@ export default function MenuPage() {
                         onClick={() => handleAddToCartWithNotes(product)}
                       >
                         {/* Image */}
+                        {product.image_url && (
                         <div style={{ position: "relative" }}>
                           <div
                             style={{
@@ -2627,19 +2573,15 @@ export default function MenuPage() {
                               overflow: "hidden",
                             }}
                           >
-                            {product.image_url ? (
-                              <img
-                                src={product.image_url}
-                                alt={product.name}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                }}
-                              />
-                            ) : (
-                              <span style={{ fontSize: 36 }}>🍽️</span>
-                            )}
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
                           </div>
                           {/* Badges */}
                           <div
@@ -2742,6 +2684,7 @@ export default function MenuPage() {
                             </span>
                           )}
                         </div>
+                        )}
 
                         {/* Info */}
                         <div
