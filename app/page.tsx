@@ -1,6 +1,7 @@
 // app/page.tsx
 import Link from "next/link";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { supabase } from "@/app/lib/supabase/client";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -91,13 +92,45 @@ const metrics = [
   { num: "", label: "Pedido desde la mesa", icon: "utensils" },
 ];
 
-export default function HomePage() {
+async function getLogoUrl(): Promise<string | null> {
+  const { data: files, error } = await supabase.storage
+    .from("logo")
+    .list("", {
+      limit: 100,
+      offset: 0,
+      sortBy: { column: "created_at", order: "desc" },
+    });
+
+  if (error || !files || files.length === 0) return null;
+
+  const latestLogo = files.find((file) => file.name.startsWith("logo_"));
+  if (!latestLogo) return null;
+
+  const { data: urlData } = supabase.storage
+    .from("logo")
+    .getPublicUrl(latestLogo.name);
+
+  return urlData?.publicUrl ?? null;
+}
+
+export default async function HomePage() {
+  const logoUrl = await getLogoUrl();
+
   return (
     <div
       className={`${plusJakarta.className} min-h-screen flex flex-col bg-white`}
     >
       {/* Main */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-[60px]">
+        {/* Logo del restaurante */}
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt="Logo del restaurante"
+            className="w-24 h-24 object-contain rounded-2xl mb-6 animate-fadeDown"
+          />
+        )}
+
         {/* Tag */}
         <div className="inline-flex items-center gap-1.5 bg-[oklch(96%_0.05_32)] rounded-full px-3.5 py-1.5 mb-7 animate-fadeDown">
           <IconStar />
