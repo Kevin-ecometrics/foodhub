@@ -49,6 +49,10 @@ export default function AdminPage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [checkingLogo, setCheckingLogo] = useState(true);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [checkingCoverImage, setCheckingCoverImage] = useState(true);
+  const [showCoverUploadModal, setShowCoverUploadModal] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   // NUEVOS ESTADOS PARA VENTAS
   const [salesHistory, setSalesHistory] = useState<SalesHistory[]>([]);
   const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
@@ -160,6 +164,104 @@ export default function AdminPage() {
       setLogoUrl(null);
     } finally {
       setCheckingLogo(false);
+    }
+  };
+  const handleCoverImageUpload = async (file: File) => {
+    // Validaciones
+    if (!file.type.startsWith("image/")) {
+      toast("Por favor selecciona un archivo de imagen válido", "warning");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast("La imagen debe ser menor a 5MB", "warning");
+      return;
+    }
+
+    setUploadingCover(true);
+    try {
+      // Generar nombre único con timestamp
+      const timestamp = Date.now();
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const fileName = `cover_${timestamp}.${fileExt}`;
+
+      // Subir la imagen con nombre único
+      const { error: uploadError } = await supabase.storage
+        .from("cover-image")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+        });
+
+      if (uploadError) {
+        console.error("❌ Error subiendo archivo:", uploadError);
+        throw uploadError;
+      }
+
+      // Obtener URL con timestamp para evitar cache
+      const { data: urlData } = supabase.storage
+        .from("cover-image")
+        .getPublicUrl(fileName);
+
+      if (urlData?.publicUrl) {
+        const urlTimestamp = new Date().getTime();
+        const urlWithTimestamp = `${urlData.publicUrl}?t=${urlTimestamp}`;
+        setCoverImageUrl(urlWithTimestamp);
+      }
+
+      toast("Cover actualizado exitosamente", "success");
+      setShowCoverUploadModal(false);
+    } catch (error: any) {
+      console.error("Error subiendo cover:", error);
+      toast("Error al subir el cover: " + error.message, "error");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+  const checkExistingCoverImage = async () => {
+    setCheckingCoverImage(true);
+    try {
+      // Listar todos los archivos del bucket
+      const { data: files, error } = await supabase.storage
+        .from("cover-image")
+        .list("", {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" }, // Ordenar por fecha de creación descendente
+        });
+
+      if (error) {
+        setCoverImageUrl(null);
+        return;
+      }
+
+      if (files && files.length > 0) {
+        // Buscar el archivo más reciente que empiece con "cover_"
+        const latestCover = files.find((file) => file.name.startsWith("cover_"));
+
+        if (latestCover) {
+          // Obtener URL pública
+          const { data: urlData } = supabase.storage
+            .from("cover-image")
+            .getPublicUrl(latestCover.name);
+
+          if (urlData?.publicUrl) {
+            // Agregar timestamp para evitar cache
+            const timestamp = new Date().getTime();
+            const urlWithTimestamp = `${urlData.publicUrl}?t=${timestamp}`;
+            setCoverImageUrl(urlWithTimestamp);
+          } else {
+            setCoverImageUrl(null);
+          }
+        } else {
+          setCoverImageUrl(null);
+        }
+      } else {
+        setCoverImageUrl(null);
+      }
+    } catch (error) {
+      setCoverImageUrl(null);
+    } finally {
+      setCheckingCoverImage(false);
     }
   };
   // NUEVA FUNCIÓN: Manejar cambio de rango de fechas
@@ -715,6 +817,11 @@ export default function AdminPage() {
     checkExistingLogo();
   }, []);
 
+  // Cargar cover cuando el usuario se autentique
+  useEffect(() => {
+    checkExistingCoverImage();
+  }, []);
+
   // Cargar datos del dashboard cuando cambie la sección o la fecha seleccionada
   useEffect(() => {
     if (isAuthenticated && activeSection === "dashboard") {
@@ -871,6 +978,14 @@ export default function AdminPage() {
             {!sidebarCollapsed && <span className="truncate">{logoUrl ? "Actualizar Logo" : "Subir Logo"}</span>}
           </button>
           <button
+            onClick={() => setShowCoverUploadModal(true)}
+            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition`}
+            title={sidebarCollapsed ? (coverImageUrl ? "Actualizar Cover" : "Subir Cover") : undefined}
+          >
+            <FaImage className="w-3.5 h-3.5 flex-shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">{coverImageUrl ? "Actualizar Cover" : "Subir Cover"}</span>}
+          </button>
+          <button
             onClick={handleLogout}
             className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-red-600 hover:bg-red-50 transition`}
             title={sidebarCollapsed ? "Cerrar Sesión" : undefined}
@@ -965,6 +1080,61 @@ export default function AdminPage() {
             <div className="p-4 border-t border-slate-200 bg-gray-50 flex justify-end">
               <button
                 onClick={() => setShowUploadModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-accent-dark)]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCoverUploadModal && (
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4" onClick={() => setShowCoverUploadModal(false)}>
+          <div className="bg-white rounded-[18px] shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-base font-extrabold text-slate-900">{coverImageUrl ? "Cambiar Cover" : "Agregar Cover"}</p>
+              </div>
+              <button onClick={() => setShowCoverUploadModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="p-6 text-center">
+              <div className="w-20 h-20 rounded-[14px] bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-4 overflow-hidden cursor-pointer">
+                {coverImageUrl ? (
+                  <img src={coverImageUrl} className="w-full h-full object-cover" />
+                ) : (
+                  <FaImage className="text-white text-3xl" />
+                )}
+              </div>
+              <p className="text-sm text-[var(--color-accent)] mb-4">Selecciona una imagen para el cover</p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCoverImageUpload(file);
+                }}
+                disabled={uploadingCover}
+                className="hidden"
+                id="cover-upload"
+              />
+              <label
+                htmlFor="cover-upload"
+                className={`inline-block px-5 py-2.5 rounded-[9px] text-sm font-bold ${
+                  uploadingCover
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-[var(--color-accent)] text-white hover:brightness-90 cursor-pointer"
+                }`}
+              >
+                {uploadingCover ? <><FaSpinner className="animate-spin inline mr-1.5" />Subiendo...</> : "Seleccionar Imagen"}
+              </label>
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowCoverUploadModal(false)}
                 className="px-4 py-2 text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-accent-dark)]"
               >
                 Cerrar

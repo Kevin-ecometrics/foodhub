@@ -266,7 +266,8 @@ end $$;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types, avif_autodetection)
 values
   ('product-images', 'product-images', true, null, null, false),
-  ('logo', 'logo', true, null, null, false)
+  ('logo', 'logo', true, null, null, false),
+  ('cover-image', 'cover-image', true, null, null, false)
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------
@@ -295,5 +296,21 @@ create policy "Permitir actualización de logos para usuarios autenticados" on s
 drop policy if exists "Permitir eliminación de logos para usuarios autenticados" on storage.objects;
 create policy "Permitir eliminación de logos para usuarios autenticados" on storage.objects
   for delete to authenticated using (bucket_id = 'logo'::text);
+
+drop policy if exists "Permitir lectura publica de cover-image" on storage.objects;
+create policy "Permitir lectura publica de cover-image" on storage.objects
+  for select to public using (bucket_id = 'cover-image'::text);
+
+drop policy if exists "Permitir insercion de cover-image para usuarios autenticados" on storage.objects;
+create policy "Permitir insercion de cover-image para usuarios autenticados" on storage.objects
+  for insert to authenticated with check (bucket_id = 'cover-image'::text);
+
+drop policy if exists "Permitir actualizacion de cover-image para usuarios autenticados" on storage.objects;
+create policy "Permitir actualizacion de cover-image para usuarios autenticados" on storage.objects
+  for update to authenticated using (bucket_id = 'cover-image'::text);
+
+drop policy if exists "Permitir eliminacion de cover-image para usuarios autenticados" on storage.objects;
+create policy "Permitir eliminacion de cover-image para usuarios autenticados" on storage.objects
+  for delete to authenticated using (bucket_id = 'cover-image'::text);
 
 commit;
