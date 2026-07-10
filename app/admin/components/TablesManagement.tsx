@@ -624,14 +624,19 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
       </html>
     `;
 
-      const newWindow = window.open(
-        "",
-        "_blank",
-        "width=500,height=700,scrollbars=no,resizable=no"
-      );
+      const newWindow = window.open("", "_blank");
       if (newWindow) {
-        newWindow.document.write(htmlContent);
-        newWindow.document.close();
+        // Navegar a un Blob URL en vez de document.write: en tablets (Safari/Chrome
+        // mobile) el meta viewport no se aplica correctamente cuando el HTML se
+        // inyecta con document.write, y la página se renderiza con un viewport de
+        // escritorio (~980px), forzando al usuario a hacer zoom para ver el QR.
+        const blobUrl = URL.createObjectURL(
+          new Blob([htmlContent], { type: "text/html" })
+        );
+        newWindow.location.href = blobUrl;
+        newWindow.addEventListener("load", () => {
+          URL.revokeObjectURL(blobUrl);
+        });
         return true;
       } else {
         // Si falla window.open, mostrar en la misma ventana
