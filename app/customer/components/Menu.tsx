@@ -1413,6 +1413,7 @@ export default function MenuPage() {
   const catTabsRef = useRef<HTMLDivElement>(null);
   const catTabBtnRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  const coverBannerRef = useRef<HTMLDivElement>(null);
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<"menu" | "cuenta" | "qr">("menu");
@@ -1429,6 +1430,7 @@ export default function MenuPage() {
   const [copied, setCopied] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers
@@ -1618,6 +1620,11 @@ export default function MenuPage() {
   useEffect(() => {
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
+  // Suppresses the scrollspy while a tab click is programmatically scrolling the
+  // page — otherwise it flickers through intermediate categories mid-animation.
+  // Only a real user gesture (touch/wheel/drag) hands control back to the spy,
+  // so it's immune to the smooth-scroll animation's variable duration.
+  const isClickScrollingRef = useRef(false);
 
   useEffect(() => {
     if (products.length === 0 || !hasCheckedSession) return;
@@ -1627,11 +1634,19 @@ export default function MenuPage() {
     const getAvailable = () =>
       menuCategories.filter((cat) => getProductsByCategory(cat.id).length > 0);
 
+    // Position of `el`'s top edge relative to `container`'s own content top,
+    // measured live via getBoundingClientRect. Unlike el.offsetTop, this is
+    // immune to whatever ancestor establishes the offsetParent, and to any
+    // sibling (sticky header, cover banner, cart bar) changing height.
+    const topRelativeToContainer = (el: HTMLElement) =>
+      container.scrollTop +
+      (el.getBoundingClientRect().top - container.getBoundingClientRect().top);
+
     const onScroll = () => {
+      if (isClickScrollingRef.current) return;
       const available = getAvailable();
       if (!available.length) return;
 
-      const headerHeight = stickyHeaderRef.current?.offsetHeight ?? 100;
       const atBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight <
         8;
@@ -1647,12 +1662,12 @@ export default function MenuPage() {
       for (let i = 0; i < available.length; i++) {
         const el = categoryRefs.current[available[i].id];
         if (!el) continue;
-        const sectionTop = el.offsetTop - headerHeight;
+        const sectionTop = topRelativeToContainer(el);
         const nextEl = available[i + 1]
           ? categoryRefs.current[available[i + 1].id]
           : null;
         const sectionBottom = nextEl
-          ? nextEl.offsetTop - headerHeight
+          ? topRelativeToContainer(nextEl)
           : Infinity;
         if (
           container.scrollTop >= sectionTop &&
@@ -1677,28 +1692,34 @@ export default function MenuPage() {
       }
     };
 
+    // A real user gesture on the list means they're manually scrolling —
+    // hand control back to the spy immediately, regardless of any
+    // still-finishing programmatic scroll animation from a tab click.
+    const clearClickScrolling = () => {
+      isClickScrollingRef.current = false;
+    };
+
     container.addEventListener("scroll", throttled, { passive: true });
+    container.addEventListener("touchstart", clearClickScrolling, { passive: true });
+    container.addEventListener("wheel", clearClickScrolling, { passive: true });
+    container.addEventListener("pointerdown", clearClickScrolling, { passive: true });
     onScroll(); // run once on mount
-    return () => container.removeEventListener("scroll", throttled);
+    return () => {
+      container.removeEventListener("scroll", throttled);
+      container.removeEventListener("touchstart", clearClickScrolling);
+      container.removeEventListener("wheel", clearClickScrolling);
+      container.removeEventListener("pointerdown", clearClickScrolling);
+    };
   }, [products, hasCheckedSession]);
 
-  // Auto-scroll the category tab bar to keep the active tab visible
+  // Carousel-style: whenever the active category changes — by click or by
+  // scrolling the product list (scrollspy) — bring its tab to the start of
+  // the tab bar so the following categories become visible.
   useEffect(() => {
     const tabBar = catTabsRef.current;
     const btn = catTabBtnRefs.current[selectedCategory];
     if (!tabBar || !btn) return;
-    const barLeft = tabBar.scrollLeft;
-    const barRight = barLeft + tabBar.clientWidth;
-    const btnLeft = btn.offsetLeft;
-    const btnRight = btnLeft + btn.offsetWidth;
-    if (btnLeft < barLeft + 20) {
-      tabBar.scrollTo({ left: btnLeft - 20, behavior: "smooth" });
-    } else if (btnRight > barRight - 20) {
-      tabBar.scrollTo({
-        left: btnRight - tabBar.clientWidth + 20,
-        behavior: "smooth",
-      });
-    }
+    tabBar.scrollTo({ left: btn.offsetLeft - 20, behavior: "smooth" });
   }, [selectedCategory]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1788,14 +1809,18 @@ export default function MenuPage() {
 
   const scrollToCategory = (catId: string | number) => {
     setSelectedCategory(catId);
+    isClickScrollingRef.current = true;
     setTimeout(() => {
       const el = categoryRefs.current[catId];
-      if (el && menuScrollRef.current) {
-        const offset = stickyHeaderRef.current?.offsetHeight ?? 100;
-        menuScrollRef.current.scrollTo({
-          top: el.offsetTop - offset,
-          behavior: "smooth",
-        });
+      const container = menuScrollRef.current;
+      if (el && container) {
+        // Align el's top edge with the container's own top edge — live and
+        // exact, regardless of sticky header / cover banner heights.
+        const target =
+          container.scrollTop +
+          (el.getBoundingClientRect().top -
+            container.getBoundingClientRect().top);
+        container.scrollTo({ top: target, behavior: "smooth" });
       }
     }, 10);
   };
@@ -2021,6 +2046,33 @@ export default function MenuPage() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    supabase.storage
+      .from("cover-image")
+      .list("", {
+        limit: 100,
+        sortBy: { column: "created_at", order: "desc" },
+      })
+      .then(({ data: files }) => {
+        if (!files?.length) {
+          setCoverImageUrl(null);
+          return;
+        }
+        const cover = files.find((f) => f.name.startsWith("cover_"));
+        if (!cover) {
+          setCoverImageUrl(null);
+          return;
+        }
+        const { data: urlData } = supabase.storage
+          .from("cover-image")
+          .getPublicUrl(cover.name);
+        setCoverImageUrl(
+          urlData?.publicUrl ? `${urlData.publicUrl}?t=${Date.now()}` : null,
+        );
+      })
+      .catch(() => setCoverImageUrl(null));
+  }, []);
+
   const handleCopyLink = async () => {
     if (!currentUrl) return;
     try {
@@ -2233,6 +2285,25 @@ export default function MenuPage() {
     );
     return (
       <>
+        {/* Cover banner */}
+        {coverImageUrl && (
+          <div
+            ref={coverBannerRef}
+            style={{ flexShrink: 0, height: 200, overflow: "hidden" }}
+          >
+            <img
+              src={coverImageUrl}
+              alt="Portada del restaurante"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </div>
+        )}
+
         {/* Sticky header wrapper — measured for scrollspy offset */}
         <div ref={stickyHeaderRef} style={{ flexShrink: 0 }}>
           {/* Header */}

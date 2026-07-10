@@ -105,7 +105,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
-        console.error("Error checking bill notification:", error);
+        console.error("Error checking bill notification:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
       }
 
       const hasNotification = !!data;
@@ -122,7 +127,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         hasNotification ? "PENDIENTE" : "LIBRE"
       );
     } catch (error) {
-      console.error("Error checking bill notification:", error);
+      console.error(
+        "Error checking bill notification:",
+        error instanceof Error ? error.message : error,
+      );
       setNotificationState((prev) => ({
         ...prev,
         billNotification: null,
