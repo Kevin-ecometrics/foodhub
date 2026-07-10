@@ -177,7 +177,7 @@ export default function TableHeader({
       {/* Add Products Modal */}
       {showAddModal && (
         <div onClick={() => { closeAddModal(); }} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
-          <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"100%",maxWidth:640,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"min(95vw, 1200px)",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
             {/* Modal header */}
             <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
               <div>

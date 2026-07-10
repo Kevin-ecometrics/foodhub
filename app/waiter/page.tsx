@@ -2353,6 +2353,12 @@ export default function WaiterDashboard() {
     }
   };
 
+  const handleAcknowledgeAllNotifications = () => {
+    setAttendedNotifications(
+      (prev) => new Set([...prev, ...notifications.map((n) => n.id)]),
+    );
+  };
+
   const handleCompleteNotification = async (notificationId: string) => {
     setProcessing(notificationId);
     try {
@@ -2365,6 +2371,27 @@ export default function WaiterDashboard() {
       });
     } catch (error) {
       console.error("Error completando notificación:", error);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleCompleteAllNotifications = async () => {
+    const ids = notifications.map((n) => n.id);
+    if (ids.length === 0) return;
+    setProcessing("all");
+    try {
+      await Promise.all(
+        ids.map((id) => waiterService.completeNotification(id)),
+      );
+      setNotifications((prev) => prev.filter((n) => !ids.includes(n.id)));
+      setAttendedNotifications((prev) => {
+        const newSet = new Set(prev);
+        ids.forEach((id) => newSet.delete(id));
+        return newSet;
+      });
+    } catch (error) {
+      console.error("Error completando todas las notificaciones:", error);
     } finally {
       setProcessing(null);
     }
@@ -2691,7 +2718,9 @@ export default function WaiterDashboard() {
               processing={processing}
               attendedNotifications={attendedNotifications}
               onAcknowledgeNotification={handleAcknowledgeNotification}
+              onAcknowledgeAllNotifications={handleAcknowledgeAllNotifications}
               onCompleteNotification={handleCompleteNotification}
+              onCompleteAllNotifications={handleCompleteAllNotifications}
               onGoToTables={handleGoToTables}
             />
           )}

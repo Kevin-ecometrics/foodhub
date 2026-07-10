@@ -7,13 +7,15 @@ interface NotificationsTabProps {
   processing: string | null;
   attendedNotifications: Set<string>;
   onAcknowledgeNotification: (notificationId: string) => void;
+  onAcknowledgeAllNotifications: () => void;
   onCompleteNotification: (notificationId: string) => void;
+  onCompleteAllNotifications: () => void;
   onGoToTables: () => void;
 }
 
 export default function NotificationsTab({
   notifications, processing, attendedNotifications,
-  onAcknowledgeNotification, onCompleteNotification, onGoToTables,
+  onAcknowledgeNotification, onAcknowledgeAllNotifications, onCompleteNotification, onCompleteAllNotifications, onGoToTables,
 }: NotificationsTabProps) {
   const [sortOrder, setSortOrder] = useState<"oldest" | "newest">(() => {
     const saved = localStorage.getItem("notificationsSortOrder");
@@ -46,14 +48,26 @@ export default function NotificationsTab({
             <span style={{ fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:10,background:"var(--surface)",color:"var(--muted)",border:"1px solid var(--border)" }}>{totalNotifications} total</span>
           </div>
         </div>
-        <div style={{ display:"flex",alignItems:"center",gap:6 }}>
-          <span style={{ fontSize:12,color:"var(--muted)" }}>Orden:</span>
-          <div style={{ display:"flex",border:"1.5px solid var(--border)",borderRadius:9,overflow:"hidden" }}>
-            {(["oldest","newest"] as const).map(o => (
-              <button key={o} onClick={() => setSortOrder(o)} style={{ padding:"7px 14px",border:"none",background:sortOrder===o?"var(--accent)":"white",color:sortOrder===o?"white":"var(--muted)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s" }}>
-                {o === "oldest" ? "↓ Antiguas" : "↑ Nuevas"}
-              </button>
-            ))}
+        <div style={{ display:"flex",alignItems:"center",gap:10,flexWrap:"wrap" }}>
+          <button
+            onClick={async () => {
+              onAcknowledgeAllNotifications();
+              await onCompleteAllNotifications();
+            }}
+            disabled={totalNotifications === 0 || processing === "all"}
+            style={{ padding:"7px 14px",borderRadius:9,border:"1.5px solid var(--border)",background:totalNotifications===0?"var(--surface)":"var(--green-light)",color:totalNotifications===0?"var(--muted)":"var(--green)",fontSize:12,fontWeight:700,cursor:totalNotifications===0?"default":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:totalNotifications===0?0.6:processing==="all"?0.6:1 }}
+          >
+            {processing === "all" ? <span style={{ animation:"wr-spin 0.8s linear infinite",display:"inline-block" }}>↻</span> : "✓ Leer y completar todas"}
+          </button>
+          <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+            <span style={{ fontSize:12,color:"var(--muted)" }}>Orden:</span>
+            <div style={{ display:"flex",border:"1.5px solid var(--border)",borderRadius:9,overflow:"hidden" }}>
+              {(["oldest","newest"] as const).map(o => (
+                <button key={o} onClick={() => setSortOrder(o)} style={{ padding:"7px 14px",border:"none",background:sortOrder===o?"var(--accent)":"white",color:sortOrder===o?"white":"var(--muted)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s" }}>
+                  {o === "oldest" ? "↓ Antiguas" : "↑ Nuevas"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
