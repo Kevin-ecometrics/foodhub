@@ -413,8 +413,10 @@ app/
 - [ ] Funciona con browser en segundo plano o pantalla apagada
 
 ### 4. Múltiples Meseros / Gestión de Personal
-- [ ] Tabla `staff` en Supabase (id, name, pin, role: waiter/manager)
-- [ ] Login por PIN en `/waiter` — sesión en `localStorage`
+- [x] Tabla `users` en Supabase (id, email, name, role: super_admin/admin/waiter, pin_code, is_active) — vinculada a `auth.users`, ver `docs/AUTH.md`
+- [x] Login por PIN en `/waiter/login` — sesión real de Supabase Auth (cookies), no `localStorage`
+- [x] Login admin/waiter por correo+contraseña vía Supabase Auth, cuentas creadas desde el panel ya verificadas (sin correo de confirmación)
+- [x] Super admin (`ADMIN_USERNAME`/`ADMIN_PASSWORD`) sincronizado como cuenta real de Supabase Auth
 - [ ] Asignación de mesas a mesero (`tables.assigned_staff_id`)
 - [ ] Tracking en `orders` y `sales_history` de qué mesero atendió
 - [ ] Vista en Admin de rendimiento por mesero (órdenes, propinas, ventas)

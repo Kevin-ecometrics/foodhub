@@ -23,6 +23,7 @@ export type TableStatus        = 'available' | 'occupied' | 'reserved' | 'cleani
 export type OrderItemStatus    = 'ordered' | 'preparing' | 'ready' | 'served' | 'cancelled'
 export type OrderStatus        = 'active' | 'pending' | 'sent' | 'completed' | 'cancelled' | 'paid'
 export type PaymentMethod      = 'cash' | 'terminal' | 'usd' | 'mixed' | null
+export type UserRole           = 'super_admin' | 'admin' | 'waiter'
 
 // ─── Shared Interfaces ────────────────────────────────────────────────────────
 
@@ -408,6 +409,40 @@ export interface Database {
           order_count?: number
           total_amount?: number
           created_at?: string | null
+        }
+      }
+
+      // ── users ─────────────────────────────────────────────────────────────────
+      users: {
+        Row: {
+          id: string
+          email: string
+          name: string
+          role: UserRole
+          pin_code: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          name: string
+          role: UserRole
+          pin_code?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          name?: string
+          role?: UserRole
+          pin_code?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
         }
       }
 

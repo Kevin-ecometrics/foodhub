@@ -89,7 +89,7 @@ export interface Product {
   extras?: ProductExtra[];
 }
 
-export type AdminSection = "dashboard" | "tables" | "products" | "categories";
+export type AdminSection = "dashboard" | "tables" | "products" | "categories" | "users";
 
 export interface TableFormData {
   number: string;

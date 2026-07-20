@@ -32,11 +32,11 @@ import Dashboard from "./components/Dashboard";
 import TablesManagement from "./components/TablesManagement";
 import ProductsManagement from "./components/ProductsManagement";
 import CategoriesManagement from "./components/CategoriesManagement";
+import UsersManagement from "./components/UsersManagement";
 
 export default function AdminPage() {
   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authToken, setAuthToken] = useState<string | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
@@ -792,24 +792,12 @@ export default function AdminPage() {
 
   // Verificar sesión existente al cargar
   useEffect(() => {
-    const saved = localStorage.getItem("adminToken");
-    if (saved) {
-      fetch("/api/admin/verify", {
-        headers: { Authorization: `Bearer ${saved}` },
-      })
-        .then((r) => {
-          if (r.ok) {
-            setAuthToken(saved);
-            setIsAuthenticated(true);
-          } else {
-            localStorage.removeItem("adminToken");
-          }
-        })
-        .catch(() => localStorage.removeItem("adminToken"))
-        .finally(() => setCheckingAuth(false));
-    } else {
+    supabase.auth.getUser().then(({ data, error }) => {
+      const role = data.user?.app_metadata?.role;
+      const authorized = !error && (role === "admin" || role === "super_admin");
+      setIsAuthenticated(authorized);
       setCheckingAuth(false);
-    }
+    });
   }, []);
 
   // Cargar logo cuando el usuario se autentique
@@ -830,9 +818,8 @@ export default function AdminPage() {
     }
   }, [isAuthenticated, activeSection, selectedDate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("adminToken");
-    setAuthToken(null);
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
     setIsAuthenticated(false);
     setDailyStats(null);
     setTodayOrders([]);
@@ -869,11 +856,7 @@ export default function AdminPage() {
   }
 
   if (!isAuthenticated) {
-    return <LoginForm onLogin={(token) => {
-      localStorage.setItem("adminToken", token);
-      setAuthToken(token);
-      setIsAuthenticated(true);
-    }} />;
+    return <LoginForm onLogin={() => setIsAuthenticated(true)} />;
   }
 
   return (
@@ -941,6 +924,11 @@ export default function AdminPage() {
               id: "categories" as AdminSection,
               name: "Gestión de Categorías",
               icon: FaTag,
+            },
+            {
+              id: "users" as AdminSection,
+              name: "Usuarios",
+              icon: FaUser,
             },
           ].map((item) => (
             <button
@@ -1030,6 +1018,10 @@ export default function AdminPage() {
 
           {activeSection === "categories" && (
             <CategoriesManagement onError={handleError} />
+          )}
+
+          {activeSection === "users" && (
+            <UsersManagement onError={handleError} />
           )}
         </div>
       </main>

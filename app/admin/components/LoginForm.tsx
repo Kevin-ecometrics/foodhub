@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 interface LoginFormProps {
-  onLogin: (token: string) => void;
+  onLogin: () => void;
 }
 
 const IconUser = () => (
@@ -232,15 +232,14 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     setErrors({});
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       })
       if (res.ok) {
-        const data = await res.json()
         setSuccess(true);
-        setTimeout(() => onLogin(data.token), 800);
+        setTimeout(() => onLogin(), 800);
       } else {
         const data = await res.json().catch(() => ({}))
         setLoading(false);

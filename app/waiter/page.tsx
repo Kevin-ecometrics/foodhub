@@ -2172,6 +2172,11 @@ export default function WaiterDashboard() {
     modalOpenRef.current = showPaymentCalculator || showSeparatePayments;
   }, [showPaymentCalculator, showSeparatePayments]);
 
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/waiter/login";
+  };
+
   const loadData = async () => {
     // Prevenir llamadas simultáneas
     if (isLoadingRef.current) return;
@@ -2692,7 +2697,7 @@ export default function WaiterDashboard() {
         .waiter-root input, .waiter-root textarea { font-family:'Plus Jakarta Sans',sans-serif; }
       `}</style>
 
-      <Header loading={loading} onRefresh={loadData} />
+      <Header loading={loading} onRefresh={loadData} onLogout={handleLogout} />
 
       <Tabs
         activeTab={activeTab}

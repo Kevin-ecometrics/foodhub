@@ -1152,6 +1152,25 @@ const ADMIN_CREDENTIALS = { username: "admin", password: "restaurant" };
 
 ---
 
+### `users`
+
+| Column     | Type        | Constraints / Default                                 |
+|------------|-------------|--------------------------------------------------------|
+| id         | uuid        | PK, FK → auth.users.id ON DELETE CASCADE                |
+| email      | text        | NOT NULL UNIQUE                                         |
+| name       | text        | NOT NULL                                                |
+| role       | text        | NOT NULL, CHECK IN ('super_admin','admin','waiter')     |
+| pin_code   | char(4)     | NULL, CHECK ~ '^[0-9]{4}$'                              |
+| is_active  | boolean     | DEFAULT true NOT NULL                                   |
+| created_at | timestamptz | DEFAULT timezone('utc', now())                          |
+| updated_at | timestamptz | DEFAULT timezone('utc', now()), trigger `set_updated_at`|
+
+Índice único parcial `users_pin_code_unique_idx` en `pin_code` `WHERE pin_code IS NOT NULL AND is_active = true` — permite reciclar el PIN de un waiter desactivado. Único con RLS real por rol (`current_role()` lee `app_metadata.role` del JWT): cada usuario ve su propia fila, admin/super_admin ven todas. Ver `docs/AUTH.md` para el flujo completo de auth.
+
+> `role` está denormalizado aquí para mostrarlo fácilmente en el panel; la fuente de verdad para autorización es `auth.users.raw_app_meta_data.role` (JWT `app_metadata`), no esta columna.
+
+---
+
 ### Foreign Keys
 
 ```
@@ -1164,6 +1183,7 @@ tips.table_id                 → tables.id
 tips.order_id                 → orders.id (nullable)
 sales_history.table_id        → tables.id
 sales_items.sale_id           → sales_history.id
+users.id                      → auth.users.id
 ```
 
 ---

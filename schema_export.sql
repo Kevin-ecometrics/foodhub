@@ -145,11 +145,32 @@ create table if not exists public.tips (
   created_at timestamp with time zone not null default now()
 );
 
+-- users: cuentas de staff (admin / waiter / super_admin) vinculadas a auth.users.
+-- El rol de autorizacion vive en auth.users.raw_app_meta_data (JWT app_metadata),
+-- no en esta tabla, para permitir checks de rol sin round-trip a public.users.
+create table if not exists public.users (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  name text not null,
+  role text not null check (role in ('super_admin', 'admin', 'waiter')),
+  pin_code char(4),
+  is_active boolean not null default true,
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  updated_at timestamp with time zone not null default timezone('utc'::text, now()),
+  constraint users_pin_code_format check (pin_code is null or pin_code ~ '^[0-9]{4}$')
+);
+
 -- ---------------------------------------------------------------------
 -- Indices adicionales (fuera de PK/UNIQUE ya creados por las tablas)
 -- ---------------------------------------------------------------------
 create index if not exists tips_created_at_idx on public.tips using btree (created_at);
 create index if not exists tips_table_id_idx on public.tips using btree (table_id);
+
+-- Unico PIN activo a la vez: permite reciclar el PIN de un waiter desactivado.
+create unique index if not exists users_pin_code_unique_idx
+  on public.users (pin_code)
+  where pin_code is not null and is_active = true;
+create index if not exists users_role_idx on public.users (role);
 
 -- ---------------------------------------------------------------------
 -- Funciones
@@ -162,6 +183,21 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
+$function$;
+
+drop trigger if exists set_users_updated_at on public.users;
+create trigger set_users_updated_at
+  before update on public.users
+  for each row execute function public.update_updated_at_column();
+
+-- Lee app_metadata.role directo del JWT (sin consultar public.users -> sin recursion RLS)
+create or replace function public.current_role()
+returns text
+language sql
+stable
+set search_path = ''
+as $function$
+  select coalesce((auth.jwt() -> 'app_metadata' ->> 'role'), '');
 $function$;
 
 -- ---------------------------------------------------------------------
@@ -177,6 +213,7 @@ alter table public.sales_history enable row level security;
 alter table public.sales_items enable row level security;
 alter table public.customer_feedback enable row level security;
 alter table public.tips enable row level security;
+alter table public.users enable row level security;
 
 drop policy if exists "Allow all for all roles" on public.categories;
 create policy "Allow all for all roles" on public.categories
@@ -225,6 +262,28 @@ create policy "tips_insert_all" on public.tips
 drop policy if exists "tips_update_all" on public.tips;
 create policy "tips_update_all" on public.tips
   for update to public using (true);
+
+-- users: unica tabla con RLS real por rol (el resto queda "allow all" por ahora)
+drop policy if exists "users_select" on public.users;
+create policy "users_select" on public.users
+  for select to authenticated
+  using (id = auth.uid() or public.current_role() in ('admin', 'super_admin'));
+
+drop policy if exists "users_insert" on public.users;
+create policy "users_insert" on public.users
+  for insert to authenticated
+  with check (public.current_role() in ('admin', 'super_admin'));
+
+drop policy if exists "users_update" on public.users;
+create policy "users_update" on public.users
+  for update to authenticated
+  using (public.current_role() in ('admin', 'super_admin'))
+  with check (public.current_role() in ('admin', 'super_admin'));
+
+drop policy if exists "users_delete" on public.users;
+create policy "users_delete" on public.users
+  for delete to authenticated
+  using (public.current_role() in ('admin', 'super_admin'));
 
 -- ---------------------------------------------------------------------
 -- Realtime publication
