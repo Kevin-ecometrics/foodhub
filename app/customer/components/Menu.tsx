@@ -7,7 +7,11 @@ import { useOrder } from "@/app/context/OrderContext";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
-import { historyService, OrderWithItems, OrderItemWithProduct } from "@/app/lib/supabase/history";
+import {
+  historyService,
+  OrderWithItems,
+  OrderItemWithProduct,
+} from "@/app/lib/supabase/history";
 import { supabase } from "@/app/lib/supabase/client";
 import { OrderItem } from "@/app/lib/supabase/order-items";
 import { useToast } from "@/app/context/ToastContext";
@@ -93,19 +97,8 @@ const ICart = ({ s = 18 }: { s?: number }) => (
   </svg>
 );
 const IHelp = () => (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-    <line x1="12" y1="17" x2="12.01" y2="17" />
+  <svg width="20" height="20" fill="currentColor" viewBox="0 0 409.223 409.223">
+    <path d="m240.153,226.521l52.812,40.237c4.393,3.347 5.241,9.621 1.894,14.015-1.968,2.583-4.947,3.94-7.962,3.94-2.112,0-4.242-0.667-6.053-2.047l-52.812-40.237c-4.393-3.347-5.241-9.621-1.894-14.015 3.347-4.392 9.621-5.243 14.015-1.893zm-131.711-139.567c-17.907-18.896-25.428-46.52-21.21-78.271 0.662-4.97 4.9-8.683 9.914-8.683h8.943c3.047,0 5.927,1.389 7.824,3.772 2.704,3.397 5.587,6.371 8.669,8.936 0.14,0.109 0.277,0.223 0.412,0.34 5.745,4.684 12.179,7.964 19.441,9.935 11.575,3.142 32.172,2.57 48.717,2.111 5.724-0.159 11.13-0.309 15.888-0.309 24.353,0 44.164,19.813 44.164,44.165 0,12.65-5.345,24.074-13.896,32.134v35.308c0,0.617-0.058,1.233-0.171,1.84l-9.142,48.838c-3.13,16.73-14.597,27.541-29.212,27.541h-51.818c-14.616,0-26.082-10.811-29.211-27.542l-9.141-48.83c-0.113-0.606-0.171-1.223-0.171-1.84v-49.445zm108.866,24.956c-3.295,0.787-6.734,1.205-10.268,1.205-3.343,0-6.691,0.036-10.035,0.072-23.252,0.253-47.13,0.511-68.563-10.946v33.229l8.97,47.919c0.351,1.875 2.458,11.221 9.553,11.221h51.818c7.095,0 9.203-9.347 9.554-11.22l8.971-47.927v-23.553zm-92.402-36.759c0.08,0.076 0.161,0.153 0.241,0.229 0.093,0.083 0.184,0.169 0.272,0.256 19.418,18.115 44.67,17.846 71.368,17.554 3.416-0.037 6.837-0.074 10.252-0.074 5.135,0 9.899-1.609 13.818-4.351 0.329-0.278 0.676-0.535 1.039-0.769 5.661-4.427 9.307-11.318 9.307-19.045 0-13.325-10.84-24.166-24.164-24.166-4.48,0-9.752,0.146-15.333,0.301-15.848,0.438-33.48,0.93-47.264-1.276 10.225,8.784 21.448,12.108 30.699,13.105 5.49,0.592 9.462,5.523 8.87,11.015-0.592,5.49-5.519,9.459-11.014,8.87-16.888-1.82-47.482-10.788-64.854-50.145-0.691-0.609-1.376-1.234-2.051-1.873-0.147,20.886 6.345,38.463 18.814,50.369zm72.559,285.787l-14.591-14.524v-47.269c0-5.522-4.478-10-10-10s-10,4.478-10,10v47.269l-43.001,42.806h-22.254v-62.978c0-5.522-4.478-10-10-10s-10,4.478-10,10v72.978c0,5.522 4.478,10 10,10h36.383c2.645,0 5.181-1.047 7.055-2.913l41.817-41.627 10.481,10.433c3.913,3.896 10.246,3.882 14.142-0.032 3.897-3.916 3.882-10.248-0.032-14.143zm8.937-121.935c-2.16-5.08-8.028-7.45-13.116-5.288l-20.412,8.682-20.411-8.682c-5.088-2.162-10.956,0.207-13.116,5.288-2.162,5.082 0.206,10.955 5.288,13.116l2.688,1.144-2.688,1.144c-5.082,2.161-7.45,8.033-5.288,13.116 2.161,5.082 8.031,7.452 13.116,5.288l20.411-8.681 20.41,8.681c1.277,0.543 2.604,0.801 3.909,0.801 3.89,0 7.589-2.284 9.207-6.089 2.162-5.082-0.206-10.955-5.288-13.116l-2.688-1.144 2.689-1.144c5.083-2.161 7.451-8.033 5.289-13.116zm171.083,160.218c0,5.522-4.478,10-10,10h-19.208c-0.066,0.001-0.134,0.002-0.201,0.002s-0.135-0.001-0.201-0.002h-121.944c-0.133,0.002-0.27,0.002-0.402,0h-19.206c-5.522,0-10-4.478-10-10s4.478-10 10-10h9.407v-3.766c0-35.853 26.646-65.598 61.175-70.472v-8.311c0-5.522 4.478-10 10-10s10,4.478 10,10v8.311c34.527,4.877 61.172,34.621 61.172,70.472v3.766h9.409c5.522,0 9.999,4.477 9.999,10zm-39.409-13.766c0-28.216-22.956-51.172-51.172-51.172-28.218,0-51.175,22.956-51.175,51.172v3.766h102.347v-3.766zm-218.412-157.038c-3.345-4.394-9.619-5.246-14.014-1.898l-69.971,53.27c-2.484,1.892-3.942,4.835-3.942,7.957v111.476c0,5.522 4.478,10 10,10s10-4.478 10-10v-106.522l66.028-50.27c4.395-3.344 5.245-9.618 1.899-14.013z" />
   </svg>
 );
 const IPlus = ({ s = 14 }: { s?: number }) => (
@@ -1446,7 +1439,9 @@ export default function MenuPage() {
   } = useOrder();
 
   // ── Menu state ──
-  const [selectedCategory, setSelectedCategory] = useState<string | number>("favorites");
+  const [selectedCategory, setSelectedCategory] = useState<string | number>(
+    "favorites",
+  );
   const [products, setProducts] = useState<Product[]>([]);
   const [recentItems, setRecentItems] = useState<Product[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
@@ -1600,7 +1595,10 @@ export default function MenuPage() {
             clearLocalStorage();
             clearSession();
             setTimeout(() => {
-              toast("La mesa ha sido liberada. ¡Gracias por su visita!", "success");
+              toast(
+                "La mesa ha sido liberada. ¡Gracias por su visita!",
+                "success",
+              );
               router.push("/customer");
             }, 300);
           }
@@ -1627,7 +1625,10 @@ export default function MenuPage() {
         },
         (payload) => {
           if (payload.new.type === "table_freed") {
-            toast("La cuenta ha sido cerrada. ¡Gracias por su visita!", "success");
+            toast(
+              "La cuenta ha sido cerrada. ¡Gracias por su visita!",
+              "success",
+            );
             clearSession();
             window.location.href = "/customer";
           }
@@ -1779,9 +1780,13 @@ export default function MenuPage() {
     };
 
     container.addEventListener("scroll", throttled, { passive: true });
-    container.addEventListener("touchstart", clearClickScrolling, { passive: true });
+    container.addEventListener("touchstart", clearClickScrolling, {
+      passive: true,
+    });
     container.addEventListener("wheel", clearClickScrolling, { passive: true });
-    container.addEventListener("pointerdown", clearClickScrolling, { passive: true });
+    container.addEventListener("pointerdown", clearClickScrolling, {
+      passive: true,
+    });
     onScroll(); // run once on mount
     return () => {
       container.removeEventListener("scroll", throttled);
@@ -1856,8 +1861,12 @@ export default function MenuPage() {
   const getProductsByCategory = (catId: string | number) => {
     if (catId === "favorites") return favoriteItems;
     if (catId === "repite-item") return recentItems;
-    if (catId === "popular") return products.filter((p) => p.rating && p.rating >= 4.5).slice(0, 6);
-    const name = typeof catId === "string" ? catId : dbCategories.find((c) => c.id === catId)?.name;
+    if (catId === "popular")
+      return products.filter((p) => p.rating && p.rating >= 4.5).slice(0, 6);
+    const name =
+      typeof catId === "string"
+        ? catId
+        : dbCategories.find((c) => c.id === catId)?.name;
     if (!name) return [];
     return products.filter((p) => p.category === name);
   };
@@ -2720,129 +2729,129 @@ export default function MenuPage() {
                       >
                         {/* Image */}
                         {product.image_url && (
-                        <div style={{ position: "relative" }}>
-                          <div
-                            style={{
-                              width: "100%",
-                              height: 210,
-                              background: "var(--surface)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              overflow: "hidden",
-                            }}
-                          >
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
+                          <div style={{ position: "relative" }}>
+                            <div
                               style={{
                                 width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
+                                height: 210,
+                                background: "var(--surface)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                overflow: "hidden",
                               }}
-                            />
-                          </div>
-                          {/* Badges */}
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: 8,
-                              left: 8,
-                              display: "flex",
-                              gap: 4,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {product.is_favorite && (
-                              <span
+                            >
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
                                 style={{
-                                  background: "oklch(52% 0.18 20)",
-                                  color: "white",
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 3,
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
                                 }}
-                              >
-                                <IHeart />
-                                Favorito
-                              </span>
-                            )}
-                            {!!product.rating && product.rating >= 4.5 && (
-                              <span
-                                style={{
-                                  background: "var(--accent)",
-                                  color: "white",
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 3,
-                                }}
-                              >
-                                <IFire />
-                                Popular
-                              </span>
-                            )}
-                            {cat.id === "repite-item" && recentQty > 0 && (
-                              <span
-                                style={{
-                                  background: "oklch(55% 0.14 300)",
-                                  color: "white",
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                }}
-                              >
-                                {recentQty}x antes
-                              </span>
-                            )}
-                          </div>
-                          {!!product.rating && product.rating > 0 && (
-                            <span
+                              />
+                            </div>
+                            {/* Badges */}
+                            <div
                               style={{
                                 position: "absolute",
                                 top: 8,
-                                right: 8,
-                                background: "white",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                padding: "2px 8px",
-                                borderRadius: 10,
-                                color: "var(--text)",
-                                boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+                                left: 8,
                                 display: "flex",
-                                alignItems: "center",
-                                gap: 3,
+                                gap: 4,
+                                flexWrap: "wrap",
                               }}
                             >
-                              <IStar />⭐ {product.rating.toFixed(1)}
-                            </span>
-                          )}
-                          {inCart && (
-                            <span
-                              style={{
-                                position: "absolute",
-                                bottom: 8,
-                                right: 8,
-                                background: "var(--green)",
-                                color: "white",
-                                fontSize: 10,
-                                fontWeight: 700,
-                                padding: "2px 8px",
-                                borderRadius: 10,
-                              }}
-                            >
-                              {qty} en carrito
-                            </span>
-                          )}
-                        </div>
+                              {product.is_favorite && (
+                                <span
+                                  style={{
+                                    background: "oklch(52% 0.18 20)",
+                                    color: "white",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: 10,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                  }}
+                                >
+                                  <IHeart />
+                                  Favorito
+                                </span>
+                              )}
+                              {!!product.rating && product.rating >= 4.5 && (
+                                <span
+                                  style={{
+                                    background: "var(--accent)",
+                                    color: "white",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: 10,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                  }}
+                                >
+                                  <IFire />
+                                  Popular
+                                </span>
+                              )}
+                              {cat.id === "repite-item" && recentQty > 0 && (
+                                <span
+                                  style={{
+                                    background: "oklch(55% 0.14 300)",
+                                    color: "white",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: 10,
+                                  }}
+                                >
+                                  {recentQty}x antes
+                                </span>
+                              )}
+                            </div>
+                            {!!product.rating && product.rating > 0 && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  top: 8,
+                                  right: 8,
+                                  background: "white",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: "2px 8px",
+                                  borderRadius: 10,
+                                  color: "var(--text)",
+                                  boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                }}
+                              >
+                                <IStar />⭐ {product.rating.toFixed(1)}
+                              </span>
+                            )}
+                            {inCart && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  bottom: 8,
+                                  right: 8,
+                                  background: "var(--green)",
+                                  color: "white",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "2px 8px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                {qty} en carrito
+                              </span>
+                            )}
+                          </div>
                         )}
 
                         {/* Info */}
@@ -2926,21 +2935,22 @@ export default function MenuPage() {
                               >
                                 ${product.price.toFixed(2)}
                               </p>
-                              {!!product.preparation_time && product.preparation_time > 0 && (
-                                <p
-                                  style={{
-                                    fontSize: 13,
-                                    color: "var(--muted)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 3,
-                                    marginTop: 4,
-                                  }}
-                                >
-                                  <IClock />
-                                  {product.preparation_time} min
-                                </p>
-                              )}
+                              {!!product.preparation_time &&
+                                product.preparation_time > 0 && (
+                                  <p
+                                    style={{
+                                      fontSize: 13,
+                                      color: "var(--muted)",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 3,
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    <IClock />
+                                    {product.preparation_time} min
+                                  </p>
+                                )}
                             </div>
                             {inCart ? (
                               <div
@@ -3349,52 +3359,98 @@ export default function MenuPage() {
                         >
                           {new Date(order.created_at).toLocaleString("es-MX")}
                         </p>
-                        {order.order_items.map((item: OrderItemWithProduct, ii: number) => {
-                          const cancelled = item.cancelled_quantity || 0;
-                          const active = item.quantity - cancelled;
-                          const isFullCancelled = active === 0 && cancelled > 0;
-                          return (
-                            <div
-                              key={ii}
-                              style={{
-                                padding: "12px 18px",
-                                borderBottom: "1px solid var(--border)",
-                                background: isFullCancelled
-                                  ? "oklch(98% 0.03 20)"
-                                  : "white",
-                              }}
-                            >
+                        {order.order_items.map(
+                          (item: OrderItemWithProduct, ii: number) => {
+                            const cancelled = item.cancelled_quantity || 0;
+                            const active = item.quantity - cancelled;
+                            const isFullCancelled =
+                              active === 0 && cancelled > 0;
+                            return (
                               <div
+                                key={ii}
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  marginBottom: 4,
+                                  padding: "12px 18px",
+                                  borderBottom: "1px solid var(--border)",
+                                  background: isFullCancelled
+                                    ? "oklch(98% 0.03 20)"
+                                    : "white",
                                 }}
                               >
                                 <div
                                   style={{
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: 8,
+                                    justifyContent: "space-between",
+                                    marginBottom: 4,
                                   }}
                                 >
-                                  <span
+                                  <div
                                     style={{
-                                      fontSize: 14,
-                                      fontWeight: 600,
-                                      color: isFullCancelled
-                                        ? "var(--red)"
-                                        : "var(--text)",
-                                      textDecoration: isFullCancelled
-                                        ? "line-through"
-                                        : "none",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
                                     }}
                                   >
-                                    {item.product_name}
-                                  </span>
-                                  {!isFullCancelled &&
-                                    item.status === "ordered" && (
+                                    <span
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: isFullCancelled
+                                          ? "var(--red)"
+                                          : "var(--text)",
+                                        textDecoration: isFullCancelled
+                                          ? "line-through"
+                                          : "none",
+                                      }}
+                                    >
+                                      {item.product_name}
+                                    </span>
+                                    {!isFullCancelled &&
+                                      item.status === "ordered" && (
+                                        <span
+                                          style={{
+                                            background: "var(--red-light)",
+                                            color: "var(--red)",
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            padding: "2px 7px",
+                                            borderRadius: 6,
+                                          }}
+                                        >
+                                          ● Ordenado
+                                        </span>
+                                      )}
+                                    {!isFullCancelled &&
+                                      item.status === "preparing" && (
+                                        <span
+                                          style={{
+                                            background: "oklch(96% 0.06 70)",
+                                            color: "var(--amber)",
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            padding: "2px 7px",
+                                            borderRadius: 6,
+                                          }}
+                                        >
+                                          ⏳ En preparación
+                                        </span>
+                                      )}
+                                    {!isFullCancelled &&
+                                      item.status === "served" && (
+                                        <span
+                                          style={{
+                                            background: "var(--green-light)",
+                                            color: "var(--green)",
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            padding: "2px 7px",
+                                            borderRadius: 6,
+                                          }}
+                                        >
+                                          ✓ Servido
+                                        </span>
+                                      )}
+                                    {isFullCancelled && (
                                       <span
                                         style={{
                                           background: "var(--red-light)",
@@ -3405,93 +3461,54 @@ export default function MenuPage() {
                                           borderRadius: 6,
                                         }}
                                       >
-                                        ● Ordenado
+                                        Cancelado
                                       </span>
                                     )}
-                                  {!isFullCancelled &&
-                                    item.status === "preparing" && (
-                                      <span
-                                        style={{
-                                          background: "oklch(96% 0.06 70)",
-                                          color: "var(--amber)",
-                                          fontSize: 10,
-                                          fontWeight: 700,
-                                          padding: "2px 7px",
-                                          borderRadius: 6,
-                                        }}
-                                      >
-                                        ⏳ En preparación
-                                      </span>
-                                    )}
-                                  {!isFullCancelled &&
-                                    item.status === "served" && (
-                                      <span
-                                        style={{
-                                          background: "var(--green-light)",
-                                          color: "var(--green)",
-                                          fontSize: 10,
-                                          fontWeight: 700,
-                                          padding: "2px 7px",
-                                          borderRadius: 6,
-                                        }}
-                                      >
-                                        ✓ Servido
-                                      </span>
-                                    )}
-                                  {isFullCancelled && (
-                                    <span
-                                      style={{
-                                        background: "var(--red-light)",
-                                        color: "var(--red)",
-                                        fontSize: 10,
-                                        fontWeight: 700,
-                                        padding: "2px 7px",
-                                        borderRadius: 6,
-                                      }}
-                                    >
-                                      Cancelado
-                                    </span>
-                                  )}
+                                  </div>
+                                  <span
+                                    style={{
+                                      fontSize: 14,
+                                      fontWeight: 700,
+                                      color: isFullCancelled
+                                        ? "var(--muted)"
+                                        : "var(--text)",
+                                    }}
+                                  >
+                                    $
+                                    {(
+                                      item.price *
+                                      (isFullCancelled ? 0 : active)
+                                    ).toFixed(2)}
+                                  </span>
                                 </div>
-                                <span
-                                  style={{
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                    color: isFullCancelled
-                                      ? "var(--muted)"
-                                      : "var(--text)",
-                                  }}
-                                >
-                                  $
-                                  {(
-                                    item.price * (isFullCancelled ? 0 : active)
-                                  ).toFixed(2)}
-                                </span>
-                              </div>
-                              <p
-                                style={{ fontSize: 12, color: "var(--muted)" }}
-                              >
-                                Cantidad:{" "}
-                                {isFullCancelled ? item.quantity : active}
-                                {cancelled > 0 &&
-                                  !isFullCancelled &&
-                                  ` (${cancelled} cancelado${cancelled > 1 ? "s" : ""})`}{" "}
-                                • ${item.price.toFixed(2)} c/u
-                              </p>
-                              {item.notes && (
                                 <p
                                   style={{
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     color: "var(--muted)",
-                                    marginTop: 4,
                                   }}
                                 >
-                                  📝 {item.notes}
+                                  Cantidad:{" "}
+                                  {isFullCancelled ? item.quantity : active}
+                                  {cancelled > 0 &&
+                                    !isFullCancelled &&
+                                    ` (${cancelled} cancelado${cancelled > 1 ? "s" : ""})`}{" "}
+                                  • ${item.price.toFixed(2)} c/u
                                 </p>
-                              )}
-                            </div>
-                          );
-                        })}
+                                {item.notes && (
+                                  <p
+                                    style={{
+                                      fontSize: 11,
+                                      color: "var(--muted)",
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    📝 {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          },
+                        )}
                         <div
                           style={{
                             padding: "12px 18px",
