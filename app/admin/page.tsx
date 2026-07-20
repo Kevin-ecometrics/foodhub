@@ -2,6 +2,7 @@
 // app/admin/page.tsx
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase/client";
 import { tipsService } from "@/app/lib/supabase/tips";
 import { useToast } from "@/app/context/ToastContext";
@@ -17,6 +18,7 @@ import {
   FaSpinner,
   FaChevronLeft,
   FaTag,
+  FaCog,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -33,9 +35,11 @@ import TablesManagement from "./components/TablesManagement";
 import ProductsManagement from "./components/ProductsManagement";
 import CategoriesManagement from "./components/CategoriesManagement";
 import UsersManagement from "./components/UsersManagement";
+import SettingsManagement from "./components/SettingsManagement";
 
 export default function AdminPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState("");
@@ -800,15 +804,17 @@ export default function AdminPage() {
     });
   }, []);
 
-  // Cargar logo cuando el usuario se autentique
+  // Cargar logo al montar (se muestra en el sidebar)
   useEffect(() => {
     checkExistingLogo();
   }, []);
 
-  // Cargar cover cuando el usuario se autentique
+  // Cargar cover solo cuando se abre Configuración
   useEffect(() => {
-    checkExistingCoverImage();
-  }, []);
+    if (activeSection === "settings") {
+      checkExistingCoverImage();
+    }
+  }, [activeSection]);
 
   // Cargar datos del dashboard cuando cambie la sección o la fecha seleccionada
   useEffect(() => {
@@ -837,7 +843,7 @@ export default function AdminPage() {
   };
 
   const handleWaiter = () => {
-    window.location.href = "/waiter";
+    router.push("/waiter");
   };
 
   const handleError = (errorMessage: string) => {
@@ -930,6 +936,11 @@ export default function AdminPage() {
               name: "Usuarios",
               icon: FaUser,
             },
+            {
+              id: "settings" as AdminSection,
+              name: "Configuración",
+              icon: FaCog,
+            },
           ].map((item) => (
             <button
               key={item.id}
@@ -957,22 +968,7 @@ export default function AdminPage() {
             <FaUser className="w-3.5 h-3.5 flex-shrink-0" />
             {!sidebarCollapsed && <span className="truncate">Waiter</span>}
           </button>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition`}
-            title={sidebarCollapsed ? (logoUrl ? "Actualizar Logo" : "Subir Logo") : undefined}
-          >
-            <FaUpload className="w-3.5 h-3.5 flex-shrink-0" />
-            {!sidebarCollapsed && <span className="truncate">{logoUrl ? "Actualizar Logo" : "Subir Logo"}</span>}
-          </button>
-          <button
-            onClick={() => setShowCoverUploadModal(true)}
-            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition`}
-            title={sidebarCollapsed ? (coverImageUrl ? "Actualizar Cover" : "Subir Cover") : undefined}
-          >
-            <FaImage className="w-3.5 h-3.5 flex-shrink-0" />
-            {!sidebarCollapsed && <span className="truncate">{coverImageUrl ? "Actualizar Cover" : "Subir Cover"}</span>}
-          </button>
+
           <button
             onClick={handleLogout}
             className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-1.5 px-3"} py-[7px] rounded-lg border border-slate-200 text-xs font-semibold text-red-600 hover:bg-red-50 transition`}
@@ -1022,6 +1018,16 @@ export default function AdminPage() {
 
           {activeSection === "users" && (
             <UsersManagement onError={handleError} />
+          )}
+
+          {activeSection === "settings" && (
+            <SettingsManagement
+              onError={handleError}
+              coverImageUrl={coverImageUrl}
+              onOpenCoverUpload={() => setShowCoverUploadModal(true)}
+              logoImageUrl={logoUrl}
+              onOpenLogoUpload={() => setShowUploadModal(true)}
+            />
           )}
         </div>
       </main>

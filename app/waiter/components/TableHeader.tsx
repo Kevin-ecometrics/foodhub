@@ -10,6 +10,7 @@ interface TableHeaderProps {
   processing: string | null;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   onPagarPorSeparado: (tableId: number, tableNumber: number) => void;
+  onCerrarMesa: (tableId: number, tableNumber: number) => void;
   notifications: WaiterNotification[];
   onOrderAdded?: () => void;
   onAddModalChange?: (isOpen: boolean) => void;
@@ -20,7 +21,7 @@ interface TableHeaderProps {
 
 
 export default function TableHeader({
-  table, processing, onCobrarMesa, onPagarPorSeparado,
+  table, processing, onCobrarMesa, onPagarPorSeparado, onCerrarMesa,
   notifications = [], onOrderAdded, onAddModalChange,
   isHighlighted = false, occupationTime,
 }: TableHeaderProps) {
@@ -129,6 +130,11 @@ export default function TableHeader({
               {(table.status==="occupied"||table.status==="reserved") && (
                 <button onClick={openAddModal} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--green)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4 }}>
                   + Agregar
+                </button>
+              )}
+              {table.status==="occupied" && (
+                <button onClick={() => onCerrarMesa(table.id, table.number)} disabled={processing===`cerrar-${table.id}`} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--red)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,opacity:processing===`cerrar-${table.id}`?0.6:1 }}>
+                  {processing===`cerrar-${table.id}` ? "↻" : "Cerrar Mesa"}
                 </button>
               )}
               {showPaymentButtons && (

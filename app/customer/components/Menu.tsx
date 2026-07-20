@@ -16,6 +16,7 @@ import {
   MenuCategory,
   Category,
 } from "@/app/lib/supabase/categories";
+import { settingsService } from "@/app/lib/supabase/settings";
 
 // ─── Design Tokens & Animations ─────────────────────────────────────────────
 const DESIGN_CSS = `
@@ -338,6 +339,22 @@ const IHeart = () => (
 const IFire = () => (
   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 1.5C8.5 5 6 8 7.5 12c.5 1.5-.5 3-2 3.5C7 18 9.5 20 12 22.5c2.5-2.5 5-4.5 6.5-7-.5-.5-1.5-2-2-3.5C18 8 15.5 5 12 1.5z" />
+  </svg>
+);
+const INote = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
   </svg>
 );
 
@@ -913,13 +930,16 @@ const ProductModal = ({
   onClose,
   onAdd,
   adding,
+  notesEnabled,
 }: {
   product: Product;
   onClose: () => void;
   onAdd: (notes: string, qty: number, extras: { [k: string]: boolean }) => void;
   adding: boolean;
+  notesEnabled: boolean;
 }) => {
   const [qty, setQty] = useState(1);
+  const [notes, setNotes] = useState("");
   const [selectedExtras, setSelectedExtras] = useState<{
     [k: string]: boolean;
   }>({});
@@ -1264,6 +1284,48 @@ const ProductModal = ({
                 </button>
               </div>
             </div>
+            {notesEnabled && (
+              <>
+                <label
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 8,
+                  }}
+                >
+                  <INote /> Instrucciones especiales (opcional):
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value.slice(0, 200))}
+                  placeholder="Ej: Sin tomate, extra queso, bien cocido…"
+                  style={{
+                    width: "100%",
+                    border: "1.5px solid var(--border)",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                    fontSize: 13,
+                    color: "var(--text)",
+                    resize: "none",
+                    height: 80,
+                    fontFamily: "inherit",
+                    lineHeight: 1.6,
+                    background: "var(--surface)",
+                    outline: "none",
+                    transition: "border-color 0.15s",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                  onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+                />
+                <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                  {notes.length}/200 caracteres
+                </p>
+              </>
+            )}
           </div>
 
           {/* Total + CTA */}
@@ -1306,7 +1368,7 @@ const ProductModal = ({
                 Cancelar
               </button>
               <button
-                onClick={() => onAdd("", qty, selectedExtras)}
+                onClick={() => onAdd(notes, qty, selectedExtras)}
                 disabled={adding}
                 style={{
                   flex: 2,
@@ -1389,6 +1451,8 @@ export default function MenuPage() {
   const [recentItems, setRecentItems] = useState<Product[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
+  const [productNotesEnabled, setProductNotesEnabled] = useState(false);
+  const [breakfastEndHour, setBreakfastEndHour] = useState("11:00");
   const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingProduct, setAddingProduct] = useState<number | null>(null);
@@ -1473,6 +1537,21 @@ export default function MenuPage() {
   // ─────────────────────────────────────────────────────────────────────────
   // Table status check & realtime subscription
   // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    Promise.all([
+      settingsService.getSetting("product_notes_enabled"),
+      settingsService.getSetting("breakfast_end_hour"),
+    ])
+      .then(([notesVal, hourVal]) => {
+        setProductNotesEnabled(notesVal === 'true');
+        setBreakfastEndHour(hourVal && hourVal !== 'false' ? hourVal : '11:00');
+      })
+      .catch(() => {
+        setProductNotesEnabled(false);
+        setBreakfastEndHour('11:00');
+      });
+  }, []);
+
   useEffect(() => {
     const checkTableStatus = async () => {
       const tid = tableId || currentTableId;
@@ -1739,15 +1818,24 @@ export default function MenuPage() {
     try {
       await setCurrentUserOrder(oid, uid);
       if (currentTableId) await refreshOrder(currentTableId);
-      const [allProducts, recent, cats] = await Promise.all([
+      const [allProducts, recent, cats, hourSetting] = await Promise.all([
         productsService.getProducts(),
         getRecentOrdersItems(tid),
         categoriesService.getActiveCategories(),
+        settingsService.getSetting("breakfast_end_hour").catch(() => '11:00'),
       ]);
-      setProducts(allProducts);
+      const endHour = hourSetting && hourSetting !== 'false' ? hourSetting : '11:00';
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const [h, m] = endHour.split(':').map(Number);
+      const isBreakfast = currentMinutes < (h * 60 + m);
+      const filtered = allProducts.filter(
+        (p) => p.meal_type === (isBreakfast ? 'breakfast' : 'lunch') || p.meal_type === 'both'
+      );
+      setProducts(filtered);
       setRecentOrderItems(recent);
       setDbCategories(cats);
-      const favs = allProducts.filter((p) => p.is_favorite);
+      const favs = filtered.filter((p) => p.is_favorite);
       setFavoriteItems(favs);
       const recentProds = recent
         .map((ri) => allProducts.find((p) => p.id === ri.product_id))
@@ -3736,6 +3824,7 @@ export default function MenuPage() {
         }}
         onAdd={handleConfirmAdd}
         adding={addingProduct === selectedProduct.id}
+        notesEnabled={productNotesEnabled}
       />
     );
   };

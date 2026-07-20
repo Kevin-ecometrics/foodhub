@@ -307,6 +307,52 @@ export const waiterService = {
     }
   },
 
+  async resetTable(tableId: number, tableNumber: number): Promise<void> {
+    try {
+      console.log(`🔄 Resetando mesa ${tableNumber} (sin guardar historial)`)
+
+      const { error: notifError } = await supabase
+        .from('waiter_notifications')
+        .delete()
+        .eq('table_id', tableId)
+      if (notifError) throw notifError
+
+      const { data: orderRows, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('table_id', tableId)
+      if (ordersError) throw ordersError
+
+      const orderIds = ((orderRows || []) as { id: string }[]).map(o => o.id)
+
+      if (orderIds.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .delete()
+          .in('order_id', orderIds)
+        if (itemsError) throw itemsError
+
+        const { error: ordersDeleteError } = await supabase
+          .from('orders')
+          .delete()
+          .in('id', orderIds)
+        if (ordersDeleteError) throw ordersDeleteError
+      }
+
+      const tableUpdate: TablesUpdate = { status: 'available', updated_at: new Date().toISOString() }
+      const { error: tableError } = await (supabase as any)
+        .from('tables')
+        .update(tableUpdate)
+        .eq('id', tableId) as { error: Error | null }
+      if (tableError) throw tableError
+
+      console.log(`✅ Mesa ${tableNumber} resetada correctamente`)
+    } catch (err) {
+      console.error('❌ Error resetando mesa:', err)
+      throw err
+    }
+  },
+
   async acknowledgeNotification(notificationId: string): Promise<void> {
     const payload: WaiterNotifUpdate = { status: 'acknowledged', updated_at: new Date().toISOString() }
     const { error } = await (supabase as any)

@@ -9,7 +9,7 @@ import ProductForm from "./ProductForm";
 import { categoriesService } from "@/app/lib/supabase/categories";
 import StarRating from "./StarRating";
 
-type SortField = "category" | "price" | "rating" | "is_favorite" | "preparation_time" | "is_available";
+type SortField = "category" | "price" | "rating" | "is_favorite" | "preparation_time" | "is_available" | "meal_type";
 type SortDir = "asc" | "desc";
 
 interface ProductsManagementProps {
@@ -36,6 +36,7 @@ export default function ProductsManagement({
     preparation_time: "",
     is_available: true,
     is_favorite: false,
+    meal_type: "both" as const,
     rating: "0",
     extras: [],
   });
@@ -163,6 +164,7 @@ export default function ProductsManagement({
         preparation_time: parseInt(productForm.preparation_time) || null,
         is_available: productForm.is_available,
         is_favorite: productForm.is_favorite,
+        meal_type: productForm.meal_type,
         rating: parseFloat(productForm.rating) || 0,
         rating_count: 0,
         extras: productForm.extras || [], // INCLUIR EXTRAS
@@ -184,6 +186,7 @@ export default function ProductsManagement({
         preparation_time: "",
         is_available: true,
         is_favorite: false,
+        meal_type: "both" as const,
         rating: "0",
         extras: [],
       });
@@ -214,8 +217,10 @@ export default function ProductsManagement({
         preparation_time: parseInt(productForm.preparation_time) || null,
         is_available: productForm.is_available,
         is_favorite: productForm.is_favorite,
+        meal_type: productForm.meal_type,
         rating: parseFloat(productForm.rating) || 0,
-        extras: productForm.extras || [], // INCLUIR EXTRAS
+        extras: productForm.extras || [],
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
@@ -223,7 +228,10 @@ export default function ProductsManagement({
         .update(productData as never)
         .eq("id", editingProduct.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error details:", JSON.stringify(error));
+        throw error;
+      }
 
       setShowProductForm(false);
       setEditingProduct(null);
@@ -236,6 +244,7 @@ export default function ProductsManagement({
         preparation_time: "",
         is_available: true,
         is_favorite: false,
+        meal_type: "both" as const,
         rating: "0",
         extras: [],
       });
@@ -258,6 +267,7 @@ export default function ProductsManagement({
       preparation_time: product.preparation_time?.toString() || "",
       is_available: product.is_available,
       is_favorite: product.is_favorite,
+      meal_type: product.meal_type || "both",
       rating: product.rating.toString(),
       extras: product.extras || [], // CARGAR EXTRAS EXISTENTES
     });
@@ -363,6 +373,7 @@ export default function ProductsManagement({
               preparation_time: "",
               is_available: true,
               is_favorite: false,
+              meal_type: "both" as const,
               rating: "0",
               extras: [],
             });
@@ -464,6 +475,15 @@ export default function ProductsManagement({
                       <span className="px-2 py-1 text-xs font-semibold rounded-full bg-[var(--color-accent-light)] text-[var(--color-accent-dark)]">
                         {product.category}
                       </span>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        product.meal_type === "breakfast"
+                          ? "bg-amber-100 text-amber-700"
+                          : product.meal_type === "lunch"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-emerald-100 text-emerald-700"
+                      }`}>
+                        {product.meal_type === "breakfast" ? "Desayuno" : product.meal_type === "lunch" ? "Comida" : "Ambos"}
+                      </span>
 
                       {product.preparation_time && (
                         <span className="text-xs text-gray-500">
@@ -525,6 +545,7 @@ export default function ProductsManagement({
                     {(
                       [
                         { label: "CATEGORÍA", field: "category" },
+                        { label: "TIPO", field: "meal_type" },
                         { label: "PRECIO", field: "price" },
                         { label: "CALIFICACIÓN", field: "rating" },
                         { label: "FAVORITO", field: "is_favorite" },
@@ -580,6 +601,17 @@ export default function ProductsManagement({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="px-2 py-0.5 text-[10px] font-bold rounded-[5px] bg-[var(--color-accent-light)] text-[var(--color-accent-dark)]">{product.category}</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-[5px] ${
+                          product.meal_type === "breakfast"
+                            ? "bg-amber-100 text-amber-700"
+                            : product.meal_type === "lunch"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}>
+                          {product.meal_type === "breakfast" ? "Desayuno" : product.meal_type === "lunch" ? "Comida" : "Ambos"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-900">{formatCurrency(product.price)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">

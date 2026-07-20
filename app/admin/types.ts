@@ -81,6 +81,7 @@ export interface Product {
   image_url: string;
   is_available: boolean;
   is_favorite: boolean;
+  meal_type: "breakfast" | "lunch" | "both";
   preparation_time: number;
   rating: number;
   rating_count: number;
@@ -89,7 +90,7 @@ export interface Product {
   extras?: ProductExtra[];
 }
 
-export type AdminSection = "dashboard" | "tables" | "products" | "categories" | "users";
+export type AdminSection = "dashboard" | "tables" | "products" | "categories" | "users" | "settings";
 
 export interface TableFormData {
   number: string;
@@ -106,6 +107,7 @@ export interface ProductFormData {
   preparation_time: string;
   is_available: boolean;
   is_favorite: boolean;
+  meal_type: "breakfast" | "lunch" | "both";
   rating: string;
   extras?: ProductExtra[];
 }

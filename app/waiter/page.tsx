@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   waiterService,
   WaiterNotification,
@@ -19,6 +20,7 @@ import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
 
 import { tipsService } from "@/app/lib/supabase/tips";
+import { settingsService } from "@/app/lib/supabase/settings";
 
 // Clave para localStorage
 const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
@@ -56,27 +58,39 @@ interface PaymentData {
   usdRate?: number;
 }
 
-// Modal de confirmación con contraseña - SIMPLIFICADO
+// Modal de confirmación con contraseña / PIN
 function PasswordModal({
   isOpen,
   onClose,
   onConfirm,
+  targetPin,
+  title = "Confirmar Cancelación",
+  description = "Ingrese la contraseña para confirmar la cancelación del producto.",
+  errorMessage = "Contraseña incorrecta",
+  inputLabel = "Contraseña:",
+  confirmLabel = "Confirmar",
 }: {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  targetPin?: string;
+  title?: string;
+  description?: string;
+  errorMessage?: string;
+  inputLabel?: string;
+  confirmLabel?: string;
 }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleConfirm = () => {
-    if (password === "restaurant") {
+    if (password === targetPin) {
       setError("");
       setPassword("");
       onConfirm();
       onClose();
     } else {
-      setError("Contraseña incorrecta");
+      setError(errorMessage);
     }
   };
 
@@ -123,7 +137,7 @@ function PasswordModal({
             marginBottom: 4,
           }}
         >
-          Confirmar Cancelación
+          {title}
         </p>
         <p
           style={{
@@ -133,7 +147,7 @@ function PasswordModal({
             lineHeight: 1.5,
           }}
         >
-          Ingrese la contraseña para confirmar la cancelación del producto.
+          {description}
         </p>
 
         <div style={{ marginBottom: 16 }}>
@@ -146,7 +160,7 @@ function PasswordModal({
               marginBottom: 6,
             }}
           >
-            Contraseña:
+            {inputLabel}
           </label>
           <input
             type="password"
@@ -162,14 +176,14 @@ function PasswordModal({
               fontFamily: "inherit",
               transition: "border-color 0.15s",
             }}
-            placeholder="Contraseña de autorización"
+            placeholder={inputLabel}
             onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
             onBlur={(e) =>
               (e.target.style.borderColor = error
                 ? "var(--red)"
                 : "var(--border)")
             }
-            onKeyPress={(e) => {
+            onKeyDown={(e) => {
               if (e.key === "Enter") handleConfirm();
             }}
           />
@@ -211,7 +225,7 @@ function PasswordModal({
               opacity: !password ? 0.5 : 1,
             }}
           >
-            Confirmar
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -2082,6 +2096,7 @@ function TablesOrderSelect({
 
 export default function WaiterDashboard() {
   const { toast } = useToast();
+  const router = useRouter();
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -2130,6 +2145,24 @@ export default function WaiterDashboard() {
     orders: TableOrder[];
   } | null>(null);
 
+  const [cancelTargetPin, setCancelTargetPin] = useState("");
+
+  const [showClosePinModal, setShowClosePinModal] = useState(false);
+  const [pendingCloseTable, setPendingCloseTable] = useState<{
+    id: number;
+    number: number;
+    total: number;
+    customerTip: number;
+  } | null>(null);
+  const [closeTableTargetPin, setCloseTableTargetPin] = useState("");
+
+  const [showCerrarPinModal, setShowCerrarPinModal] = useState(false);
+  const [pendingCerrarTable, setPendingCerrarTable] = useState<{
+    id: number;
+    number: number;
+  } | null>(null);
+  const [cerrarTargetPin, setCerrarTargetPin] = useState("");
+
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
   const isLoadingRef = useRef(false);
@@ -2169,12 +2202,12 @@ export default function WaiterDashboard() {
   }, [tablesOrder]);
 
   useEffect(() => {
-    modalOpenRef.current = showPaymentCalculator || showSeparatePayments;
+    modalOpenRef.current = showPaymentCalculator || showSeparatePayments || showCerrarPinModal;
   }, [showPaymentCalculator, showSeparatePayments]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/waiter/login";
+    router.push("/waiter/login");
   };
 
   const loadData = async () => {
@@ -2407,6 +2440,12 @@ export default function WaiterDashboard() {
     cancelQuantity: number = 1,
   ) => {
     setPendingCancelAction({ itemId, cancelQuantity });
+    try {
+      const pinSetting = await settingsService.getSetting("close_table_pin");
+      setCancelTargetPin(pinSetting || '');
+    } catch {
+      setCancelTargetPin('');
+    }
     setShowPasswordModal(true);
   };
 
@@ -2521,6 +2560,17 @@ export default function WaiterDashboard() {
       }
     } catch (e) { console.error(e); }
 
+    // Verificar si hay PIN configurado para cerrar mesa
+    try {
+      const pinSetting = await settingsService.getSetting("close_table_pin");
+      if (pinSetting && pinSetting !== 'false' && pinSetting.length > 0) {
+        setCloseTableTargetPin(pinSetting);
+        setPendingCloseTable({ id: tableId, number: tableNumber, total: tableTotal, customerTip });
+        setShowClosePinModal(true);
+        return;
+      }
+    } catch {}
+
     setSelectedTableForPayment({
       id: tableId,
       number: tableNumber,
@@ -2528,6 +2578,45 @@ export default function WaiterDashboard() {
       customerTip,
     });
     setShowPaymentCalculator(true);
+  };
+
+  const handleCloseTablePinConfirm = () => {
+    if (!pendingCloseTable) return;
+    setSelectedTableForPayment({
+      id: pendingCloseTable.id,
+      number: pendingCloseTable.number,
+      total: pendingCloseTable.total,
+      customerTip: pendingCloseTable.customerTip,
+    });
+    setShowPaymentCalculator(true);
+    setPendingCloseTable(null);
+  };
+
+  const handleCerrarMesa = async (tableId: number, tableNumber: number) => {
+    try {
+      const pinSetting = await settingsService.getSetting("close_table_pin");
+      setCerrarTargetPin(pinSetting || '');
+    } catch {
+      setCerrarTargetPin('');
+    }
+    setPendingCerrarTable({ id: tableId, number: tableNumber });
+    setShowCerrarPinModal(true);
+  };
+
+  const handleCerrarPinConfirm = async () => {
+    if (!pendingCerrarTable) return;
+    setProcessing(`cerrar-${pendingCerrarTable.id}`);
+    try {
+      await waiterService.resetTable(pendingCerrarTable.id, pendingCerrarTable.number);
+      toast(`Mesa ${pendingCerrarTable.number} cerrada correctamente`, "success");
+      await loadData();
+    } catch (error: any) {
+      console.error("Error cerrando mesa:", error);
+      toast(`Error al cerrar mesa: ${error.message}`, "error");
+    } finally {
+      setProcessing(null);
+      setPendingCerrarTable(null);
+    }
   };
 
   const handlePagarPorSeparado = async (
@@ -2743,10 +2832,11 @@ export default function WaiterDashboard() {
                 onCancelItem={handleCancelItem}
                 onCobrarMesa={handleCobrarMesa}
                 onPagarPorSeparado={handlePagarPorSeparado}
+                onCerrarMesa={handleCerrarMesa}
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
                 tablesOrder={tablesOrder}
-                onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments; }}
+                onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments || showCerrarPinModal; }}
               />
             </>
           )}
@@ -2759,8 +2849,47 @@ export default function WaiterDashboard() {
 
       <PasswordModal
         isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
+        onClose={() => {
+          setShowPasswordModal(false);
+          setCancelTargetPin('');
+        }}
         onConfirm={executeCancelItem}
+        targetPin={cancelTargetPin}
+        title="Confirmar Cancelación"
+        description="Ingrese el PIN de seguridad para cancelar el producto."
+        errorMessage="PIN incorrecto"
+        inputLabel="PIN de seguridad:"
+        confirmLabel="Cancelar Producto"
+      />
+
+      <PasswordModal
+        isOpen={showClosePinModal}
+        onClose={() => {
+          setShowClosePinModal(false);
+          setPendingCloseTable(null);
+        }}
+        onConfirm={handleCloseTablePinConfirm}
+        targetPin={closeTableTargetPin}
+        title="Cerrar Mesa"
+        description="Ingrese el PIN de seguridad para cerrar la mesa y cobrar."
+        errorMessage="PIN incorrecto"
+        inputLabel="PIN de seguridad:"
+        confirmLabel="Cobrar"
+      />
+
+      <PasswordModal
+        isOpen={showCerrarPinModal}
+        onClose={() => {
+          setShowCerrarPinModal(false);
+          setPendingCerrarTable(null);
+        }}
+        onConfirm={handleCerrarPinConfirm}
+        targetPin={cerrarTargetPin}
+        title="Cerrar Mesa"
+        description="Esto eliminará todos los pedidos y notificaciones sin cobrar. Ingrese el PIN de seguridad."
+        errorMessage="PIN incorrecto"
+        inputLabel="PIN de seguridad:"
+        confirmLabel="Eliminar Orden"
       />
 
       <PaymentCalculator

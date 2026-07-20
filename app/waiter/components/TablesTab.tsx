@@ -9,6 +9,7 @@ interface TablesTabProps {
   onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   onPagarPorSeparado: (tableId: number, tableNumber: number) => void;
+  onCerrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
   tablesOrder: string;
@@ -17,7 +18,7 @@ interface TablesTabProps {
 
 export default function TablesTab({
   tables, processing, onUpdateItemStatus, onCancelItem,
-  onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
+  onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, tablesOrder, onAddModalChange,
 }: TablesTabProps) {
   const [now, setNow] = useState(() => Date.now());
@@ -93,6 +94,7 @@ export default function TablesTab({
                 onCancelItem={onCancelItem}
                 onCobrarMesa={onCobrarMesa}
                 onPagarPorSeparado={onPagarPorSeparado}
+                onCerrarMesa={onCerrarMesa}
                 calculateTableTotal={calculateTableTotal}
                 notifications={notifications}
                 occupationTime={occupationDisplay}

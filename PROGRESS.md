@@ -48,6 +48,7 @@ All tables have RLS enabled.
 | rating_count | integer | 0 | número de ratings |
 | is_favorite | boolean | false | |
 | extras | jsonb | `[]` | add-ons con precio |
+| meal_type | text | `'both'` | CHECK IN (breakfast, lunch, both) — controla en qué horario se muestra |
 | created_at | timestamptz | now() | |
 | updated_at | timestamptz | now() | |
 
@@ -139,6 +140,29 @@ All tables have RLS enabled.
 | total_amount | numeric | — | |
 | created_at | timestamptz | now() | nullable |
 
+### `users`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | — | FK→auth.users, ON DELETE CASCADE |
+| email | text UNIQUE | — | |
+| name | text | — | |
+| role | text | — | CHECK IN (super_admin, admin, waiter) — fuente de verdad real es `auth.users.raw_app_meta_data.role` |
+| pin_code | char(4) | — | nullable, CHECK 4 dígitos, único entre waiters activos |
+| is_active | boolean | true | |
+| created_at | timestamptz | now() | |
+| updated_at | timestamptz | now() | trigger `set_updated_at` |
+
+> Única tabla con RLS real por rol (`current_role()` lee `app_metadata` del JWT). Ver `docs/AUTH.md`.
+
+### `app_settings`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| key | text PK | — | ej. `product_notes_enabled`, `breakfast_end_hour`, `printing_enabled`, `default_check_ui`, `close_table_pin` |
+| value | text | `'false'` | toggles: `'true'`/`'false'`, time: `"HH:MM"`, select: string |
+| updated_at | timestamptz | now() | trigger `set_updated_at` |
+
+> Feature flags configurables desde `/admin` → Configuración. Soporta tipos: toggle (`'true'`/`'false'`), time (`"HH:MM"`), select (string). Lectura pública (RLS `select` abierto), escritura solo admin/super_admin.
+
 ---
 
 ## Realtime Channels
@@ -186,7 +210,14 @@ Admin (/admin)
   └─ Login JWT
   └─ Dashboard con métricas diarias (ingresos, propinas, órdenes, productos top)
   └─ CRUD: Mesas / Productos / Categorías
-  └─ Upload logo (Supabase Storage bucket: logo)
+  └─ Configuración con 7 settings:
+       ├─ Notas especiales en productos (toggle)
+       ├─ Cambio de Desayuno a Comida (time picker)
+       ├─ Impresión (toggle) — al activar muestra modal de pago simulado con tarjeta ($35 USD)
+       ├─ Diseño de cuenta por defecto (select: Moderno/Clásico/Compacto)
+       ├─ Cover del menú (preview + upload)
+       ├─ Logo del negocio (preview + upload)
+       └─ PIN para cerrar mesa (password)
 ```
 
 ---
@@ -209,6 +240,7 @@ app/
 │       ├── ProductsManagement.tsx  # CRUD productos
 │       ├── ProductForm.tsx
 │       ├── CategoriesManagement.tsx
+│       ├── SettingsManagement.tsx  # Panel de config (toggles, time, select, cover/logo upload)
 │       └── StarRating.tsx
 │
 ├── customer/
@@ -276,11 +308,11 @@ app/
 - [x] Tailwind CSS 4 con colores OKLCH + fuente Plus Jakarta Sans
 - [x] Supabase client con SSR
 - [x] Providers: OrderContext, SessionContext, ToastContext, ConfirmContext
-- [x] Admin JWT auth (`/api/admin/login` + `/api/admin/verify`)
+- [x] Auth real con Supabase (`app/api/auth/login`, `app/api/auth/waiter-login`, `app/api/auth/logout`) + `middleware.ts` — reemplaza el login JWT propio anterior, ver `docs/AUTH.md`
 
 ### Customer Portal
 - [x] Entrada por QR — descubrimiento de mesa
-- [x] Menú por categorías con carrito y notas por item
+- [x] Menú por categorías con carrito y notas por item — instrucciones especiales (textarea) opt-in/opt-out vía `app_settings.product_notes_enabled`, controlado desde `/admin` → Configuración (apagado por defecto)
 - [x] Extras con precio adicional (JSONB en productos)
 - [x] Sesiones multi-comensal por mesa
 - [x] Tracking de estado de orden en tiempo real
@@ -294,20 +326,22 @@ app/
 - [x] Generación de ticket PDF
 
 ### Waiter Dashboard
+- [x] Login en `/waiter/login` por correo+contraseña o PIN de 4 dígitos (Supabase Auth), protegido por `middleware.ts`
 - [x] Tab Notificaciones — feed realtime: new_order, refill, assistance, bill_request
 - [x] Tab Mesas — grid con desglose por comensal
   - [x] Controles de estado por item (ordered→preparing→ready→served)
-  - [x] Cancelación con contraseña (parcial o total)
+   - [x] Cancelación con PIN (parcial o total) — usa `close_table_pin` de DB (sin hardcode)
   - [x] Ordenado por número o tiempo de ocupación
   - [x] Filtro FCFS
 - [x] PaymentCalculator — efectivo + terminal + USD (tasa configurable) + mixto + cambio automático
 - [x] **Propina en calculadora pre-llenada desde sugerencia del cliente**
 - [x] **Badge "💬 Cliente sugirió $X.XX"** cuando hay propina del customer
 - [x] Split Payments — pago individual por comensal
+- [x] **Cerrar Mesa** — botón rojo que elimina pedidos/notificaciones sin cobrar (protegido por `close_table_pin`)
 - [x] Tab Productos — toggle disponibilidad rápido
 
 ### Admin Dashboard
-- [x] Login JWT con sesión en localStorage
+- [x] Login con Supabase Auth (correo/contraseña; super admin vía `ADMIN_USERNAME`/`ADMIN_PASSWORD` sincronizado como cuenta real)
 - [x] Sidebar colapsable
 - [x] Dashboard con stats diarias (órdenes, ingresos, propinas, mesas activas, ticket promedio)
 - [x] Filtro por rango de fechas
@@ -315,12 +349,20 @@ app/
 - [x] CRUD Mesas (capacidad, ubicación, estado)
 - [x] CRUD Productos (imagen, precio, tiempo prep, disponibilidad, extras)
 - [x] CRUD Categorías (orden de display, activo/inactivo)
-- [x] Upload de logo (Supabase Storage bucket `logo`)
+- [x] CRUD Usuarios (`UsersManagement.tsx`) — crear/editar/desactivar/eliminar cuentas admin/waiter, PIN, ya verificadas sin correo
+- [x] Configuración (`SettingsManagement.tsx`) — panel de settings con 5 tipos: toggle, time picker, select dropdown, image upload (cover/logo), password
+  - [x] Toggle: Notas especiales en productos, Impresión (con modal de pago simulado al activar)
+  - [x] Time picker: Cambio de Desayuno a Comida
+  - [x] Select: Diseño de cuenta por defecto (Moderno/Clásico/Compacto)
+  - [x] Image upload: Cover del menú + Logo del negocio (movidos del sidebar a settings)
+  - [x] Password: PIN para cerrar mesa (input enmascarado + toggle visibilidad + auto-save)
+- [x] Upload de logo (Supabase Storage bucket `logo`) — ahora desde Configuración
+- [x] Upload de cover (Supabase Storage bucket `cover-image`) — ahora desde Configuración
 
 ### Service Layer
 - [x] `tips.ts` — insertTip, getTipsTotal, getTipsByDateRange
 - [x] `history.ts` — requestBill (con tip_amount), archival de ventas
-- [x] `waiter.ts` — freeTableAndClean
+- [x] `waiter.ts` — freeTableAndClean, resetTable
 - [x] `notifications.ts` — creación de alertas
 - [x] Todos los servicios CRUD de entidades
 
@@ -344,6 +386,15 @@ app/
 | Fecha | Nombre | Descripción |
 |---|---|---|
 | 2026-06-15 | `add_tip_amount_to_waiter_notifications` | Columna `tip_amount numeric DEFAULT 0` en `waiter_notifications` para comunicar propina del cliente al mesero |
+| 2026-07-20 | `create_users_table_and_role_auth` | Tabla `users` (roles admin/waiter/super_admin) + función `current_role()` + RLS por rol; migra el login de admin/waiter a Supabase Auth real |
+| 2026-07-20 | `fix_current_role_search_path` | Fix del linter de seguridad: `search_path` explícito en `current_role()` |
+| 2026-07-20 | `create_app_settings_table` | Tabla `app_settings` (feature flags opt-in/opt-out) + seed de `product_notes_enabled = false` |
+| 2026-07-20 | — | `app_settings.value` migrado a text para soportar string (time/select) además de boolean; service layer (`settings.ts`) actualizado con tipo `string` |
+| 2026-07-20 | `add_meal_type_to_products` | Columna `meal_type text NOT NULL DEFAULT 'both' CHECK (meal_type IN ('breakfast','lunch','both'))` en `products` — controla visibilidad por horario de desayuno/comida |
+| 2026-07-20 | — | `close_table_pin` agregado a seeds de `app_settings` |
+| 2026-07-20 | — | `PasswordModal` refactorizado: elimina hardcode `"restaurant"`, valida contra `targetPin` prop |
+| 2026-07-20 | — | `waiterService.resetTable()` — elimina pedidos/notificaciones sin historial (como admin) |
+| 2026-07-20 | — | Modal de pago simulado para `printing_enabled` — formulario tipo Shopify con tarjeta, $35 USD, mock |
 
 ---
 

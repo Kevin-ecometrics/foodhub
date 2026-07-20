@@ -215,6 +215,31 @@ export default function ProductForm({
           </div>
         </div>
 
+        {/* Row 1.5: Tipo de Comida */}
+        <div>
+          <label className={labelBase}>Tipo de Comida</label>
+          <div className="flex gap-2">
+            {[
+              { value: "breakfast" as const, label: "Desayuno" },
+              { value: "lunch" as const, label: "Comida" },
+              { value: "both" as const, label: "Ambos" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleChange("meal_type", opt.value)}
+                className={`flex-1 py-2.5 rounded-[9px] text-xs font-bold border transition ${
+                  productForm.meal_type === opt.value
+                    ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+                    : "bg-[oklch(98.5%_0.005_80)] text-[oklch(45%_0.02_260)] border-[oklch(88%_0.01_260)] hover:bg-white hover:border-[oklch(78%_0.01_260)]"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Row 2: Precio + Tiempo */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

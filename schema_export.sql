@@ -49,6 +49,7 @@ create table if not exists public.products (
   image_url character varying,
   is_available boolean default true,
   preparation_time integer,
+  meal_type text not null default 'both'::text check (meal_type in ('breakfast', 'lunch', 'both')),
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
   rating numeric default 0.0,
@@ -160,6 +161,16 @@ create table if not exists public.users (
   constraint users_pin_code_format check (pin_code is null or pin_code ~ '^[0-9]{4}$')
 );
 
+-- app_settings: feature flags opt-in/opt-out configurables desde el admin panel
+-- Soporta boolean (toggles) y text (time, select).
+-- Lectura publica (el customer sin login necesita leer los flags),
+-- escritura solo admin/super_admin.
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null default 'false',
+  updated_at timestamp with time zone not null default timezone('utc', now())
+);
+
 -- ---------------------------------------------------------------------
 -- Indices adicionales (fuera de PK/UNIQUE ya creados por las tablas)
 -- ---------------------------------------------------------------------
@@ -190,6 +201,11 @@ create trigger set_users_updated_at
   before update on public.users
   for each row execute function public.update_updated_at_column();
 
+drop trigger if exists set_app_settings_updated_at on public.app_settings;
+create trigger set_app_settings_updated_at
+  before update on public.app_settings
+  for each row execute function public.update_updated_at_column();
+
 -- Lee app_metadata.role directo del JWT (sin consultar public.users -> sin recursion RLS)
 create or replace function public.current_role()
 returns text
@@ -214,6 +230,7 @@ alter table public.sales_items enable row level security;
 alter table public.customer_feedback enable row level security;
 alter table public.tips enable row level security;
 alter table public.users enable row level security;
+alter table public.app_settings enable row level security;
 
 drop policy if exists "Allow all for all roles" on public.categories;
 create policy "Allow all for all roles" on public.categories
@@ -285,6 +302,17 @@ create policy "users_delete" on public.users
   for delete to authenticated
   using (public.current_role() in ('admin', 'super_admin'));
 
+-- app_settings: lectura publica (customer sin login la necesita), escritura solo admin
+drop policy if exists "app_settings_select_public" on public.app_settings;
+create policy "app_settings_select_public" on public.app_settings
+  for select to public using (true);
+
+drop policy if exists "app_settings_write_admin" on public.app_settings;
+create policy "app_settings_write_admin" on public.app_settings
+  for all to authenticated
+  using (public.current_role() in ('admin', 'super_admin'))
+  with check (public.current_role() in ('admin', 'super_admin'));
+
 -- ---------------------------------------------------------------------
 -- Realtime publication
 -- ---------------------------------------------------------------------
@@ -318,6 +346,47 @@ begin
     alter publication supabase_realtime add table public.waiter_notifications;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Migraciones aplicadas
+-- ---------------------------------------------------------------------
+
+-- 2026-07-20: add_meal_type_to_products
+-- Agrega columna meal_type a products para controlar visibilidad por horario
+alter table public.products add column if not exists meal_type text not null default 'both'::text
+  check (meal_type in ('breakfast', 'lunch', 'both'));
+
+update public.products set meal_type = 'breakfast' where category = 'Breakfast' and meal_type = 'both';
+update public.products set meal_type = 'lunch' where category in ('Lunch', 'Dinner') and meal_type = 'both';
+update public.products set meal_type = 'both' where category in ('Combos', 'Drinks', 'Refill') and meal_type = 'both';
+
+-- 2026-07-20: Alter app_settings.value a text para soportar string ademas de boolean
+alter table public.app_settings alter column value type text using value::text;
+alter table public.app_settings alter column value set not null;
+alter table public.app_settings alter column value set default 'false'::text;
+
+-- ---------------------------------------------------------------------
+-- Seed data: feature flags iniciales
+-- ---------------------------------------------------------------------
+insert into public.app_settings (key, value)
+values ('product_notes_enabled', 'false')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('breakfast_end_hour', '11:00')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('printing_enabled', 'false')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('default_check_ui', 'modern')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('close_table_pin', '1234')
+on conflict (key) do nothing;
 
 -- ---------------------------------------------------------------------
 -- Storage: buckets

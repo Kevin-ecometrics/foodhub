@@ -20,6 +20,7 @@ interface TableCardProps {
   onCancelItem: (itemId: string) => void;
   onCobrarMesa: (tableId: number, tableNumber: number) => void;
   onPagarPorSeparado: (tableId: number, tableNumber: number) => void;
+  onCerrarMesa: (tableId: number, tableNumber: number) => void;
   calculateTableTotal: (table: TableWithOrder) => number;
   notifications: WaiterNotification[];
   occupationTime?: string;
@@ -30,7 +31,7 @@ interface TableCardProps {
 
 export default function TableCard({
   table, processing, onUpdateItemStatus, onCancelItem,
-  onCobrarMesa, onPagarPorSeparado, calculateTableTotal,
+  onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, occupationTime, hasNotifications, isHighlighted = false,
   onAddModalChange,
 }: TableCardProps) {
@@ -63,6 +64,7 @@ export default function TableCard({
         processing={processing}
         onCobrarMesa={onCobrarMesa}
         onPagarPorSeparado={onPagarPorSeparado}
+        onCerrarMesa={onCerrarMesa}
         notifications={notifications}
         hasNotifications={hasNotifications}
         isHighlighted={isHighlighted}

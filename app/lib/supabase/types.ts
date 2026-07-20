@@ -24,6 +24,7 @@ export type OrderItemStatus    = 'ordered' | 'preparing' | 'ready' | 'served' | 
 export type OrderStatus        = 'active' | 'pending' | 'sent' | 'completed' | 'cancelled' | 'paid'
 export type PaymentMethod      = 'cash' | 'terminal' | 'usd' | 'mixed' | null
 export type UserRole           = 'super_admin' | 'admin' | 'waiter'
+export type MealType           = 'breakfast' | 'lunch' | 'both'
 
 // ─── Shared Interfaces ────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ export interface Database {
           image_url: string | null
           is_available: boolean
           is_favorite: boolean
+          meal_type: MealType
           preparation_time: number | null
           rating: number
           rating_count: number
@@ -98,6 +100,7 @@ export interface Database {
           image_url?: string | null
           is_available?: boolean
           is_favorite?: boolean
+          meal_type?: MealType
           preparation_time?: number | null
           rating?: number
           rating_count?: number
@@ -114,6 +117,7 @@ export interface Database {
           image_url?: string | null
           is_available?: boolean
           is_favorite?: boolean
+          meal_type?: MealType
           preparation_time?: number | null
           rating?: number
           rating_count?: number
@@ -442,6 +446,25 @@ export interface Database {
           pin_code?: string | null
           is_active?: boolean
           created_at?: string
+          updated_at?: string
+        }
+      }
+
+      // ── app_settings ──────────────────────────────────────────────────────────
+      app_settings: {
+        Row: {
+          key: string
+          value: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value?: string
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: string
           updated_at?: string
         }
       }

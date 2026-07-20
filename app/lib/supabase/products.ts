@@ -11,6 +11,7 @@ export interface Product {
   image_url: string | null
   is_available: boolean
   is_favorite: boolean
+  meal_type: 'breakfast' | 'lunch' | 'both'
   preparation_time: number | null
   rating: number
   rating_count?: number
@@ -73,6 +74,7 @@ export const productsService = {
     image_url?: string | null
     is_available: boolean
     is_favorite: boolean
+    meal_type?: 'breakfast' | 'lunch' | 'both'
     preparation_time?: string | number | null
     rating?: string | number
     extras?: ProductExtra[]
@@ -85,6 +87,7 @@ export const productsService = {
       image_url: typeof productData.image_url === 'string' ? productData.image_url : null,
       is_available: productData.is_available,
       is_favorite: productData.is_favorite,
+      meal_type: productData.meal_type ?? 'both',
       preparation_time: productData.preparation_time ? parseInt(String(productData.preparation_time)) : null,
       rating: Number(productData.rating) || 0,
       rating_count: 0,
@@ -109,6 +112,7 @@ export const productsService = {
     image_url?: string | null
     is_available: boolean
     is_favorite: boolean
+    meal_type?: 'breakfast' | 'lunch' | 'both'
     preparation_time?: string | number | null
     rating?: string | number
     extras?: ProductExtra[]
@@ -121,6 +125,7 @@ export const productsService = {
       image_url: typeof productData.image_url === 'string' ? productData.image_url : undefined,
       is_available: productData.is_available,
       is_favorite: productData.is_favorite,
+      meal_type: productData.meal_type ?? 'both',
       preparation_time: productData.preparation_time ? parseInt(String(productData.preparation_time)) : null,
       rating: Number(productData.rating) || 0,
       updated_at: new Date().toISOString(),

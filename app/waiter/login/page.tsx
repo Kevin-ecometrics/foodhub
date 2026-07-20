@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Mode = "password" | "pin";
 
 export default function WaiterLoginPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("pin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +44,7 @@ export default function WaiterLoginPage() {
         setLoading(false);
         return;
       }
-      window.location.href = "/waiter";
+      router.push("/waiter");
     } catch {
       setError("Error de conexión con el servidor");
       setLoading(false);

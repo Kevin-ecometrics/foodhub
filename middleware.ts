@@ -7,6 +7,13 @@ import { createServerClient } from "@supabase/ssr"
  * porque esa ruta ya renderiza el LoginForm inline cuando no hay sesion.
  */
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // /waiter/login no necesita validación — salta crear Supabase client
+  if (pathname === "/waiter/login") {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -28,13 +35,8 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
-  const isWaiterLogin = pathname === "/waiter/login"
-  const isProtectedWaiterRoute = pathname.startsWith("/waiter") && !isWaiterLogin
+  const { data: { user } } = await supabase.auth.getUser()
+  const isProtectedWaiterRoute = pathname.startsWith("/waiter")
   const isProtectedAdminApi = pathname.startsWith("/api/admin")
 
   if (!user && isProtectedWaiterRoute) {
