@@ -28,17 +28,18 @@ interface TableCardProps {
   isHighlighted?: boolean;
   onAddModalChange?: (isOpen: boolean) => void;
   onMoveItem?: (itemId: string, tableId: number, targetCustomerName: string) => void;
+  waiterName: string;
 }
 
 export default function TableCard({
   table, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, occupationTime, hasNotifications, isHighlighted = false,
-  onAddModalChange, onMoveItem,
+  onAddModalChange, onMoveItem, waiterName,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
   const isOccupied = table.status === "occupied";
-  const generalName = `Mesero ${table.number}`;
+  const generalName = `Mesero - ${waiterName}`;
 
   const groupOrdersByCustomer = (t: TableWithOrder): CustomerGroupSummary[] => {
     const map = new Map<string, CustomerGroupSummary>();
@@ -82,6 +83,7 @@ export default function TableCard({
         isHighlighted={isHighlighted}
         occupationTime={occupationTime}
         onAddModalChange={onAddModalChange}
+        waiterName={waiterName}
       />
 
       {customerSummaries.map(cs => (

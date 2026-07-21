@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { TableWithOrder, WaiterNotification, OrderItem } from "@/app/lib/supabase/waiter";
+import {
+  TableWithOrder,
+  WaiterNotification,
+  OrderItem,
+} from "@/app/lib/supabase/waiter";
 import { productsService, Product } from "@/app/lib/supabase/products";
 import { supabase } from "@/app/lib/supabase/client";
 import { useState, useEffect } from "react";
@@ -17,108 +21,207 @@ interface TableHeaderProps {
   hasNotifications?: boolean;
   isHighlighted?: boolean;
   occupationTime?: string;
+  waiterName: string;
 }
 
-
 export default function TableHeader({
-  table, processing, onCobrarMesa, onPagarPorSeparado, onCerrarMesa,
-  notifications = [], onOrderAdded, onAddModalChange,
-  isHighlighted = false, occupationTime,
+  table,
+  processing,
+  onCobrarMesa,
+  onPagarPorSeparado,
+  onCerrarMesa,
+  notifications = [],
+  onOrderAdded,
+  onAddModalChange,
+  isHighlighted = false,
+  occupationTime,
+  waiterName,
 }: TableHeaderProps) {
+  const selfName = `Mesero - ${waiterName}`;
   const [showAddModal, setShowAddModal] = useState(false);
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [addStep, setAddStep] = useState<"products" | "customer">("products");
   const [selectedCustomerName, setSelectedCustomerName] = useState("");
-  const openAddModal = () => { setShowAddModal(true); onAddModalChange?.(true); };
+  const openAddModal = () => {
+    setShowAddModal(true);
+    onAddModalChange?.(true);
+  };
   const closeAddModal = () => {
-    setShowAddModal(false); setSelectedProducts({}); setError(null); setSuccessCount(null);
-    setAddStep("products"); setSelectedCustomerName(""); onAddModalChange?.(false);
+    setShowAddModal(false);
+    setSelectedProducts({});
+    setError(null);
+    setSuccessCount(null);
+    setAddStep("products");
+    setSelectedCustomerName("");
+    onAddModalChange?.(false);
   };
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<{ [k: number]: number }>({});
+  const [selectedProducts, setSelectedProducts] = useState<{
+    [k: number]: number;
+  }>({});
   const [addingOrder, setAddingOrder] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const activeCustomerNames = Array.from(new Set(
-    table.orders
-      .filter(o => o.status === "sent")
-      .map(o => o.customer_name?.trim())
-      .filter((n): n is string => !!n && n !== `Mesero ${table.number}`)
-  ));
+  const activeCustomerNames = Array.from(
+    new Set(
+      table.orders
+        .filter((o) => o.status === "sent")
+        .map((o) => o.customer_name?.trim())
+        .filter((n): n is string => !!n && n !== selfName),
+    ),
+  );
 
-  useEffect(() => { if (showAddModal) loadProducts(); }, [showAddModal]);
+  useEffect(() => {
+    if (showAddModal) loadProducts();
+  }, [showAddModal]);
 
   const loadProducts = async () => {
-    setProductsLoading(true); setError(null);
+    setProductsLoading(true);
+    setError(null);
     try {
       const data = await productsService.getProducts();
       setProducts(data);
-    } catch (e) { console.error(e); setError("Error cargando los productos"); }
-    finally { setProductsLoading(false); }
+    } catch (e) {
+      console.error(e);
+      setError("Error cargando los productos");
+    } finally {
+      setProductsLoading(false);
+    }
   };
 
   const calculateItemsByStatus = (t: TableWithOrder) => {
-    const pending = t.orders.reduce((s, o) => s + o.order_items.filter((i: OrderItem) => i.status==="ordered"||i.status==="preparing").length, 0);
-    const ready   = t.orders.reduce((s, o) => s + o.order_items.filter((i: OrderItem) => i.status==="ready").length, 0);
-    const served  = t.orders.reduce((s, o) => s + o.order_items.filter((i: OrderItem) => i.status==="served").length, 0);
+    const pending = t.orders.reduce(
+      (s, o) =>
+        s +
+        o.order_items.filter(
+          (i: OrderItem) => i.status === "ordered" || i.status === "preparing",
+        ).length,
+      0,
+    );
+    const ready = t.orders.reduce(
+      (s, o) =>
+        s + o.order_items.filter((i: OrderItem) => i.status === "ready").length,
+      0,
+    );
+    const served = t.orders.reduce(
+      (s, o) =>
+        s +
+        o.order_items.filter((i: OrderItem) => i.status === "served").length,
+      0,
+    );
     return { pending, ready, served };
   };
 
-  const billRequestNotifs = notifications.filter(n => n.table_id === table.id && n.type === "bill_request");
-  const latestBillRequest = billRequestNotifs.length > 0 ? billRequestNotifs[billRequestNotifs.length - 1] : null;
+  const billRequestNotifs = notifications.filter(
+    (n) => n.table_id === table.id && n.type === "bill_request",
+  );
+  const latestBillRequest =
+    billRequestNotifs.length > 0
+      ? billRequestNotifs[billRequestNotifs.length - 1]
+      : null;
   const showPaymentButtons = latestBillRequest?.type === "bill_request";
 
   const getPaymentLabel = (method: string | null) => {
-    if (method === "cash") return { text:"EFECTIVO", color:"var(--green)", bg:"var(--green-light)" };
-    if (method === "terminal") return { text:"TARJETA", color:"var(--blue)", bg:"var(--blue-light)" };
-    return { text:"PENDIENTE", color:"var(--muted)", bg:"var(--surface)" };
+    if (method === "cash")
+      return {
+        text: "EFECTIVO",
+        color: "var(--green)",
+        bg: "var(--green-light)",
+      };
+    if (method === "terminal")
+      return { text: "TARJETA", color: "var(--blue)", bg: "var(--blue-light)" };
+    return { text: "PENDIENTE", color: "var(--muted)", bg: "var(--surface)" };
   };
 
   const handleProductQtyChange = (id: number, qty: number) =>
-    setSelectedProducts(prev => ({ ...prev, [id]: qty }));
+    setSelectedProducts((prev) => ({ ...prev, [id]: qty }));
 
-  const getTotalItems = () => Object.values(selectedProducts).reduce((s, q) => s + q, 0);
-  const getTotalAmount = () => Object.entries(selectedProducts).reduce((s, [id, q]) => {
-    const p = products.find(x => x.id === parseInt(id)); return s + (p?.price||0)*q;
-  }, 0);
+  const getTotalItems = () =>
+    Object.values(selectedProducts).reduce((s, q) => s + q, 0);
+  const getTotalAmount = () =>
+    Object.entries(selectedProducts).reduce((s, [id, q]) => {
+      const p = products.find((x) => x.id === parseInt(id));
+      return s + (p?.price || 0) * q;
+    }, 0);
 
-  const formatCurrency = (n: number) => new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" }).format(n);
+  const formatCurrency = (n: number) =>
+    new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(n);
 
   const handleContinueToCustomerStep = () => {
-    if (getTotalItems() === 0) { setError("Por favor selecciona al menos un producto"); return; }
+    if (getTotalItems() === 0) {
+      setError("Por favor selecciona al menos un producto");
+      return;
+    }
     setError(null);
     setAddStep("customer");
   };
 
   const handleConfirmAddOrder = async () => {
-    const customerName = selectedCustomerName.trim() || `Mesero ${table.number}`;
-    setAddingOrder(true); setError(null);
+    const customerName = selectedCustomerName.trim();
+    if (!customerName) {
+      setError("Selecciona el cliente al que se le asignan los productos");
+      return;
+    }
+    setAddingOrder(true);
+    setError(null);
     try {
-      const selectedItems = Object.entries(selectedProducts).filter(([,q]) => q > 0).map(([pid, qty]) => {
-        const p = products.find(x => x.id === parseInt(pid));
-        if (!p) throw new Error(`Producto ${pid} no encontrado`);
-        return { product_id: p.id, product_name: p.name, price: p.price, quantity: qty, notes: "Agregado por el mesero" };
-      });
-      if (selectedItems.length === 0) { setError("Por favor selecciona al menos un producto"); return; }
+      const selectedItems = Object.entries(selectedProducts)
+        .filter(([, q]) => q > 0)
+        .map(([pid, qty]) => {
+          const p = products.find((x) => x.id === parseInt(pid));
+          if (!p) throw new Error(`Producto ${pid} no encontrado`);
+          return {
+            product_id: p.id,
+            product_name: p.name,
+            price: p.price,
+            quantity: qty,
+            notes: "Agregado por el mesero",
+          };
+        });
+      if (selectedItems.length === 0) {
+        setError("Por favor selecciona al menos un producto");
+        return;
+      }
 
       // Same product still pending (not yet in preparation, no cancellations) for this
       // customer gets its quantity incremented instead of creating a duplicate line.
       const customerPendingItems = table.orders
-        .filter(o => o.status === "sent" && o.customer_name === customerName)
-        .flatMap(o => o.order_items.map(oi => ({ ...oi, orderId: o.id, orderTotal: o.total_amount })));
+        .filter((o) => o.status === "sent" && o.customer_name === customerName)
+        .flatMap((o) =>
+          o.order_items.map((oi) => ({
+            ...oi,
+            orderId: o.id,
+            orderTotal: o.total_amount,
+          })),
+        );
 
       const itemsToInsert: typeof selectedItems = [];
-      const itemsToUpdate: { id: string; orderId: string; newQuantity: number; addedAmount: number; orderTotal: number }[] = [];
+      const itemsToUpdate: {
+        id: string;
+        orderId: string;
+        newQuantity: number;
+        addedAmount: number;
+        orderTotal: number;
+      }[] = [];
 
       for (const item of selectedItems) {
         const existing = customerPendingItems.find(
-          oi => oi.product_id === item.product_id && oi.status === "ordered" && (oi.cancelled_quantity || 0) === 0
+          (oi) =>
+            oi.product_id === item.product_id &&
+            oi.status === "ordered" &&
+            (oi.cancelled_quantity || 0) === 0,
         );
         if (existing) {
           itemsToUpdate.push({
-            id: existing.id, orderId: existing.orderId, orderTotal: existing.orderTotal,
-            newQuantity: existing.quantity + item.quantity, addedAmount: item.price * item.quantity,
+            id: existing.id,
+            orderId: existing.orderId,
+            orderTotal: existing.orderTotal,
+            newQuantity: existing.quantity + item.quantity,
+            addedAmount: item.price * item.quantity,
           });
         } else {
           itemsToInsert.push(item);
@@ -126,38 +229,85 @@ export default function TableHeader({
       }
 
       for (const u of itemsToUpdate) {
-        const { error: updItemError } = await (supabase as any).from("order_items").update({ quantity: u.newQuantity }).eq("id", u.id);
+        const { error: updItemError } = await (supabase as any)
+          .from("order_items")
+          .update({ quantity: u.newQuantity })
+          .eq("id", u.id);
         if (updItemError) throw new Error(updItemError.message);
-        const { error: updOrderError } = await (supabase as any).from("orders").update({ total_amount: u.orderTotal + u.addedAmount }).eq("id", u.orderId);
+        const { error: updOrderError } = await (supabase as any)
+          .from("orders")
+          .update({ total_amount: u.orderTotal + u.addedAmount })
+          .eq("id", u.orderId);
         if (updOrderError) throw new Error(updOrderError.message);
       }
 
       if (itemsToInsert.length > 0) {
-        const orderTotal = itemsToInsert.reduce((s, i) => s + i.price * i.quantity, 0);
-        const { data: order, error: orderError } = await supabase.from("orders")
-          .insert([{ table_id: table.id, customer_name: customerName, status: "sent", total_amount: orderTotal }] as any)
-          .select().single();
-        if (orderError) throw new Error(orderError.message);
-        const { error: itemsError } = await supabase.from("order_items").insert(
-          itemsToInsert.map(i => ({ order_id: (order as any).id, product_id: i.product_id, product_name: i.product_name, price: i.price, quantity: i.quantity, notes: i.notes, status: "ordered" as const, cancelled_quantity: 0 })) as any
+        const orderTotal = itemsToInsert.reduce(
+          (s, i) => s + i.price * i.quantity,
+          0,
         );
-        if (itemsError) { await supabase.from("orders").delete().eq("id", (order as any).id); throw new Error(itemsError.message); }
+        const { data: order, error: orderError } = await supabase
+          .from("orders")
+          .insert([
+            {
+              table_id: table.id,
+              customer_name: customerName,
+              status: "sent",
+              total_amount: orderTotal,
+            },
+          ] as any)
+          .select()
+          .single();
+        if (orderError) throw new Error(orderError.message);
+        const { error: itemsError } = await supabase
+          .from("order_items")
+          .insert(
+            itemsToInsert.map((i) => ({
+              order_id: (order as any).id,
+              product_id: i.product_id,
+              product_name: i.product_name,
+              price: i.price,
+              quantity: i.quantity,
+              notes: i.notes,
+              status: "ordered" as const,
+              cancelled_quantity: 0,
+            })) as any,
+          );
+        if (itemsError) {
+          await supabase
+            .from("orders")
+            .delete()
+            .eq("id", (order as any).id);
+          throw new Error(itemsError.message);
+        }
       }
 
       setSuccessCount(selectedItems.length);
       setSelectedProducts({});
       setSelectedCustomerName("");
       if (onOrderAdded) onOrderAdded();
-      setTimeout(() => { setShowAddModal(false); setSuccessCount(null); setAddStep("products"); onAddModalChange?.(false); }, 1800);
-    } catch (e) { console.error(e); setError(`Error: ${e instanceof Error ? e.message : "Error desconocido"}`); }
-    finally { setAddingOrder(false); }
+      setTimeout(() => {
+        setShowAddModal(false);
+        setSuccessCount(null);
+        setAddStep("products");
+        onAddModalChange?.(false);
+      }, 1800);
+    } catch (e) {
+      console.error(e);
+      setError(
+        `Error: ${e instanceof Error ? e.message : "Error desconocido"}`,
+      );
+    } finally {
+      setAddingOrder(false);
+    }
   };
 
   const statusCounts = calculateItemsByStatus(table);
   const getTimeColor = () => {
     if (!occupationTime) return "var(--muted)";
     if (occupationTime.includes("h")) return "var(--red)";
-    if (occupationTime.includes("min") && parseInt(occupationTime) > 30) return "var(--amber)";
+    if (occupationTime.includes("min") && parseInt(occupationTime) > 30)
+      return "var(--amber)";
     return "var(--green)";
   };
   const payLabel = getPaymentLabel(latestBillRequest?.payment_method || null);
@@ -167,37 +317,144 @@ export default function TableHeader({
       <div>
         {/* Time bar */}
         {occupationTime && (
-          <div style={{ padding:"10px 14px",background:"var(--surface)",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-            <span style={{ fontSize:11,color:"var(--muted)",fontWeight:600 }}>Tiempo de ocupación:</span>
-            <span style={{ fontSize:12,fontWeight:700,color:getTimeColor() }}>{occupationTime}</span>
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "var(--surface)",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}
+            >
+              Tiempo de ocupación:
+            </span>
+            <span
+              style={{ fontSize: 12, fontWeight: 700, color: getTimeColor() }}
+            >
+              {occupationTime}
+            </span>
           </div>
         )}
 
         {/* Header */}
-        <div style={{ padding:"10px 14px",borderBottom:"1px solid var(--border)" }}>
+        <div
+          style={{
+            padding: "10px 14px",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
           {/* Title row */}
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:8 }}>
-            <span style={{ fontSize:16,fontWeight:800,color:isHighlighted?"var(--red)":"var(--navy)" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 8,
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                color: isHighlighted ? "var(--red)" : "var(--navy)",
+              }}
+            >
               Mesa {table.number}
             </span>
-            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
-              {(table.status==="occupied"||table.status==="reserved") && (
-                <button onClick={openAddModal} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--green)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(table.status === "occupied" || table.status === "reserved") && (
+                <button
+                  onClick={openAddModal}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "var(--green)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "white",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
                   + Agregar
                 </button>
               )}
-              {table.status==="occupied" && (
-                <button onClick={() => onCerrarMesa(table.id, table.number)} disabled={processing===`cerrar-${table.id}`} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--red)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,opacity:processing===`cerrar-${table.id}`?0.6:1 }}>
-                  {processing===`cerrar-${table.id}` ? "↻" : "Cerrar Mesa"}
+              {table.status === "occupied" && (
+                <button
+                  onClick={() => onCerrarMesa(table.id, table.number)}
+                  disabled={processing === `cerrar-${table.id}`}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "var(--red)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "white",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    opacity: processing === `cerrar-${table.id}` ? 0.6 : 1,
+                  }}
+                >
+                  {processing === `cerrar-${table.id}` ? "↻" : "Cerrar Mesa"}
                 </button>
               )}
               {showPaymentButtons && (
                 <>
-                  <button onClick={() => onPagarPorSeparado(table.id, table.number)} disabled={processing===`separate-${table.id}`} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--blue)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,opacity:processing===`separate-${table.id}`?0.6:1 }}>
-                    {processing===`separate-${table.id}` ? "↻" : "⇌ Separado"}
+                  <button
+                    onClick={() => onPagarPorSeparado(table.id, table.number)}
+                    disabled={processing === `separate-${table.id}`}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "var(--blue)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "white",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      opacity: processing === `separate-${table.id}` ? 0.6 : 1,
+                    }}
+                  >
+                    {processing === `separate-${table.id}` ? "↻" : "⇌ Separado"}
                   </button>
-                  <button onClick={() => onCobrarMesa(table.id, table.number)} disabled={processing===`cobrar-${table.id}`} style={{ padding:"6px 12px",borderRadius:8,border:"none",background:"var(--amber)",fontSize:12,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,opacity:processing===`cobrar-${table.id}`?0.6:1 }}>
-                    {processing===`cobrar-${table.id}` ? "↻" : "$ Cobrar"}
+                  <button
+                    onClick={() => onCobrarMesa(table.id, table.number)}
+                    disabled={processing === `cobrar-${table.id}`}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "var(--amber)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "white",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      opacity: processing === `cobrar-${table.id}` ? 0.6 : 1,
+                    }}
+                  >
+                    {processing === `cobrar-${table.id}` ? "↻" : "$ Cobrar"}
                   </button>
                 </>
               )}
@@ -206,115 +463,548 @@ export default function TableHeader({
 
           {/* Time + source */}
           {occupationTime && (
-            <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:8,fontSize:11 }}>
-              <span style={{ color:getTimeColor(),fontWeight:700 }}>⏱ {occupationTime}</span>
-              <span style={{ color:"var(--muted)" }}>•</span>
-              <span style={{ color:"var(--muted)" }}>
-                Desde: {table.orders.length>0 ? new Date(table.orders[0].created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) : "Sin registro"}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 8,
+                fontSize: 11,
+              }}
+            >
+              <span style={{ color: getTimeColor(), fontWeight: 700 }}>
+                ⏱ {occupationTime}
+              </span>
+              <span style={{ color: "var(--muted)" }}>•</span>
+              <span style={{ color: "var(--muted)" }}>
+                Desde:{" "}
+                {table.orders.length > 0
+                  ? new Date(table.orders[0].created_at).toLocaleTimeString(
+                      [],
+                      { hour: "2-digit", minute: "2-digit" },
+                    )
+                  : "Sin registro"}
               </span>
             </div>
           )}
 
           {/* Badges */}
-          <div style={{ display:"flex",flexWrap:"wrap",gap:5,marginBottom:6 }}>
-            <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:table.status==="occupied"?"var(--green-light)":table.status==="reserved"?"var(--amber-light)":"var(--surface)",color:table.status==="occupied"?"var(--green)":table.status==="reserved"?"var(--amber)":"var(--muted)" }}>
-              {table.status==="occupied"?"Ocupada":table.status==="reserved"?"Reservada":"Disponible"}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 5,
+              marginBottom: 6,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 5,
+                background:
+                  table.status === "occupied"
+                    ? "var(--green-light)"
+                    : table.status === "reserved"
+                      ? "var(--amber-light)"
+                      : "var(--surface)",
+                color:
+                  table.status === "occupied"
+                    ? "var(--green)"
+                    : table.status === "reserved"
+                      ? "var(--amber)"
+                      : "var(--muted)",
+              }}
+            >
+              {table.status === "occupied"
+                ? "Ocupada"
+                : table.status === "reserved"
+                  ? "Reservada"
+                  : "Disponible"}
             </span>
             {latestBillRequest && (
-              <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:payLabel.bg,color:payLabel.color }}>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 5,
+                  background: payLabel.bg,
+                  color: payLabel.color,
+                }}
+              >
                 {payLabel.text}
               </span>
             )}
-            {statusCounts.served > 0 && <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"var(--surface)",color:"var(--muted)",border:"1px solid var(--border)" }}>{statusCounts.served} servido{statusCounts.served>1?"s":""}</span>}
-            {statusCounts.ready > 0 && <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"var(--blue-light)",color:"var(--blue)" }}>{statusCounts.ready} listo{statusCounts.ready>1?"s":""}</span>}
-            {statusCounts.pending > 0 && <span style={{ fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,background:"var(--amber-light)",color:"var(--amber)" }}>{statusCounts.pending} pendiente{statusCounts.pending>1?"s":""}</span>}
+            {statusCounts.served > 0 && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 5,
+                  background: "var(--surface)",
+                  color: "var(--muted)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                {statusCounts.served} servido
+                {statusCounts.served > 1 ? "s" : ""}
+              </span>
+            )}
+            {statusCounts.ready > 0 && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 5,
+                  background: "var(--blue-light)",
+                  color: "var(--blue)",
+                }}
+              >
+                {statusCounts.ready} listo{statusCounts.ready > 1 ? "s" : ""}
+              </span>
+            )}
+            {statusCounts.pending > 0 && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 5,
+                  background: "var(--amber-light)",
+                  color: "var(--amber)",
+                }}
+              >
+                {statusCounts.pending} pendiente
+                {statusCounts.pending > 1 ? "s" : ""}
+              </span>
+            )}
           </div>
 
-          <p style={{ fontSize:11,color:"var(--muted)",margin:0 }}>{table.location} • {table.capacity} personas</p>
+          <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
+            {table.location} • {table.capacity} personas
+          </p>
         </div>
       </div>
 
       {/* Add Products Modal */}
       {showAddModal && (
-        <div onClick={() => { closeAddModal(); }} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:700,padding:16,animation:"wr-fadein 0.2s ease" }}>
-          <div onClick={e => e.stopPropagation()} style={{ background:"white",borderRadius:18,width:"min(95vw, 1200px)",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.2)",animation:"wr-scalein 0.22s ease",overflow:"hidden" }}>
+        <div
+          onClick={() => {
+            closeAddModal();
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 700,
+            padding: 16,
+            animation: "wr-fadein 0.2s ease",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "white",
+              borderRadius: 18,
+              width: "min(95vw, 1200px)",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+              animation: "wr-scalein 0.22s ease",
+              overflow: "hidden",
+            }}
+          >
             {/* Modal header */}
-            <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+            <div
+              style={{
+                padding: "18px 22px 14px",
+                borderBottom: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexShrink: 0,
+              }}
+            >
               <div>
-                <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>
-                  {addStep==="products" ? "Agregar Productos" : "Asignar Cliente"} — Mesa {table.number}
+                <p
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    color: "var(--text)",
+                    margin: 0,
+                  }}
+                >
+                  {addStep === "products"
+                    ? "Agregar Productos"
+                    : "Asignar Cliente"}{" "}
+                  — Mesa {table.number}
                 </p>
-                <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>
-                  {addStep==="products" ? "Selecciona los productos que deseas agregar a la orden" : "Indica a qué cliente de la mesa se le asignan estos productos (opcional)"}
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    margin: 0,
+                    marginTop: 2,
+                  }}
+                >
+                  {addStep === "products"
+                    ? "Selecciona los productos que deseas agregar a la orden"
+                    : "Indica a qué cliente de la mesa se le asignan estos productos"}
                 </p>
               </div>
-              <button onClick={() => { closeAddModal(); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
+              <button
+                onClick={() => {
+                  closeAddModal();
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--muted)",
+                  padding: 4,
+                  fontSize: 18,
+                }}
+              >
+                ✕
+              </button>
             </div>
 
-            {error && <div style={{ margin:"12px 22px 0",padding:"10px 14px",background:"var(--red-light)",borderRadius:10,color:"var(--red)",fontSize:13 }}>{error}</div>}
+            {error && (
+              <div
+                style={{
+                  margin: "12px 22px 0",
+                  padding: "10px 14px",
+                  background: "var(--red-light)",
+                  borderRadius: 10,
+                  color: "var(--red)",
+                  fontSize: 13,
+                }}
+              >
+                {error}
+              </div>
+            )}
 
             {/* Success state */}
             {successCount !== null && (
-              <div style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"48px 24px",animation:"wr-scalein 0.25s ease" }}>
-                <div style={{ width:64,height:64,borderRadius:20,background:"var(--green-light)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16 }}>
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "48px 24px",
+                  animation: "wr-scalein 0.25s ease",
+                }}
+              >
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 20,
+                    background: "var(--green-light)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <svg
+                    width="30"
+                    height="30"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--green)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
-                <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",marginBottom:6 }}>¡Productos agregados!</p>
-                <p style={{ fontSize:13,color:"var(--muted)",textAlign:"center" }}>
-                  {successCount} producto{successCount !== 1 ? "s" : ""} agregado{successCount !== 1 ? "s" : ""} a la Mesa {table.number}
+                <p
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    color: "var(--text)",
+                    marginBottom: 6,
+                  }}
+                >
+                  ¡Productos agregados!
+                </p>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "var(--muted)",
+                    textAlign: "center",
+                  }}
+                >
+                  {successCount} producto{successCount !== 1 ? "s" : ""}{" "}
+                  agregado{successCount !== 1 ? "s" : ""} a la Mesa{" "}
+                  {table.number}
                 </p>
               </div>
             )}
 
             {/* Product grid */}
-            {successCount === null && addStep === "products" && <div style={{ overflowY:"auto",flex:1,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
-              {productsLoading ? (
-                <div style={{ gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--muted)" }}>
-                  <div style={{ width:48,height:48,borderRadius:14,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 8px" }}>
-                    <svg style={{ animation:"wr-spin 0.9s linear infinite" }} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                    </svg>
+            {successCount === null && addStep === "products" && (
+              <div
+                style={{
+                  overflowY: "auto",
+                  flex: 1,
+                  padding: "12px 16px",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                }}
+              >
+                {productsLoading ? (
+                  <div
+                    style={{
+                      gridColumn: "1/-1",
+                      textAlign: "center",
+                      padding: 40,
+                      color: "var(--muted)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 14,
+                        background: "var(--accent)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 8px",
+                      }}
+                    >
+                      <svg
+                        style={{ animation: "wr-spin 0.9s linear infinite" }}
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M23 4v6h-6" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                      </svg>
+                    </div>
+                    <p style={{ fontSize: 14 }}>Cargando productos...</p>
                   </div>
-                  <p style={{ fontSize:14 }}>Cargando productos...</p>
-                </div>
-              ) : products.map(p => (
-                <div key={p.id} style={{ border:"1.5px solid var(--border)",borderRadius:12,padding:12,display:"flex",alignItems:"flex-start",gap:10,background:"white" }}>
-                  <div style={{ width:48,height:48,borderRadius:8,background:"var(--accent-light)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden" }}>
-                    {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:20 }}>🍽️</span>}
-                  </div>
-                  <div style={{ flex:1,minWidth:0 }}>
-                    <p style={{ fontSize:13,fontWeight:700,color:"var(--text)",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{p.name}</p>
-                    <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginTop:2,lineHeight:1.4 }}>{p.description}</p>
-                    <p style={{ fontSize:13,fontWeight:700,color:"var(--green)",margin:0,marginTop:4 }}>
-                      ${p.price.toFixed(2)} <span style={{ fontSize:10,color:"var(--muted)",fontWeight:400 }}>• {p.preparation_time} min</span>
-                    </p>
-                  </div>
-                  <div style={{ display:"flex",alignItems:"center",gap:4,flexShrink:0 }}>
-                    <button onClick={() => handleProductQtyChange(p.id, Math.max(0, (selectedProducts[p.id]||0)-1))} style={{ width:26,height:26,borderRadius:7,border:"1.5px solid var(--border)",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--muted)",fontFamily:"inherit" }}>−</button>
-                    <span style={{ width:22,textAlign:"center",fontSize:13,fontWeight:700,color:"var(--text)" }}>{selectedProducts[p.id]||0}</span>
-                    <button onClick={() => handleProductQtyChange(p.id, (selectedProducts[p.id]||0)+1)} style={{ width:26,height:26,borderRadius:7,border:"1.5px solid var(--border)",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text)",fontFamily:"inherit" }}>+</button>
-                  </div>
-                </div>
-              ))}
-            </div>}
+                ) : (
+                  products.map((p) => (
+                    <div
+                      key={p.id}
+                      style={{
+                        border: "1.5px solid var(--border)",
+                        borderRadius: 12,
+                        padding: 12,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        background: "white",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 8,
+                          background: "var(--accent-light)",
+                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 20 }}>🍽️</span>
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "var(--text)",
+                            margin: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {p.name}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "var(--muted)",
+                            margin: 0,
+                            marginTop: 2,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {p.description}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "var(--green)",
+                            margin: 0,
+                            marginTop: 4,
+                          }}
+                        >
+                          ${p.price.toFixed(2)}{" "}
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "var(--muted)",
+                              fontWeight: 400,
+                            }}
+                          >
+                            • {p.preparation_time} min
+                          </span>
+                        </p>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <button
+                          onClick={() =>
+                            handleProductQtyChange(
+                              p.id,
+                              Math.max(0, (selectedProducts[p.id] || 0) - 1),
+                            )
+                          }
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 7,
+                            border: "1.5px solid var(--border)",
+                            background: "white",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--muted)",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          −
+                        </button>
+                        <span
+                          style={{
+                            width: 22,
+                            textAlign: "center",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "var(--text)",
+                          }}
+                        >
+                          {selectedProducts[p.id] || 0}
+                        </span>
+                        <button
+                          onClick={() =>
+                            handleProductQtyChange(
+                              p.id,
+                              (selectedProducts[p.id] || 0) + 1,
+                            )
+                          }
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 7,
+                            border: "1.5px solid var(--border)",
+                            background: "white",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--text)",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
 
             {/* Customer/cliente selection */}
             {successCount === null && addStep === "customer" && (
-              <div style={{ overflowY:"auto",flex:1,padding:"16px 20px" }}>
-                <p style={{ fontSize:13,fontWeight:700,color:"var(--text)",margin:"0 0 10px" }}>Clientes activos en la mesa</p>
+              <div style={{ overflowY: "auto", flex: 1, padding: "16px 20px" }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    margin: "0 0 10px",
+                  }}
+                >
+                  Clientes:
+                </p>
                 {activeCustomerNames.length > 0 ? (
-                  <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginBottom:16 }}>
-                    {activeCustomerNames.map(name => (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {activeCustomerNames.map((name) => (
                       <button
                         key={name}
                         onClick={() => setSelectedCustomerName(name)}
                         style={{
-                          padding:"9px 16px",borderRadius:20,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,
-                          border:`1.5px solid ${selectedCustomerName===name?"var(--green)":"var(--border)"}`,
-                          background:selectedCustomerName===name?"var(--green-light)":"white",
-                          color:selectedCustomerName===name?"var(--green)":"var(--text)",
+                          padding: "9px 16px",
+                          borderRadius: 20,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          border: `1.5px solid ${selectedCustomerName === name ? "var(--green)" : "var(--border)"}`,
+                          background:
+                            selectedCustomerName === name
+                              ? "var(--green-light)"
+                              : "white",
+                          color:
+                            selectedCustomerName === name
+                              ? "var(--green)"
+                              : "var(--text)",
                         }}
                       >
                         {name}
@@ -322,36 +1012,188 @@ export default function TableHeader({
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>No hay clientes activos en esta mesa todavía.</p>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "var(--muted)",
+                      margin: "0 0 16px",
+                    }}
+                  >
+                    No hay clientes activos en esta mesa todavía.
+                  </p>
                 )}
+
+                <button
+                  onClick={() => setSelectedCustomerName(selfName)}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: 20,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    border: `1.5px dashed ${selectedCustomerName === selfName ? "var(--amber)" : "var(--border)"}`,
+                    background:
+                      selectedCustomerName === selfName
+                        ? "var(--amber-light)"
+                        : "white",
+                    color:
+                      selectedCustomerName === selfName
+                        ? "var(--amber)"
+                        : "var(--muted)",
+                  }}
+                >
+                  {selfName}
+                </button>
               </div>
             )}
 
             {/* Footer */}
             {successCount === null && addStep === "products" && (
-              <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+              <div
+                style={{
+                  padding: "14px 20px",
+                  borderTop: "1px solid var(--border)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexShrink: 0,
+                }}
+              >
                 <div>
-                  <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
-                  <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
+                  <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+                    Items:{" "}
+                    <strong style={{ color: "var(--text)" }}>
+                      {getTotalItems()}
+                    </strong>
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "var(--green)",
+                      margin: 0,
+                    }}
+                  >
+                    Total: {formatCurrency(getTotalAmount())}
+                  </p>
                 </div>
-                <div style={{ display:"flex",gap:10 }}>
-                  <button onClick={() => { closeAddModal(); }} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>Cancelar</button>
-                  <button onClick={handleContinueToCustomerStep} disabled={getTotalItems()===0} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:getTotalItems()===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6 }}>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => {
+                      closeAddModal();
+                    }}
+                    style={{
+                      padding: "11px 20px",
+                      borderRadius: 10,
+                      border: "1.5px solid var(--border)",
+                      background: "var(--surface)",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--muted)",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleContinueToCustomerStep}
+                    disabled={getTotalItems() === 0}
+                    style={{
+                      padding: "11px 20px",
+                      borderRadius: 10,
+                      border: "none",
+                      background:
+                        getTotalItems() === 0
+                          ? "var(--border)"
+                          : "var(--green)",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "white",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
                     Continuar
                   </button>
                 </div>
               </div>
             )}
             {successCount === null && addStep === "customer" && (
-              <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+              <div
+                style={{
+                  padding: "14px 20px",
+                  borderTop: "1px solid var(--border)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexShrink: 0,
+                }}
+              >
                 <div>
-                  <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
-                  <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
+                  <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+                    Items:{" "}
+                    <strong style={{ color: "var(--text)" }}>
+                      {getTotalItems()}
+                    </strong>
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "var(--green)",
+                      margin: 0,
+                    }}
+                  >
+                    Total: {formatCurrency(getTotalAmount())}
+                  </p>
                 </div>
-                <div style={{ display:"flex",gap:10 }}>
-                  <button onClick={() => setAddStep("products")} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>← Volver</button>
-                  <button onClick={handleConfirmAddOrder} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
-                    {addingOrder ? "↻ Agregando..." : `+ Agregar a Mesa ${table.number}`}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => setAddStep("products")}
+                    disabled={addingOrder}
+                    style={{
+                      padding: "11px 20px",
+                      borderRadius: 10,
+                      border: "1.5px solid var(--border)",
+                      background: "var(--surface)",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--muted)",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    ← Volver
+                  </button>
+                  <button
+                    onClick={handleConfirmAddOrder}
+                    disabled={addingOrder || !selectedCustomerName.trim()}
+                    style={{
+                      padding: "11px 20px",
+                      borderRadius: 10,
+                      border: "none",
+                      background: !selectedCustomerName.trim()
+                        ? "var(--border)"
+                        : "var(--green)",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "white",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      opacity: addingOrder ? 0.7 : 1,
+                    }}
+                  >
+                    {addingOrder
+                      ? "↻ Agregando..."
+                      : `+ Agregar a Mesa ${table.number}`}
                   </button>
                 </div>
               </div>

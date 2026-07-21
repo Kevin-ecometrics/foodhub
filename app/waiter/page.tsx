@@ -21,6 +21,7 @@ import LoadingScreen from "./components/LoadingScreen";
 
 import { tipsService } from "@/app/lib/supabase/tips";
 import { settingsService } from "@/app/lib/supabase/settings";
+import { usersService } from "@/app/lib/supabase/users";
 
 // Clave para localStorage
 const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
@@ -2104,6 +2105,7 @@ export default function WaiterDashboard() {
   >("notifications");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [waiterName, setWaiterName] = useState("Mesero");
   const [attendedNotifications, setAttendedNotifications] = useState<
     Set<string>
   >(new Set());
@@ -2167,6 +2169,13 @@ export default function WaiterDashboard() {
   const isUpdatingRef = useRef(false);
   const isLoadingRef = useRef(false);
   const modalOpenRef = useRef(false);
+
+  useEffect(() => {
+    usersService
+      .getCurrentUser()
+      .then((user) => { if (user?.name) setWaiterName(user.name); })
+      .catch((error) => console.error("Error cargando usuario actual:", error));
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -2882,6 +2891,7 @@ export default function WaiterDashboard() {
                 tablesOrder={tablesOrder}
                 onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments || showCerrarPinModal; }}
                 onMoveItem={handleMoveItemToCustomer}
+                waiterName={waiterName}
               />
             </>
           )}
