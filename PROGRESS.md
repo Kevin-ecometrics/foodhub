@@ -333,6 +333,9 @@ app/
    - [x] Cancelación con PIN (parcial o total) — usa `close_table_pin` de DB (sin hardcode)
   - [x] Ordenado por número o tiempo de ocupación
   - [x] Filtro FCFS
+  - [x] **Agregar productos a mesa en 2 pasos** (2026-07-20): selecciona productos → asigna a un cliente activo de la mesa (chip) o a "Sin cliente (General)"; ya no escribe nombres libres, solo elige entre los comensales con orden `status='sent'`
+  - [x] **Merge de cantidades** — si el mismo producto se agrega dos veces al mismo cliente mientras sigue `status='ordered'` y sin cancelaciones, incrementa la `quantity` de la línea existente en vez de crear una fila duplicada
+  - [x] **Drag & drop entre clientes** — arrastrar un `OrderItem` y soltarlo sobre la sección de otro cliente (o sobre "General") reasigna el producto vía `waiterService.moveOrderItemToCustomer`; mueve el `order_id` del item y resincroniza `total_amount` en la orden origen y destino
 - [x] PaymentCalculator — efectivo + terminal + USD (tasa configurable) + mixto + cambio automático
 - [x] **Propina en calculadora pre-llenada desde sugerencia del cliente**
 - [x] **Badge "💬 Cliente sugirió $X.XX"** cuando hay propina del customer
@@ -362,7 +365,7 @@ app/
 ### Service Layer
 - [x] `tips.ts` — insertTip, getTipsTotal, getTipsByDateRange
 - [x] `history.ts` — requestBill (con tip_amount), archival de ventas
-- [x] `waiter.ts` — freeTableAndClean, resetTable
+- [x] `waiter.ts` — freeTableAndClean, resetTable, moveOrderItemToCustomer (reasignación de producto entre clientes de una mesa)
 - [x] `notifications.ts` — creación de alertas
 - [x] Todos los servicios CRUD de entidades
 
