@@ -27,21 +27,23 @@ interface TableCardProps {
   hasNotifications?: boolean;
   isHighlighted?: boolean;
   onAddModalChange?: (isOpen: boolean) => void;
+  onMoveItem?: (itemId: string, tableId: number, targetCustomerName: string) => void;
 }
 
 export default function TableCard({
   table, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, occupationTime, hasNotifications, isHighlighted = false,
-  onAddModalChange,
+  onAddModalChange, onMoveItem,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
   const isOccupied = table.status === "occupied";
+  const generalName = `Mesero ${table.number}`;
 
   const groupOrdersByCustomer = (t: TableWithOrder): CustomerGroupSummary[] => {
     const map = new Map<string, CustomerGroupSummary>();
     t.orders.forEach(order => {
-      const name = order.customer_name || "Cliente";
+      const name = order.customer_name || generalName;
       if (!map.has(name)) map.set(name, { customerName: name, orders: [], subtotal: 0, taxAmount: 0, total: 0, itemsCount: 0 });
       const g = map.get(name)!;
       g.orders.push(order);
@@ -49,9 +51,19 @@ export default function TableCard({
       g.subtotal += sub;
       g.itemsCount += order.order_items.length;
     });
+    // Keep an always-visible general (no-client) drop zone whenever the table has
+    // other items, so waiters can drag a misassigned product into it even when
+    // it currently has none of its own.
+    if (t.status === "occupied" && t.orders.length > 0 && !map.has(generalName)) {
+      map.set(generalName, { customerName: generalName, orders: [], subtotal: 0, taxAmount: 0, total: 0, itemsCount: 0 });
+    }
     const taxRate = 0.16;
     map.forEach(g => { g.taxAmount = g.subtotal * taxRate; g.total = g.subtotal + g.taxAmount; });
-    return Array.from(map.values());
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.customerName === generalName) return 1;
+      if (b.customerName === generalName) return -1;
+      return 0;
+    });
   };
 
   const customerSummaries = groupOrdersByCustomer(table);
@@ -80,13 +92,15 @@ export default function TableCard({
           onUpdateItemStatus={onUpdateItemStatus}
           onCancelItem={onCancelItem}
           onCancelModalChange={onAddModalChange}
+          isGeneral={cs.customerName === generalName}
+          onMoveItem={onMoveItem ? (itemId) => onMoveItem(itemId, table.id, cs.customerName) : undefined}
         />
       ))}
 
       {tableTotal > 0 && (
         <TableSummary
           tableTotal={tableTotal}
-          customerCount={customerSummaries.length}
+          customerCount={customerSummaries.filter(cs => cs.customerName !== generalName || cs.itemsCount > 0).length}
           orderCount={table.orders.length}
           isHighlighted={isHighlighted}
         />

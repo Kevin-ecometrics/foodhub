@@ -23,6 +23,27 @@ import {
 import { settingsService } from "@/app/lib/supabase/settings";
 import { DEFAULT_CONFIG, CheckUiConfig } from "@/app/lib/checkUiTypes";
 
+const normalizeText = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+// Rank 0 = exact match, 1 = name starts with the query, 2 = some word inside
+// the name starts with the query, null = no match. Word-boundary matching
+// (instead of a plain substring search) keeps "té" from matching "latte" —
+// the query only ever appears mid-word there, never at the start of a word.
+const getNameMatchRank = (name: string, normalizedQuery: string): number | null => {
+  if (!normalizedQuery) return null;
+  const normalizedName = normalizeText(name);
+  if (normalizedName === normalizedQuery) return 0;
+  if (normalizedName.startsWith(normalizedQuery)) return 1;
+  if (normalizedName.split(/\s+/).some((word) => word.startsWith(normalizedQuery)))
+    return 2;
+  return null;
+};
+
 // ─── Design Tokens & Animations ─────────────────────────────────────────────
 const DESIGN_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -171,6 +192,20 @@ const IClose = () => (
   >
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+const ISearch = ({ s = 16 }: { s?: number }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <circle cx="11" cy="11" r="7" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 const ICheck = ({ s = 15 }: { s?: number }) => (
@@ -1443,6 +1478,7 @@ export default function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | number>(
     "favorites",
   );
+  const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [recentItems, setRecentItems] = useState<Product[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
@@ -1873,6 +1909,15 @@ export default function MenuPage() {
   // Product helpers
   // ─────────────────────────────────────────────────────────────────────────
   const getProductsByCategory = (catId: string | number) => {
+    if (catId === "search-name-matches") {
+      const q = normalizeText(searchQuery);
+      if (!q) return [];
+      return products
+        .map((p) => ({ p, rank: getNameMatchRank(p.name, q) }))
+        .filter((x): x is { p: Product; rank: number } => x.rank !== null)
+        .sort((a, b) => a.rank - b.rank)
+        .map((x) => x.p);
+    }
     if (catId === "favorites") return favoriteItems;
     if (catId === "repite-item") return recentItems;
     if (catId === "popular")
@@ -2394,13 +2439,38 @@ export default function MenuPage() {
     const availableCats = menuCategories.filter(
       (c) => getProductsByCategory(c.id).length > 0,
     );
+
+    const trimmedQuery = searchQuery.trim();
+    const isSearching = trimmedQuery.length > 0;
+    const normalizedQuery = normalizeText(trimmedQuery);
+    const searchNameMatches = isSearching
+      ? getProductsByCategory("search-name-matches")
+      : [];
+    const searchCategoryMatches = isSearching
+      ? availableCats.filter((c) => getNameMatchRank(c.name, normalizedQuery) !== null)
+      : [];
+    const noSearchResults =
+      isSearching &&
+      searchNameMatches.length === 0 &&
+      searchCategoryMatches.length === 0;
+
+    type RenderSection = { id: string | number; name: string };
+    const sectionsToRender: RenderSection[] = isSearching
+      ? [
+          ...(searchNameMatches.length > 0
+            ? [{ id: "search-name-matches", name: `Resultados para "${trimmedQuery}"` }]
+            : []),
+          ...searchCategoryMatches,
+        ]
+      : availableCats;
+
     return (
       <>
         {/* Cover banner */}
         {coverImageUrl && (
           <div
             ref={coverBannerRef}
-            style={{ flexShrink: 0, height: 200, overflow: "hidden" }}
+            style={{ flexShrink: 0, height: 200, overflow: "hidden", position: "relative" }}
           >
             <img
               src={coverImageUrl}
@@ -2412,6 +2482,30 @@ export default function MenuPage() {
                 display: "block",
               }}
             />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0.15) 55%, transparent 80%)",
+                pointerEvents: "none",
+              }}
+            />
+            <p
+              style={{
+                position: "absolute",
+                left: 20,
+                bottom: 14,
+                margin: 0,
+                fontSize: 20,
+                fontWeight: 800,
+                color: "white",
+                letterSpacing: "-0.3px",
+                textShadow: "0 1px 4px rgba(0,0,0,0.4)",
+              }}
+            >
+              RioChia7
+            </p>
           </div>
         )}
 
@@ -2438,10 +2532,10 @@ export default function MenuPage() {
                   letterSpacing: "-0.3px",
                 }}
               >
-                RioChia7
+                {customerName}
               </p>
               <p style={{ fontSize: 11, color: "var(--muted)" }}>
-                Mesa {tableNumber} • {customerName}
+                Mesa {tableNumber}
                 {currentOrder?.id && ` • #${currentOrder.id.slice(0, 8)}`}
               </p>
             </div>
@@ -2576,6 +2670,68 @@ export default function MenuPage() {
             </div>
           )}
 
+          {/* Search bar */}
+          <div
+            style={{
+              padding: "12px 20px",
+              background: "white",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  color: "var(--muted)",
+                  display: "flex",
+                }}
+              >
+                <ISearch />
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar en el menú…"
+                style={{
+                  width: "100%",
+                  padding: "10px 14px 10px 38px",
+                  borderRadius: 10,
+                  border: "1.5px solid var(--border)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  color: "var(--text)",
+                  background: "var(--surface)",
+                  boxSizing: "border-box",
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--muted)",
+                    display: "flex",
+                    padding: 4,
+                  }}
+                >
+                  <IClose />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Category tabs */}
           <div
             style={{
@@ -2655,7 +2811,23 @@ export default function MenuPage() {
           ref={menuScrollRef}
           style={{ flex: 1, overflowY: "auto", padding: "32px 24px" }}
         >
-          {availableCats.map((cat) => {
+          {noSearchResults && (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 20px",
+                color: "var(--muted)",
+              }}
+            >
+              <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+                Sin resultados para &quot;{trimmedQuery}&quot;
+              </p>
+              <p style={{ fontSize: 13 }}>
+                Intenta con otro nombre de producto o de categoría.
+              </p>
+            </div>
+          )}
+          {sectionsToRender.map((cat) => {
             const catProducts = getProductsByCategory(cat.id);
             if (!catProducts.length) return null;
             return (

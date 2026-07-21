@@ -324,6 +324,8 @@ app/
 - [x] Encuesta de satisfacción post-pago (1–5 estrellas + comentario → `customer_feedback`)
 - [x] Solicitud de factura por email (`/api/invoice`)
 - [x] Generación de ticket PDF
+- [x] **Banner de portada rediseñado** (2026-07-21): degradado oscuro en la parte inferior de la imagen de portada para legibilidad, nombre del restaurante ("RioChia7") superpuesto en blanco sobre la imagen; el header debajo ahora muestra el nombre del cliente donde antes iba el nombre del restaurante, con "Mesa N" y el código de orden debajo
+- [x] **Buscador en el menú** (2026-07-21): input arriba de la barra de categorías en `Menu.tsx`; busca por nombre de producto y por nombre de categoría (insensible a acentos/mayúsculas vía `normalizeText`); resultados por nombre de producto salen primero (agrupados en una sección "Resultados para..."), seguidos de las categorías completas cuyo nombre coincide; ranking por relevancia con `getNameMatchRank` (coincidencia exacta > empieza con la búsqueda > alguna palabra empieza con la búsqueda) para evitar falsos positivos por substring (ej. buscar "té" ya no muestra "Latte")
 
 ### Waiter Dashboard
 - [x] Login en `/waiter/login` por correo+contraseña o PIN de 4 dígitos (Supabase Auth), protegido por `middleware.ts`
@@ -333,6 +335,9 @@ app/
    - [x] Cancelación con PIN (parcial o total) — usa `close_table_pin` de DB (sin hardcode)
   - [x] Ordenado por número o tiempo de ocupación
   - [x] Filtro FCFS
+  - [x] **Agregar productos a mesa en 2 pasos** (2026-07-20): selecciona productos → asigna a un cliente activo de la mesa (chip) o a "Sin cliente (General)"; ya no escribe nombres libres, solo elige entre los comensales con orden `status='sent'`
+  - [x] **Merge de cantidades** — si el mismo producto se agrega dos veces al mismo cliente mientras sigue `status='ordered'` y sin cancelaciones, incrementa la `quantity` de la línea existente en vez de crear una fila duplicada
+  - [x] **Drag & drop entre clientes** — arrastrar un `OrderItem` y soltarlo sobre la sección de otro cliente (o sobre "General") reasigna el producto vía `waiterService.moveOrderItemToCustomer`; mueve el `order_id` del item y resincroniza `total_amount` en la orden origen y destino
 - [x] PaymentCalculator — efectivo + terminal + USD (tasa configurable) + mixto + cambio automático
 - [x] **Propina en calculadora pre-llenada desde sugerencia del cliente**
 - [x] **Badge "💬 Cliente sugirió $X.XX"** cuando hay propina del customer
@@ -362,7 +367,7 @@ app/
 ### Service Layer
 - [x] `tips.ts` — insertTip, getTipsTotal, getTipsByDateRange
 - [x] `history.ts` — requestBill (con tip_amount), archival de ventas
-- [x] `waiter.ts` — freeTableAndClean, resetTable
+- [x] `waiter.ts` — freeTableAndClean, resetTable, moveOrderItemToCustomer (reasignación de producto entre clientes de una mesa)
 - [x] `notifications.ts` — creación de alertas
 - [x] Todos los servicios CRUD de entidades
 

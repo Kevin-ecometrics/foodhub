@@ -2520,6 +2520,50 @@ export default function WaiterDashboard() {
     }
   };
 
+  const refreshTablesSilently = async () => {
+    try {
+      const tablesData = await waiterService.getTablesWithOrders();
+      const processedTables = tablesData.map((table) => ({
+        ...table,
+        orders: table.orders.map((order) => ({
+          ...order,
+          order_items: order.order_items.map((item) => {
+            const cancelledQty = item.cancelled_quantity || 0;
+            const finalCancelledQty =
+              item.status === "cancelled" && cancelledQty === 0
+                ? item.quantity
+                : cancelledQty;
+            return { ...item, cancelled_quantity: finalCancelledQty };
+          }),
+        })),
+      }));
+      setTables((prev) =>
+        JSON.stringify(prev) === JSON.stringify(processedTables)
+          ? prev
+          : processedTables,
+      );
+    } catch (error) {
+      console.error("Error refrescando mesas:", error);
+    }
+  };
+
+  const handleMoveItemToCustomer = async (
+    itemId: string,
+    tableId: number,
+    targetCustomerName: string,
+  ) => {
+    setProcessing(`move-${itemId}`);
+    try {
+      await waiterService.moveOrderItemToCustomer(tableId, itemId, targetCustomerName);
+      await refreshTablesSilently();
+    } catch (error: any) {
+      console.error("Error moviendo producto:", error);
+      toast(`Error al mover el producto: ${error.message}`, "error");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const calculateTableTotal = (table: TableWithOrder) => {
     return table.orders.reduce((total, order) => {
       if (order.order_items && Array.isArray(order.order_items)) {
@@ -2837,6 +2881,7 @@ export default function WaiterDashboard() {
                 notifications={notifications}
                 tablesOrder={tablesOrder}
                 onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments || showCerrarPinModal; }}
+                onMoveItem={handleMoveItemToCustomer}
               />
             </>
           )}
