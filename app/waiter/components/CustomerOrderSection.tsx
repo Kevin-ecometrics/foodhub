@@ -24,7 +24,7 @@ interface CustomerOrderSectionProps {
 
 export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem, onCancelModalChange, isGeneral = false, onMoveItem }: CustomerOrderSectionProps) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const displayName = isGeneral ? "General (sin cliente)" : customerSummary.customerName;
+  const displayName = customerSummary.customerName;
 
   const handleDragOver = (e: React.DragEvent) => {
     if (!onMoveItem) return;
@@ -80,7 +80,7 @@ export default function CustomerOrderSection({ customerSummary, processing, onUp
         )}
         {isGeneral && customerSummary.itemsCount === 0 && (
           <p style={{ fontSize:11,color:"var(--muted)",margin:0,padding:"8px 14px",fontStyle:"italic" }}>
-            Arrastra aquí un producto para quitarle el cliente asignado
+            Arrastra aquí un producto para asignárselo al mesero
           </p>
         )}
       </div>
