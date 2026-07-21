@@ -23,6 +23,8 @@ interface CustomerOrderSectionProps {
   orderSteps?: string | null;
 }
 
+const COURSE_LABELS: Record<number, string> = { 1: "Primer tiempo", 2: "Segundo tiempo", 3: "Tercer tiempo" };
+
 export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem, onCancelModalChange, isGeneral = false, onMoveItem, orderSteps }: CustomerOrderSectionProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const displayName = customerSummary.customerName;
@@ -64,22 +66,36 @@ export default function CustomerOrderSection({ customerSummary, processing, onUp
         </div>
       </div>
 
-      {/* Order items */}
+      {/* Order items grouped by course */}
       <div>
-        {customerSummary.orders.flatMap(order =>
-          order.order_items.map((item: OrderItemType) => (
-            <OrderItem
-              key={item.id}
-              item={item}
-              processing={processing}
-              onUpdateStatus={onUpdateItemStatus}
-              onCancelItem={onCancelItem}
-              onCancelModalChange={onCancelModalChange}
-              draggable={!!onMoveItem}
-              orderSteps={orderSteps}
-            />
-          ))
-        )}
+        {(() => {
+          const allItems: OrderItemType[] = customerSummary.orders.flatMap(order =>
+            order.order_items
+          );
+          const grouped: { [c: number]: OrderItemType[] } = {};
+          allItems.forEach(item => {
+            const c = item.course || 1;
+            if (!grouped[c]) grouped[c] = [];
+            grouped[c].push(item);
+          });
+          return Object.keys(grouped).map(Number).sort().flatMap(course => [
+            <div key={`hdr-${course}`} style={{ padding:"4px 14px 3px",background:"oklch(94% 0.06 260)",borderBottom:"1px solid var(--border)",fontSize:9,fontWeight:700,color:"oklch(40% 0.1 260)",textTransform:"uppercase",letterSpacing:"0.4px" }}>
+              ⏱ {COURSE_LABELS[course]} ({grouped[course].length})
+            </div>,
+            ...grouped[course].map(item => (
+              <OrderItem
+                key={item.id}
+                item={item}
+                processing={processing}
+                onUpdateStatus={onUpdateItemStatus}
+                onCancelItem={onCancelItem}
+                onCancelModalChange={onCancelModalChange}
+                draggable={!!onMoveItem}
+                orderSteps={orderSteps}
+              />
+            )),
+          ]);
+        })()}
         {isGeneral && customerSummary.itemsCount === 0 && (
           <p style={{ fontSize:11,color:"var(--muted)",margin:0,padding:"8px 14px",fontStyle:"italic" }}>
             Arrastra aquí un producto para asignárselo al mesero

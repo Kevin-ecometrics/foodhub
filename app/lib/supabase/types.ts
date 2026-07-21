@@ -172,6 +172,7 @@ export interface Database {
           notes: string | null
           status: OrderItemStatus
           cancelled_quantity: number
+          course: number
           created_at: string
           updated_at: string
         }
@@ -185,6 +186,7 @@ export interface Database {
           notes?: string | null
           status?: OrderItemStatus
           cancelled_quantity?: number
+          course?: number
           created_at?: string
           updated_at?: string
         }
@@ -198,6 +200,7 @@ export interface Database {
           notes?: string | null
           status?: OrderItemStatus
           cancelled_quantity?: number
+          course?: number
           created_at?: string
           updated_at?: string
         }

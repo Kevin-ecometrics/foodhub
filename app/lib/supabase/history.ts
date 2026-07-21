@@ -23,6 +23,7 @@ export interface OrderItemWithProduct {
   quantity: number
   notes: string | null
   status: OrderItemStatus
+  course: number
   created_at: string
   updated_at: string
   products?: {

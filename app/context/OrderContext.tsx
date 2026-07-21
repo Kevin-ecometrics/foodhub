@@ -35,13 +35,15 @@ interface OrderContextType {
     product: Product,
     quantity?: number,
     notes?: string,
-    customPrice?: number
+    customPrice?: number,
+    course?: number
   ) => Promise<void>;
   updateCartItem: (
     itemId: string,
     quantity: number,
     notes?: string,
-    customPrice?: number
+    customPrice?: number,
+    course?: number
   ) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => void;
@@ -405,7 +407,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     product: Product,
     quantity: number = 1,
     notes?: string,
-    customPrice?: number
+    customPrice?: number,
+    course?: number
   ) => {
     if (!currentOrder) throw new Error("No active order");
 
@@ -416,7 +419,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         product,
         quantity,
         notes,
-        price
+        price,
+        course
       );
 
       setOrderItems((prev) => [...prev, newItem]);
@@ -439,7 +443,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     itemId: string,
     quantity: number,
     notes?: string,
-    customPrice?: number
+    customPrice?: number,
+    course?: number
   ) => {
     if (quantity < 1) {
       await removeFromCart(itemId);
@@ -451,7 +456,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         itemId,
         quantity,
         notes,
-        customPrice
+        customPrice,
+        course
       );
 
       // Actualizar estado local
@@ -462,7 +468,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
                 ...item,
                 quantity,
                 price: customPrice !== undefined ? customPrice : item.price,
-                notes: notes !== undefined ? notes : item.notes, // Mantener notas existentes si no se proporcionan nuevas
+                notes: notes !== undefined ? notes : item.notes,
+                course: course !== undefined ? course : item.course,
               }
             : item
         )

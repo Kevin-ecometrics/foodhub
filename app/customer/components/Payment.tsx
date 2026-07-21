@@ -911,7 +911,31 @@ export default function PaymentPage() {
                             ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
                           }}>Orden #{order.id.slice(-8)}</p>
                         )}
-                        {order.order_items.map(item => renderOrderItem(item, checkUiMode))}
+                        {(() => {
+                          const courseGrouped: { [c: number]: typeof order.order_items } = {};
+                          order.order_items.forEach(item => {
+                            const c = (item as any).course || 1;
+                            if (!courseGrouped[c]) courseGrouped[c] = [];
+                            courseGrouped[c].push(item);
+                          });
+                          const sortedCourses = Object.keys(courseGrouped).map(Number).sort();
+                          return sortedCourses.flatMap(course => {
+                            const label = course === 1 ? "Primer tiempo" : course === 2 ? "Segundo tiempo" : "Tercer tiempo";
+                            return [
+                              <div key={`course-${order.id}-${course}`} style={{
+                                padding: modeConfig.container.spacing === "compact" ? "4px 16px 2px" : "6px 24px 3px",
+                                background: "var(--surface)",
+                                fontSize: modeConfig.container.spacing === "compact" ? 9 : 11,
+                                fontWeight: 700,
+                                color: "var(--navy)",
+                                borderBottom: "1px solid var(--border)",
+                                textTransform: "uppercase" as const,
+                                letterSpacing: "0.5px",
+                              }}>⏱ {label}</div>,
+                              ...courseGrouped[course].map(item => renderOrderItem(item, checkUiMode)),
+                            ];
+                          });
+                        })()}
                         {oi < cs.orders.length - 1 && <div style={ticketStyles.sectionDivider as React.CSSProperties} />}
                       </div>
                     ))}

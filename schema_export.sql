@@ -81,7 +81,8 @@ create table if not exists public.order_items (
   status character varying default 'ordered'::character varying,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
-  cancelled_quantity integer default 0
+  cancelled_quantity integer default 0,
+  course smallint not null default 1 check (course >= 1 and course <= 3)
 );
 
 -- waiter_notifications
@@ -364,6 +365,11 @@ update public.products set meal_type = 'both' where category in ('Combos', 'Drin
 alter table public.app_settings alter column value type text using value::text;
 alter table public.app_settings alter column value set not null;
 alter table public.app_settings alter column value set default 'false'::text;
+
+-- 2026-07-21: add_course_to_order_items
+-- Agrega columna course a order_items para tiempos de comida (1=Primer, 2=Segundo, 3=Tercer)
+alter table public.order_items add column if not exists course smallint not null default 1
+  check (course >= 1 and course <= 3);
 
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales

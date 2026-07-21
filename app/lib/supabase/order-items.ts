@@ -18,6 +18,7 @@ export interface OrderItem {
   notes: string | null
   status: OrderItemStatus
   cancelled_quantity: number
+  course: number
   created_at: string
   updated_at?: string
 }
@@ -28,7 +29,8 @@ export const orderItemsService = {
     product: ProductRef,
     quantity: number = 1,
     notes?: string,
-    customPrice?: number
+    customPrice?: number,
+    course?: number
   ): Promise<OrderItem> {
     const price = customPrice !== undefined ? customPrice : product.price
     const { data, error } = await (supabase as any)
@@ -41,6 +43,7 @@ export const orderItemsService = {
         quantity,
         notes: notes || null,
         status: 'ordered',
+        course: course ?? 1,
       })
       .select()
       .single() as { data: OrderItem | null; error: Error | null }
@@ -60,7 +63,7 @@ export const orderItemsService = {
     return (data as OrderItem[]) || []
   },
 
-  async updateItemQuantity(itemId: string, quantity: number, notes?: string, customPrice?: number): Promise<OrderItem> {
+  async updateItemQuantity(itemId: string, quantity: number, notes?: string, customPrice?: number, course?: number): Promise<OrderItem> {
     const updateData: Record<string, unknown> = {
       quantity,
       updated_at: new Date().toISOString(),
@@ -72,6 +75,10 @@ export const orderItemsService = {
 
     if (customPrice !== undefined) {
       updateData.price = customPrice
+    }
+
+    if (course !== undefined) {
+      updateData.course = course
     }
 
     const { data, error } = await (supabase as any)

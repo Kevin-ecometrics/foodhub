@@ -33,6 +33,7 @@ interface OrderItemRow {
   price: number
   notes: string | null
   cancelled_quantity: number
+  course: number
   created_at: string
 }
 
@@ -119,7 +120,7 @@ export const waiterService = {
         *,
         orders (
           id, total_amount, customer_name, created_at, status,
-          order_items ( id, order_id, product_id, product_name, quantity, status, price, notes, cancelled_quantity, created_at )
+          order_items ( id, order_id, product_id, product_name, quantity, status, price, notes, cancelled_quantity, course, created_at )
         )
       `)
       .order('number')
@@ -152,6 +153,7 @@ export const waiterService = {
             price: it.price,
             notes: it.notes ?? null,
             cancelled_quantity: it.cancelled_quantity || 0,
+            course: it.course,
             created_at: it.created_at,
           })),
         })),

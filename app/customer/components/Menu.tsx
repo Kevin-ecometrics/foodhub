@@ -620,6 +620,58 @@ const CuentaModal = ({
 );
 
 // ─── Cart Drawer ─────────────────────────────────────────────────────────────
+const COURSE_LABELS: Record<number, string> = { 1: "Primer tiempo", 2: "Segundo tiempo", 3: "Tercer tiempo" };
+
+function renderGroupedCartItems(
+  items: OrderItem[],
+  onQty: (id: string, qty: number) => void,
+  onRemove: (id: string) => void,
+  onCourseChange?: (id: string, course: number) => void,
+): React.ReactNode[] {
+  const grouped: { [course: number]: OrderItem[] } = {};
+  items.forEach(item => { const c = item.course || 1; if (!grouped[c]) grouped[c] = []; grouped[c].push(item); });
+  const sortedCourses = Object.keys(grouped).map(Number).sort();
+  const elements: React.ReactNode[] = [];
+  sortedCourses.forEach(course => {
+    elements.push(
+      <div key={'h-' + course} style={{ padding:"6px 20px 4px",background:"var(--navy-light)",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:8 }}>
+        <span style={{ fontSize:11,fontWeight:700,color:"var(--navy)" }}>{COURSE_LABELS[course] || 'Tiempo ' + course}</span>
+        <span style={{ fontSize:10,color:"var(--muted)" }}>({grouped[course].length} item{grouped[course].length > 1 ? 's' : ''})</span>
+      </div>
+    );
+    grouped[course].forEach(item => {
+      elements.push(
+        <div key={item.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--border)" }}>
+          <div style={{ width:40,height:40,borderRadius:8,background:"var(--accent-light)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",fontSize:10,fontWeight:700 }}>
+            {item.product_name?.slice(0, 2).toUpperCase()}
+          </div>
+          <div style={{ flex:1,minWidth:0 }}>
+            <p style={{ fontSize:13,fontWeight:600,color:"var(--text)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{item.product_name}</p>
+            <p style={{ fontSize:12,color:"var(--accent)",fontWeight:700 }}>${item.price.toFixed(2)}</p>
+            {item.notes && <p style={{ fontSize:11,color:"var(--muted)",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{item.notes}</p>}
+            {onCourseChange && (
+              <div style={{ display:"flex",gap:2,marginTop:4 }}>
+                {[1,2,3].map(c => (
+                  <button key={c} onClick={(e) => { e.stopPropagation(); onCourseChange(item.id, c); }}
+                    style={{ width:22,height:20,borderRadius:4,border:"none",background:(item.course||1)===c?"var(--navy)":"var(--surface)",color:(item.course||1)===c?"white":"var(--muted)",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:0,lineHeight:"20px" }}
+                  >{["1er","2do","3er"][c-1]}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ display:"flex",alignItems:"center",gap:4 }}>
+            <button onClick={() => onQty(item.id, item.quantity - 1)} style={{ width:26,height:26,borderRadius:6,border:"1.5px solid var(--border)",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}><IMinus /></button>
+            <span style={{ width:22,textAlign:"center",fontSize:13,fontWeight:700 }}>{item.quantity}</span>
+            <button onClick={() => onQty(item.id, item.quantity + 1)} style={{ width:26,height:26,borderRadius:6,border:"1.5px solid var(--border)",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}><IPlus /></button>
+            <button onClick={() => onRemove(item.id)} style={{ width:26,height:26,borderRadius:6,border:"1.5px solid oklch(90% 0.06 20)",background:"oklch(98% 0.03 20)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--red)",marginLeft:2 }}><ITrash /></button>
+          </div>
+        </div>
+      );
+    });
+  });
+  return elements;
+}
+
 const CartDrawer = ({
   items,
   customerName,
@@ -630,6 +682,7 @@ const CartDrawer = ({
   onSend,
   sending,
   estimatedTime,
+  onCourseChange,
 }: {
   items: OrderItem[];
   customerName: string;
@@ -640,8 +693,12 @@ const CartDrawer = ({
   onSend: () => void;
   sending: boolean;
   estimatedTime: number;
+  onCourseChange?: (id: string, course: number) => void;
 }) => {
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  const groupedItems = renderGroupedCartItems(items, onQty, onRemove, onCourseChange);
+
   return (
     <div
       className="anim-fadein"
@@ -714,137 +771,7 @@ const CartDrawer = ({
                 Tu carrito está vacío
               </p>
             </div>
-          ) : (
-            items.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 20px",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 8,
-                    background: "var(--accent-light)",
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--accent)",
-                    fontSize: 10,
-                    fontWeight: 700,
-                  }}
-                >
-                  {item.product_name?.slice(0, 2).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "var(--text)",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {item.product_name}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "var(--accent)",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ${item.price.toFixed(2)}
-                  </p>
-                  {item.notes && (
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "var(--muted)",
-                        marginTop: 2,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {item.notes}
-                    </p>
-                  )}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <button
-                    onClick={() => onQty(item.id, item.quantity - 1)}
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 6,
-                      border: "1.5px solid var(--border)",
-                      background: "white",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <IMinus />
-                  </button>
-                  <span
-                    style={{
-                      width: 22,
-                      textAlign: "center",
-                      fontSize: 13,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => onQty(item.id, item.quantity + 1)}
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 6,
-                      border: "1.5px solid var(--border)",
-                      background: "white",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <IPlus />
-                  </button>
-                  <button
-                    onClick={() => onRemove(item.id)}
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 6,
-                      border: "1.5px solid oklch(90% 0.06 20)",
-                      background: "oklch(98% 0.03 20)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "var(--red)",
-                      marginLeft: 2,
-                    }}
-                  >
-                    <ITrash />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
+          ) : groupedItems}
         </div>
 
         {items.length > 0 && (
@@ -955,6 +882,12 @@ const CartDrawer = ({
 };
 
 // ─── Product Modal (new design, preserves all extras/notes logic) ─────────────
+const COURSE_OPTIONS = [
+  { value: 1, label: "Primer tiempo", short: "1er" },
+  { value: 2, label: "Segundo tiempo", short: "2do" },
+  { value: 3, label: "Tercer tiempo", short: "3er" },
+];
+
 const ProductModal = ({
   product,
   onClose,
@@ -964,7 +897,7 @@ const ProductModal = ({
 }: {
   product: Product;
   onClose: () => void;
-  onAdd: (notes: string, qty: number, extras: { [k: string]: boolean }) => void;
+  onAdd: (notes: string, qty: number, extras: { [k: string]: boolean }, course: number) => void;
   adding: boolean;
   notesEnabled: boolean;
 }) => {
@@ -973,6 +906,7 @@ const ProductModal = ({
   const [selectedExtras, setSelectedExtras] = useState<{
     [k: string]: boolean;
   }>({});
+  const [course, setCourse] = useState(1);
 
   const extrasTotal = Object.entries(selectedExtras)
     .filter(([, v]) => v)
@@ -1240,6 +1174,44 @@ const ProductModal = ({
               </div>
             )}
 
+          {/* Course selector */}
+          <div
+            style={{
+              padding: "16px 24px",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <span
+              style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 10 }}
+            >
+              ¿En qué tiempo servirlo?
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              {COURSE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setCourse(opt.value)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 8px",
+                    borderRadius: 10,
+                    border: `2px solid ${course === opt.value ? "var(--accent)" : "var(--border)"}`,
+                    background: course === opt.value ? "var(--accent-light)" : "var(--surface)",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: course === opt.value ? 700 : 500,
+                    color: course === opt.value ? "var(--accent)" : "var(--muted)",
+                    fontFamily: "inherit",
+                    textAlign: "center",
+                    transition: "all 0.12s",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Quantity + Notes */}
           <div
             style={{
@@ -1398,7 +1370,7 @@ const ProductModal = ({
                 Cancelar
               </button>
               <button
-                onClick={() => onAdd(notes, qty, selectedExtras)}
+                onClick={() => onAdd(notes, qty, selectedExtras, course)}
                 disabled={adding}
                 style={{
                   flex: 2,
@@ -2006,6 +1978,7 @@ export default function MenuPage() {
     noteText: string,
     qty: number,
     extras: { [k: string]: boolean },
+    course: number = 1,
   ) => {
     if (!selectedProduct) return;
     setAddingProduct(selectedProduct.id);
@@ -2038,17 +2011,18 @@ export default function MenuPage() {
           i.price === totalPrice,
       );
       if (existing) {
-        await updateCartItem(existing.id, existing.quantity + qty);
+        await updateCartItem(existing.id, existing.quantity + qty, undefined, undefined, course);
       } else if (editingItem) {
         await updateCartItem(
           editingItem.id,
           editingItem.quantity,
           finalNotes,
           totalPrice,
+          course,
         );
       } else {
         for (let i = 0; i < qty; i++)
-          await addToCart(selectedProduct, 1, finalNotes, totalPrice);
+          await addToCart(selectedProduct, 1, finalNotes, totalPrice, course);
       }
       setShowNotesModal(false);
       resetExtras();
@@ -3532,78 +3506,80 @@ export default function MenuPage() {
                       </span>
                     </div>
                     <div style={{ background: "white" }}>
-                      {group.orders.map((order, oi) => (
-                        <div key={oi}>
-                          <p
-                            style={{
-                              fontSize: 10,
-                              color: "var(--muted)",
-                              padding: "6px 16px 2px",
-                              margin: 0,
-                            }}
-                          >
-                            {new Date(order.created_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                          {order.order_items.map(
-                            (item: OrderItemWithProduct, ii: number) => {
-                              const cancelled = item.cancelled_quantity || 0;
-                              const active = item.quantity - cancelled;
-                              const isFullCancelled = active === 0 && cancelled > 0;
-                              return (
-                                <div
-                                  key={ii}
-                                  style={{
-                                    padding: "7px 16px",
-                                    borderBottom: "1px solid var(--border)",
-                                    background: isFullCancelled ? "oklch(98% 0.03 20)" : "white",
-                                  }}
-                                >
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                                      <span
-                                        style={{
-                                          fontSize: 13,
-                                          fontWeight: 600,
-                                          color: isFullCancelled ? "var(--red)" : "var(--text)",
-                                          textDecoration: isFullCancelled ? "line-through" : "none",
-                                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                                        }}
-                                      >
-                                        {item.product_name}
-                                      </span>
-                                      {!isFullCancelled && item.status !== "cancelled" && parseOrderSteps(orderSteps)[item.status] && (
-                                        <span style={{ background: parseOrderSteps(orderSteps)[item.status].bg, color: parseOrderSteps(orderSteps)[item.status].color, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
-                                          {parseOrderSteps(orderSteps)[item.status].icon} {parseOrderSteps(orderSteps)[item.status].shortLabel}
-                                        </span>
-                                      )}
-                                      {isFullCancelled && (
-                                        <span style={{ background: "var(--red-light)", color: "var(--red)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
-                                          Cancelado
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: isFullCancelled ? "var(--muted)" : "var(--text)", flexShrink: 0, marginLeft: 8 }}>
-                                      {active > 0
-                                        ? `${active} × $${item.price.toFixed(2)}`
-                                        : `$${(item.price * item.quantity).toFixed(2)}`}
+                      {(() => {
+                        const allItems = group.orders.flatMap(order =>
+                          order.order_items.map((item: OrderItemWithProduct) => ({ item, time: order.created_at }))
+                        );
+                        const courseGrouped: Record<number, { item: OrderItemWithProduct; time: string }[]> = {};
+                        allItems.forEach(entry => {
+                          const c = entry.item.course || 1;
+                          if (!courseGrouped[c]) courseGrouped[c] = [];
+                          courseGrouped[c].push(entry);
+                        });
+                        return Object.keys(courseGrouped).map(Number).sort().flatMap(course => [
+                          <div key={`ch-${course}`} style={{ padding:"4px 16px 3px",background:"var(--navy-light)",borderBottom:"1px solid var(--border)",fontSize:9,fontWeight:700,color:"var(--navy)",textTransform:"uppercase",letterSpacing:"0.4px" }}>⏱ {COURSE_LABELS[course]} ({courseGrouped[course].length})</div>,
+                          ...courseGrouped[course].map((entry, ii) => {
+                            const item = entry.item;
+                            const cancelled = item.cancelled_quantity || 0;
+                            const active = item.quantity - cancelled;
+                            const isFullCancelled = active === 0 && cancelled > 0;
+                            return (
+                              <div
+                                key={`ci-${course}-${ii}`}
+                                style={{
+                                  padding: "7px 16px",
+                                  borderBottom: "1px solid var(--border)",
+                                  background: isFullCancelled ? "oklch(98% 0.03 20)" : "white",
+                                }}
+                              >
+                                <p style={{ fontSize: 9, color: "var(--muted)", margin: "0 0 2px" }}>
+                                  {new Date(entry.time).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                                    <span
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: isFullCancelled ? "var(--red)" : "var(--text)",
+                                        textDecoration: isFullCancelled ? "line-through" : "none",
+                                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                      }}
+                                    >
+                                      {item.product_name}
                                     </span>
+                                    {!isFullCancelled && item.status !== "cancelled" && parseOrderSteps(orderSteps)[item.status] && (
+                                      <span style={{ background: parseOrderSteps(orderSteps)[item.status].bg, color: parseOrderSteps(orderSteps)[item.status].color, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                        {parseOrderSteps(orderSteps)[item.status].icon} {parseOrderSteps(orderSteps)[item.status].shortLabel}
+                                      </span>
+                                    )}
+                                    {isFullCancelled && (
+                                      <span style={{ background: "var(--red-light)", color: "var(--red)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                        Cancelado
+                                      </span>
+                                    )}
                                   </div>
-                                  {cancelled > 0 && !isFullCancelled && (
-                                    <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, marginTop: 2 }}>
-                                      ({cancelled} cancelado{cancelled > 1 ? "s" : ""})
-                                    </p>
-                                  )}
-                                  {item.notes && (
-                                    <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, marginTop: 2 }}>
-                                      📝 {item.notes}
-                                    </p>
-                                  )}
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: isFullCancelled ? "var(--muted)" : "var(--text)", flexShrink: 0, marginLeft: 8 }}>
+                                    {active > 0
+                                      ? `${active} × $${item.price.toFixed(2)}`
+                                      : `$${(item.price * item.quantity).toFixed(2)}`}
+                                  </span>
                                 </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      ))}
+                                {cancelled > 0 && !isFullCancelled && (
+                                  <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, marginTop: 2 }}>
+                                    ({cancelled} cancelado{cancelled > 1 ? "s" : ""})
+                                  </p>
+                                )}
+                                {item.notes && (
+                                  <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, marginTop: 2 }}>
+                                    📝 {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }),
+                        ]);
+                      })()}
                     </div>
                       </div>
                   </div>
@@ -3660,141 +3636,142 @@ export default function MenuPage() {
                       </div>
                     </div>
                     <div style={{ background: "white" }}>
-                      {group.orders.map((order, oi) => (
-                        <div key={oi}>
-                          <p
-                            style={{
-                              fontSize: 11,
-                              color: "var(--muted)",
-                              padding: "10px 18px 6px",
-                              borderBottom: "1px solid var(--border)",
-                            }}
-                          >
-                            {new Date(order.created_at).toLocaleString("es-MX")}
-                          </p>
-                          {order.order_items.map(
-                            (item: OrderItemWithProduct, ii: number) => {
-                              const cancelled = item.cancelled_quantity || 0;
-                              const active = item.quantity - cancelled;
-                              const isFullCancelled =
-                                active === 0 && cancelled > 0;
-                              return (
+                      {(() => {
+                        const allItems = group.orders.flatMap(order =>
+                          order.order_items.map((item: OrderItemWithProduct) => ({ item, time: order.created_at }))
+                        );
+                        const courseGrouped: Record<number, { item: OrderItemWithProduct; time: string }[]> = {};
+                        allItems.forEach(entry => {
+                          const c = entry.item.course || 1;
+                          if (!courseGrouped[c]) courseGrouped[c] = [];
+                          courseGrouped[c].push(entry);
+                        });
+                        return Object.keys(courseGrouped).map(Number).sort().flatMap(course => [
+                          <div key={`ch-${course}`} style={{ padding:"5px 18px 4px",background:"var(--navy-light)",borderBottom:"1px solid var(--border)",fontSize:10,fontWeight:700,color:"var(--navy)",textTransform:"uppercase",letterSpacing:"0.5px" }}>⏱ {COURSE_LABELS[course]} ({courseGrouped[course].length})</div>,
+                          ...courseGrouped[course].map((entry, ii) => {
+                            const item = entry.item;
+                            const cancelled = item.cancelled_quantity || 0;
+                            const active = item.quantity - cancelled;
+                            const isFullCancelled = active === 0 && cancelled > 0;
+                            return (
+                              <div
+                                key={`ci-${course}-${ii}`}
+                                style={{
+                                  padding: "12px 18px",
+                                  borderBottom: "1px solid var(--border)",
+                                  background: isFullCancelled
+                                    ? "oklch(98% 0.03 20)"
+                                    : "white",
+                                }}
+                              >
+                                <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 4px" }}>
+                                  {new Date(entry.time).toLocaleString("es-MX")}
+                                </p>
                                 <div
-                                  key={ii}
                                   style={{
-                                    padding: "12px 18px",
-                                    borderBottom: "1px solid var(--border)",
-                                    background: isFullCancelled
-                                      ? "oklch(98% 0.03 20)"
-                                      : "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginBottom: 4,
                                   }}
                                 >
                                   <div
                                     style={{
                                       display: "flex",
                                       alignItems: "center",
-                                      justifyContent: "space-between",
-                                      marginBottom: 4,
+                                      gap: 8,
                                     }}
                                   >
-                                    <div
+                                    <span
                                       style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 8,
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: isFullCancelled
+                                          ? "var(--red)"
+                                          : "var(--text)",
+                                        textDecoration: isFullCancelled
+                                          ? "line-through"
+                                          : "none",
                                       }}
                                     >
-                                      <span
-                                        style={{
-                                          fontSize: 14,
-                                          fontWeight: 600,
-                                          color: isFullCancelled
-                                            ? "var(--red)"
-                                            : "var(--text)",
-                                          textDecoration: isFullCancelled
-                                            ? "line-through"
-                                            : "none",
-                                        }}
-                                      >
-                                        {item.product_name}
-                                      </span>
-                                      {!isFullCancelled &&
-                                        item.status !== "cancelled" &&
-                                        parseOrderSteps(orderSteps)[item.status] && (
-                                          <span
-                                            style={{
-                                              background: parseOrderSteps(orderSteps)[item.status].bg,
-                                              color: parseOrderSteps(orderSteps)[item.status].color,
-                                              fontSize: 10,
-                                              fontWeight: 700,
-                                              padding: "2px 7px",
-                                              borderRadius: 6,
-                                            }}
-                                          >
-                                            {parseOrderSteps(orderSteps)[item.status].icon} {parseOrderSteps(orderSteps)[item.status].label}
-                                          </span>
-                                        )}
-                                      {isFullCancelled && (
+                                      {item.product_name}
+                                    </span>
+                                    {!isFullCancelled &&
+                                      item.status !== "cancelled" &&
+                                      parseOrderSteps(orderSteps)[item.status] && (
                                         <span
                                           style={{
-                                            background: "var(--red-light)",
-                                            color: "var(--red)",
+                                            background: parseOrderSteps(orderSteps)[item.status].bg,
+                                            color: parseOrderSteps(orderSteps)[item.status].color,
                                             fontSize: 10,
                                             fontWeight: 700,
                                             padding: "2px 7px",
                                             borderRadius: 6,
                                           }}
                                         >
-                                          Cancelado
+                                          {parseOrderSteps(orderSteps)[item.status].icon} {parseOrderSteps(orderSteps)[item.status].label}
                                         </span>
                                       )}
-                                    </div>
-                                    <span
-                                      style={{
-                                        fontSize: 14,
-                                        fontWeight: 700,
-                                        color: isFullCancelled
-                                          ? "var(--muted)"
-                                          : "var(--text)",
-                                      }}
-                                    >
-                                      $
-                                      {(
-                                        item.price *
-                                        (isFullCancelled ? 0 : active)
-                                      ).toFixed(2)}
-                                    </span>
+                                    {isFullCancelled && (
+                                      <span
+                                        style={{
+                                          background: "var(--red-light)",
+                                          color: "var(--red)",
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                          padding: "2px 7px",
+                                          borderRadius: 6,
+                                        }}
+                                      >
+                                        Cancelado
+                                      </span>
+                                    )}
                                   </div>
-                                  <p
+                                  <span
                                     style={{
-                                      fontSize: 12,
-                                      color: "var(--muted)",
+                                      fontSize: 14,
+                                      fontWeight: 700,
+                                      color: isFullCancelled
+                                        ? "var(--muted)"
+                                        : "var(--text)",
                                     }}
                                   >
-                                    Cantidad:{" "}
-                                    {isFullCancelled ? item.quantity : active}
-                                    {cancelled > 0 &&
-                                      !isFullCancelled &&
-                                      ` (${cancelled} cancelado${cancelled > 1 ? "s" : ""})`}{" "}
-                                    • ${item.price.toFixed(2)} c/u
-                                  </p>
-                                  {item.notes && (
-                                    <p
-                                      style={{
-                                        fontSize: 11,
-                                        color: "var(--muted)",
-                                        marginTop: 4,
-                                      }}
-                                    >
-                                      📝 {item.notes}
-                                    </p>
-                                  )}
+                                    $
+                                    {(
+                                      item.price *
+                                      (isFullCancelled ? 0 : active)
+                                    ).toFixed(2)}
+                                  </span>
                                 </div>
-                              );
-                            },
-                          )}
-                      </div>
-                      ))}
+                                <p
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--muted)",
+                                  }}
+                                >
+                                  Cantidad:{" "}
+                                  {isFullCancelled ? item.quantity : active}
+                                  {cancelled > 0 &&
+                                    !isFullCancelled &&
+                                    ` (${cancelled} cancelado${cancelled > 1 ? "s" : ""})`}{" "}
+                                  • ${item.price.toFixed(2)} c/u
+                                </p>
+                                {item.notes && (
+                                  <p
+                                    style={{
+                                      fontSize: 11,
+                                      color: "var(--muted)",
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    📝 {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }),
+                        ]);
+                      })()}
                     </div>
                   </div>
                 ))
@@ -4196,6 +4173,7 @@ export default function MenuPage() {
           onSend={handleSendOrder}
           sending={sendingOrder}
           estimatedTime={getEstimatedTime()}
+          onCourseChange={(id, course) => updateCartItem(id, orderItems.find(i => i.id === id)?.quantity || 1, undefined, undefined, course)}
         />
       )}
 

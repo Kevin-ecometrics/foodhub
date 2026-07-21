@@ -84,6 +84,11 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
               <span style={{ fontSize:13,fontWeight:600,color:isCancelled?"var(--red)":"var(--text)",textDecoration:isCancelled?"line-through":"none" }}>
                 {item.product_name}
               </span>
+              {!isCancelled && (
+                <span style={{ background:"oklch(55% 0.14 260)",color:"white",fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:4,flexShrink:0 }}>
+                  {["T1","T2","T3"][(item.course||1)-1]}
+                </span>
+              )}
               {isCancelled && (
                 <span style={{ background:"var(--red-light)",color:"var(--red)",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:6 }}>Cancelado</span>
               )}

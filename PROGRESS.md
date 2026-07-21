@@ -503,6 +503,45 @@ app/
 
 ---
 
+## Courses (Tiempos de Comida) — 2026-07-21
+
+### SQL
+- `alter table public.order_items add column course smallint not null default 1 check (course >= 1 and course <= 3)`
+
+### UI Mejoras
+| Cambio | Archivo(s) | Detalle |
+|--------|-----------|---------|
+| Selector de course en modal del producto | `Menu.tsx` (ProductModal) | Botones `Primer / Segundo / Tercer tiempo` al agregar item al carrito, con estado `course` que se pasa a `addToCart` |
+| Labels mejorados en carrito | `Menu.tsx` (CartDrawer) | Botones `1\|2\|3` → `1er\|2do\|3er` |
+| Agrupación global en Cuenta tab | `Menu.tsx` (Cuenta tab, ambos modos) | Items agrupados por course sobre todos los pedidos del cliente, con headers `⏱ PRIMER TIEMPO (N)` y timestamp inline por item |
+| course en query del waiter | `waiter.ts` (`getTablesWithOrders`) | Agregado `course` a la lista de columnas SELECT de `order_items` |
+| Agrupación por course en waiter | `CustomerOrderSection.tsx` | Items agrupados por course con headers `⏱ PRIMER TIEMPO (N)` por cliente |
+| Selector de course al agregar productos | `TableHeader.tsx` | Botones de tiempo en Step 1 del modal "Agregar Productos"; `course` incluido en insert payload y en dedup |
+| course en OrderItemWithProduct | `history.ts` | Agregado `course: number` a la interfaz para datos históricos |
+
+### Archivos modificados
+- `app/lib/supabase/types.ts` — `course` en `order_items.Row`, `Insert`, `Update`
+- `app/lib/supabase/order-items.ts` — `course` en `OrderItem`, parámetro en `addItemToOrder` y `updateItemQuantity`
+- `app/lib/supabase/waiter.ts` — `course` en `OrderItemRow`, `getTablesWithOrders` query, mapping
+- `app/lib/supabase/history.ts` — `course` en `OrderItemWithProduct`
+- `app/context/OrderContext.tsx` — `course?: number` en `addToCart` y `updateCartItem`
+- `app/customer/components/Menu.tsx` — ProductModal course selector, CartDrawer labels, Cuenta tab grouping global
+- `app/waiter/components/TableHeader.tsx` — Course selector en modal de agregar productos
+- `app/waiter/components/CustomerOrderSection.tsx` — Grouping por course con headers
+- `app/waiter/components/OrderItem.tsx` — Badge T1/T2/T3
+- `app/customer/components/Payment.tsx` — Items agrupados por course
+
+### Comportamiento
+- Nuevos items se crean con `course = 1` por defecto (default DB)
+- Customer elige tiempo al agregar producto en el modal
+- Customer puede cambiar tiempo desde el carrito
+- Waiter elige tiempo al agregar productos a una mesa
+- Waiter ve items agrupados por tiempo dentro de cada cliente
+- Cuenta tab del customer muestra items agrupados globalmente por tiempo
+- Ticket de pago agrupa items por tiempo
+
+---
+
 ## ⏳ Pendiente
 
 ### 1. Kitchen Display System (KDS) — `/kitchen`

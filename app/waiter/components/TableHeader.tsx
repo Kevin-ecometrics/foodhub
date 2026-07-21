@@ -42,6 +42,7 @@ export default function TableHeader({
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [addStep, setAddStep] = useState<"products" | "customer">("products");
   const [selectedCustomerName, setSelectedCustomerName] = useState("");
+  const [addCourse, setAddCourse] = useState(1);
   const openAddModal = () => {
     setShowAddModal(true);
     onAddModalChange?.(true);
@@ -53,6 +54,7 @@ export default function TableHeader({
     setSuccessCount(null);
     setAddStep("products");
     setSelectedCustomerName("");
+    setAddCourse(1);
     onAddModalChange?.(false);
   };
   const [products, setProducts] = useState<Product[]>([]);
@@ -180,6 +182,7 @@ export default function TableHeader({
             price: p.price,
             quantity: qty,
             notes: "Agregado por el mesero",
+            course: addCourse,
           };
         });
       if (selectedItems.length === 0) {
@@ -213,7 +216,8 @@ export default function TableHeader({
           (oi) =>
             oi.product_id === item.product_id &&
             oi.status === "ordered" &&
-            (oi.cancelled_quantity || 0) === 0,
+            (oi.cancelled_quantity || 0) === 0 &&
+            (oi.course || 1) === item.course,
         );
         if (existing) {
           itemsToUpdate.push({
@@ -259,20 +263,21 @@ export default function TableHeader({
           .select()
           .single();
         if (orderError) throw new Error(orderError.message);
-        const { error: itemsError } = await supabase
-          .from("order_items")
-          .insert(
-            itemsToInsert.map((i) => ({
-              order_id: (order as any).id,
-              product_id: i.product_id,
-              product_name: i.product_name,
-              price: i.price,
-              quantity: i.quantity,
-              notes: i.notes,
-              status: "ordered" as const,
-              cancelled_quantity: 0,
-            })) as any,
-          );
+          const { error: itemsError } = await supabase
+            .from("order_items")
+            .insert(
+              itemsToInsert.map((i) => ({
+                order_id: (order as any).id,
+                product_id: i.product_id,
+                product_name: i.product_name,
+                price: i.price,
+                quantity: i.quantity,
+                notes: i.notes,
+                status: "ordered" as const,
+                cancelled_quantity: 0,
+                course: i.course,
+              })) as any,
+            );
         if (itemsError) {
           await supabase
             .from("orders")
@@ -751,6 +756,33 @@ export default function TableHeader({
                   agregado{successCount !== 1 ? "s" : ""} a la Mesa{" "}
                   {table.number}
                 </p>
+              </div>
+            )}
+
+            {/* Course selector */}
+            {successCount === null && addStep === "products" && (
+              <div style={{ padding:"12px 22px 0",borderBottom:"1px solid var(--border)" }}>
+                <span style={{ fontSize:12,fontWeight:600,color:"var(--text)",display:"block",marginBottom:8 }}>
+                  ¿En qué tiempo servirlo?
+                </span>
+                <div style={{ display:"flex",gap:8,paddingBottom:12 }}>
+                  {[
+                    { value:1, label:"Primer tiempo" },
+                    { value:2, label:"Segundo tiempo" },
+                    { value:3, label:"Tercer tiempo" },
+                  ].map(opt => (
+                    <button key={opt.value} onClick={() => setAddCourse(opt.value)}
+                      style={{
+                        flex:1,padding:"8px 6px",borderRadius:8,
+                        border:`2px solid ${addCourse===opt.value?"var(--accent)":"var(--border)"}`,
+                        background:addCourse===opt.value?"var(--accent-light)":"var(--surface)",
+                        cursor:"pointer",fontSize:12,fontWeight:addCourse===opt.value?700:500,
+                        color:addCourse===opt.value?"var(--accent)":"var(--muted)",
+                        fontFamily:"inherit",textAlign:"center",transition:"all 0.12s",
+                      }}
+                    >{opt.label}</button>
+                  ))}
+                </div>
               </div>
             )}
 
