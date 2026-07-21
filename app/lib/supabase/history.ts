@@ -163,7 +163,7 @@ export const historyService = {
     if (paymentMethod === 'cash') message = 'Solicita la cuenta - Pago en efectivo'
     else if (paymentMethod === 'terminal') message = 'Solicita la cuenta - Pago con terminal'
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('waiter_notifications')
       .insert({
         table_id: tableId,
@@ -172,7 +172,7 @@ export const historyService = {
         message,
         status: 'pending',
         payment_method: paymentMethod || null,
-      }) as { error: Error | null }
+      } as never)
 
     if (error) {
       console.error('Error requesting bill:', error)

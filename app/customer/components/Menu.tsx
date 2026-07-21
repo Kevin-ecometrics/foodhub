@@ -1445,6 +1445,7 @@ export default function MenuPage() {
     getRecentOrdersItems,
     getTableUsers,
     switchUserOrder,
+    notificationState,
   } = useOrder();
 
   // ── Menu state ──
@@ -1693,6 +1694,16 @@ export default function MenuPage() {
     if (!tableId || !orderId || !userId) return;
     const loadData = async () => {
       try {
+        const { data: bills } = await supabase
+          .from("waiter_notifications")
+          .select("id")
+          .eq("table_id", parseInt(tableId))
+          .eq("type", "bill_request")
+          .limit(1);
+        if (bills && bills.length > 0) {
+          router.replace("/customer/payment");
+          return;
+        }
         await loadInitialData(parseInt(tableId), orderId, userId);
       } catch (e) {
         console.error(e);
@@ -1705,6 +1716,12 @@ export default function MenuPage() {
   useEffect(() => {
     if (tableId && hasCheckedSession) loadTableUsers(parseInt(tableId));
   }, [tableId, hasCheckedSession]);
+
+  useEffect(() => {
+    if (notificationState.hasPendingBill) {
+      router.replace("/customer/payment");
+    }
+  }, [notificationState.hasPendingBill, router]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Scroll tracking for category tabs
@@ -3776,6 +3793,28 @@ export default function MenuPage() {
                   </div>
                 ))
               )}
+              {(() => {
+                const overallTotal = groups.reduce((s, g) => s + g.subtotal, 0);
+                const taxRate = 0.08;
+                const overallSubtotal = overallTotal / (1 + taxRate);
+                const overallTax = overallTotal - overallSubtotal;
+                return (
+                  <div style={{ padding:"16px 20px",borderTop:"1.5px solid var(--border)",marginTop:8 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                      <span style={{ fontSize:13,color:"var(--muted)" }}>Subtotal total:</span>
+                      <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>${overallSubtotal.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                      <span style={{ fontSize:13,color:"var(--muted)" }}>Impuestos (8%):</span>
+                      <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>${overallTax.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display:"flex",justifyContent:"space-between",paddingTop:8,borderTop:"1.5px solid var(--text)" }}>
+                      <span style={{ fontSize:15,fontWeight:800,color:"var(--navy)" }}>TOTAL:</span>
+                      <span style={{ fontSize:15,fontWeight:800,color:"var(--green)" }}>${overallTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </main>

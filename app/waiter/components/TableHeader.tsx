@@ -419,27 +419,29 @@ export default function TableHeader({
               )}
               {showPaymentButtons && (
                 <>
-                  <button
-                    onClick={() => onPagarPorSeparado(table.id, table.number)}
-                    disabled={processing === `separate-${table.id}`}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "var(--blue)",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "white",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      opacity: processing === `separate-${table.id}` ? 0.6 : 1,
-                    }}
-                  >
-                    {processing === `separate-${table.id}` ? "↻" : "⇌ Separado"}
-                  </button>
+                  {activeCustomerNames.length > 1 && (
+                    <button
+                      onClick={() => onPagarPorSeparado(table.id, table.number)}
+                      disabled={processing === `separate-${table.id}`}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "var(--blue)",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "white",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        opacity: processing === `separate-${table.id}` ? 0.6 : 1,
+                      }}
+                    >
+                      {processing === `separate-${table.id}` ? "↻" : "⇌ Separado"}
+                    </button>
+                  )}
                   <button
                     onClick={() => onCobrarMesa(table.id, table.number)}
                     disabled={processing === `cobrar-${table.id}`}

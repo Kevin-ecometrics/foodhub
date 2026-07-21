@@ -2929,8 +2929,8 @@ export default function WaiterDashboard() {
         }}
         onConfirm={handleCloseTablePinConfirm}
         targetPin={closeTableTargetPin}
-        title="Cerrar Mesa"
-        description="Ingrese el PIN de seguridad para cerrar la mesa y cobrar."
+        title="Cobrar Cuenta"
+        description="Ingrese el PIN de seguridad para cobrar la cuenta de la mesa."
         errorMessage="PIN incorrecto"
         inputLabel="PIN de seguridad:"
         confirmLabel="Cobrar"

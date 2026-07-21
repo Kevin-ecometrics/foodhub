@@ -7,6 +7,7 @@ import { tablesService, Table } from "@/app/lib/supabase/tables";
 import { useToast } from "@/app/context/ToastContext";
 import { ordersService } from "@/app/lib/supabase/orders";
 import { notificationsService } from "@/app/lib/supabase/notifications";
+import { supabase } from "@/app/lib/supabase/client";
 import { FaExclamationTriangle } from "react-icons/fa";
 
 const PageShell = ({ children, tableInfo }: { children: React.ReactNode; tableInfo?: { number: number; status: string } | null }) => (
@@ -143,7 +144,17 @@ export default function CustomerPage() {
             const tableNumber = parseInt(tableFromParams);
             if (data.tableNumber === tableNumber) {
               setSession(data);
-              router.replace("/customer/menu");
+              (async () => {
+                const tid = parseInt(data.tableId);
+                if (isNaN(tid)) { router.replace("/customer/menu"); return; }
+                const { data: bills } = await supabase
+                  .from("waiter_notifications")
+                  .select("id")
+                  .eq("table_id", tid)
+                  .eq("type", "bill_request")
+                  .limit(1);
+                router.replace(bills && bills.length > 0 ? "/customer/payment" : "/customer/menu");
+              })();
               return;
             }
           }
@@ -190,6 +201,29 @@ export default function CustomerPage() {
     try {
       const table = tables.find((t) => t.number === selectedTable);
       if (!table) { setError("Mesa no encontrada"); return; }
+      const { data: pendingBills } = await supabase
+        .from("waiter_notifications")
+        .select("id")
+        .eq("table_id", table.id)
+        .eq("type", "bill_request")
+        .eq("status", "pending")
+        .limit(1);
+      if (pendingBills && pendingBills.length > 0) {
+        setError("La cuenta de esta mesa ya ha sido solicitada. No es posible unirse en este momento.");
+        setLoading(false);
+        return;
+      }
+      const { data: anyBills } = await supabase
+        .from("waiter_notifications")
+        .select("id")
+        .eq("table_id", table.id)
+        .eq("type", "bill_request")
+        .limit(1);
+      if (anyBills && anyBills.length > 0) {
+        setError("La cuenta de esta mesa ya ha sido procesada. No es posible unirse en este momento.");
+        setLoading(false);
+        return;
+      }
       const trimmedName = customerName.trim();
       const existing = await ordersService.getOrderByUser(table.id, trimmedName);
       if (existing) {

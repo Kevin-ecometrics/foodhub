@@ -682,6 +682,7 @@ export default function PaymentPage() {
   const selectedTipAmount = tipMode === "pct" ? paymentSummary.total * tipPct
     : tipMode === "custom" ? (parseFloat(tipCustom) || 0)
     : 0;
+  const totalWithTip = paymentSummary.total + selectedTipAmount;
 
   const saveTip = async (amount: number) => {
     const notifId = (notificationState.billNotification as any)?.id;
@@ -758,13 +759,19 @@ export default function PaymentPage() {
           <p style={{ color:"var(--muted)",marginBottom:24,lineHeight:1.6 }}>Gracias por su preferencia. ¡Esperamos verle pronto!</p>
 
           <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20 }}>
-            {[["Comensales",customerSummaries.length],["Órdenes",allOrders.length],["Total",formatCurrency(paymentSummary.total)]].map(([label,val]) => (
+            {[["Comensales",customerSummaries.length],["Órdenes",allOrders.length],["Total",formatCurrency(totalWithTip)]].map(([label,val]) => (
               <div key={label as string} style={{ padding:"12px 8px",background:"var(--surface)",borderRadius:10,border:"1px solid var(--border)" }}>
                 <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginBottom:4 }}>{label}</p>
                 <p style={{ fontSize:14,fontWeight:700,color:"var(--text)",margin:0 }}>{val}</p>
               </div>
             ))}
           </div>
+
+          {selectedTipAmount > 0 && (
+            <div style={{ background:"var(--accent-light)",borderRadius:10,padding:"10px 14px",marginBottom:16 }}>
+              <p style={{ fontSize:12,color:"var(--accent)",margin:0 }}>Propina incluida: <strong>{formatCurrency(selectedTipAmount)}</strong></p>
+            </div>
+          )}
 
           {mesaCancelledUnits > 0 && (
             <div style={{ background:"var(--red-light)",borderRadius:10,padding:"10px 14px",marginBottom:16 }}>
@@ -973,6 +980,16 @@ export default function PaymentPage() {
                     <span style={ticketStyles.totalLabel as React.CSSProperties}>Impuestos (8%):</span>
                     <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.taxAmount)}</span>
                   </div>
+                  {selectedTipAmount > 0 && (
+                    <div style={{
+                      padding: modeConfig.container.spacing === "compact" ? "6px 0" : "8px 0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}>
+                      <span style={ticketStyles.totalLabel as React.CSSProperties}>Propina:</span>
+                      <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(selectedTipAmount)}</span>
+                    </div>
+                  )}
                   <div style={{
                     padding: modeConfig.container.spacing === "compact" ? "8px 0 0" : "12px 0 0",
                     borderTop: "2px solid var(--text)",
@@ -980,7 +997,7 @@ export default function PaymentPage() {
                     justifyContent: "space-between",
                   }}>
                     <span style={ticketStyles.totalFinalLabel as React.CSSProperties}>TOTAL GENERAL:</span>
-                    <span style={ticketStyles.totalFinalValue as React.CSSProperties}>{formatCurrency(paymentSummary.total)}</span>
+                    <span style={ticketStyles.totalFinalValue as React.CSSProperties}>{formatCurrency(totalWithTip)}</span>
                   </div>
                 </div>
 
