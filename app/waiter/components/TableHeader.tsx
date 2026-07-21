@@ -92,8 +92,7 @@ export default function TableHeader({
   };
 
   const handleConfirmAddOrder = async () => {
-    const customerName = selectedCustomerName.trim();
-    if (!customerName) { setError("Selecciona el cliente al que se le asignan los productos"); return; }
+    const customerName = selectedCustomerName.trim() || `Mesero ${table.number}`;
     setAddingOrder(true); setError(null);
     try {
       const selectedItems = Object.entries(selectedProducts).filter(([,q]) => q > 0).map(([pid, qty]) => {
@@ -246,7 +245,7 @@ export default function TableHeader({
                   {addStep==="products" ? "Agregar Productos" : "Asignar Cliente"} — Mesa {table.number}
                 </p>
                 <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>
-                  {addStep==="products" ? "Selecciona los productos que deseas agregar a la orden" : "Indica a qué cliente de la mesa se le asignan estos productos"}
+                  {addStep==="products" ? "Selecciona los productos que deseas agregar a la orden" : "Indica a qué cliente de la mesa se le asignan estos productos (opcional)"}
                 </p>
               </div>
               <button onClick={() => { closeAddModal(); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
@@ -323,21 +322,8 @@ export default function TableHeader({
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize:13,color:"var(--muted)",margin:"0 0 16px" }}>No hay clientes activos en esta mesa todavía.</p>
+                  <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>No hay clientes activos en esta mesa todavía.</p>
                 )}
-
-                <p style={{ fontSize:12,color:"var(--muted)",margin:"0 0 6px" }}>O agrégalo sin cliente asignado:</p>
-                <button
-                  onClick={() => setSelectedCustomerName(`Mesero ${table.number}`)}
-                  style={{
-                    padding:"9px 16px",borderRadius:20,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,
-                    border:`1.5px dashed ${selectedCustomerName===`Mesero ${table.number}`?"var(--amber)":"var(--border)"}`,
-                    background:selectedCustomerName===`Mesero ${table.number}`?"var(--amber-light)":"white",
-                    color:selectedCustomerName===`Mesero ${table.number}`?"var(--amber)":"var(--muted)",
-                  }}
-                >
-                  Sin cliente (General)
-                </button>
               </div>
             )}
 
@@ -364,7 +350,7 @@ export default function TableHeader({
                 </div>
                 <div style={{ display:"flex",gap:10 }}>
                   <button onClick={() => setAddStep("products")} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>← Volver</button>
-                  <button onClick={handleConfirmAddOrder} disabled={addingOrder||!selectedCustomerName.trim()} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:(!selectedCustomerName.trim())?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
+                  <button onClick={handleConfirmAddOrder} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
                     {addingOrder ? "↻ Agregando..." : `+ Agregar a Mesa ${table.number}`}
                   </button>
                 </div>

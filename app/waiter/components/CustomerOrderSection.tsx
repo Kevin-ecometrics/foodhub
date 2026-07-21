@@ -58,7 +58,7 @@ export default function CustomerOrderSection({ customerSummary, processing, onUp
         <div>
           <p style={{ fontSize:13,fontWeight:700,color:isGeneral?"var(--muted)":"var(--text)",margin:0 }}>{displayName}</p>
           <p style={{ fontSize:11,color:"var(--muted)",margin:0 }}>
-            {customerSummary.orders.length} pedido{customerSummary.orders.length>1?"s":""} • {customerSummary.itemsCount} producto{customerSummary.itemsCount>1?"s":""}
+            {customerSummary.itemsCount} producto{customerSummary.itemsCount>1?"s":""}
           </p>
         </div>
       </div>

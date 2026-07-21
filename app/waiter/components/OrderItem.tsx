@@ -96,9 +96,8 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
             </div>
             <div style={{ fontSize:11,color:"var(--muted)",marginTop:2 }}>
               × {remainingQuantity}{cancelledQty>0&&<span style={{ color:"var(--red)",textDecoration:"line-through",marginLeft:4 }}>(de {item.quantity})</span>}
-              {" "}• ${item.price.toFixed(2)} c/u
               {" "}• <strong style={{ color:isCancelled?"var(--muted)":"var(--green)" }}>Total: ${(item.price * remainingQuantity).toFixed(2)}</strong>
-              {cancelledQty > 0 && <span style={{ color:"var(--red)",marginLeft:4 }}>(Cancelado: ${(item.price * cancelledQty).toFixed(2)})</span>}
+              {cancelledQty > 0 && <span style={{ color:"var(--red)",textDecoration:"line-through",marginLeft:4 }}>(${(item.price * cancelledQty).toFixed(2)})</span>}
             </div>
             {item.notes && <div style={{ opacity:isCancelled?0.7:1 }}>{formatItemNotes(item.notes)}</div>}
           </div>
