@@ -8,6 +8,7 @@ interface OrderItemProps {
   onUpdateStatus: (itemId: string, newStatus: string) => void;
   onCancelItem: (itemId: string, cancelQuantity: number) => void;
   onCancelModalChange?: (isOpen: boolean) => void;
+  draggable?: boolean;
 }
 
 const STATUS_LABEL: Record<string, string> = { ordered:"Ordenado", preparing:"En Preparación", ready:"Listo", served:"Servido", cancelled:"Cancelado" };
@@ -15,10 +16,11 @@ const STATUS_BG:    Record<string, string> = { ordered:"var(--red-light)", prepa
 const STATUS_COLOR: Record<string, string> = { ordered:"var(--red)", preparing:"var(--amber)", ready:"var(--blue)", served:"var(--green)", cancelled:"var(--muted)" };
 const STATUS_NEXT:  Record<string, string> = { ordered:"preparing", preparing:"ready", ready:"served", served:"served", cancelled:"cancelled" };
 
-export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem, onCancelModalChange }: OrderItemProps) {
+export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem, onCancelModalChange, draggable = false }: OrderItemProps) {
   const { toast } = useToast();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelQuantity, setCancelQuantity] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
 
   const isCancelled = item.status === "cancelled";
   const cancelledQty = item.cancelled_quantity || 0;
@@ -70,10 +72,16 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
 
   return (
     <>
-      <div style={{ padding:"10px 14px",borderTop:"1px dashed var(--border)",background:isCancelled?"oklch(98% 0.03 20)":"white" }}>
+      <div
+        draggable={draggable}
+        onDragStart={e => { e.dataTransfer.setData("text/plain", item.id); e.dataTransfer.effectAllowed = "move"; setIsDragging(true); }}
+        onDragEnd={() => setIsDragging(false)}
+        style={{ padding:"10px 14px",borderTop:"1px dashed var(--border)",background:isCancelled?"oklch(98% 0.03 20)":"white",opacity:isDragging?0.4:1,cursor:draggable?"grab":"default" }}
+      >
         <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4 }}>
           <div style={{ flex:1 }}>
             <div style={{ display:"flex",alignItems:"center",gap:8,flexWrap:"wrap" }}>
+              {draggable && <span style={{ color:"var(--muted)",fontSize:12,cursor:"grab" }} title="Arrastra para reasignar cliente">⠿</span>}
               <span style={{ fontSize:13,fontWeight:600,color:isCancelled?"var(--red)":"var(--text)",textDecoration:isCancelled?"line-through":"none" }}>
                 {item.product_name}
               </span>

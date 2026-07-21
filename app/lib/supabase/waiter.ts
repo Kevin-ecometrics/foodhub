@@ -420,4 +420,72 @@ export const waiterService = {
       throw error
     }
   },
+
+  async moveOrderItemToCustomer(tableId: number, itemId: string, targetCustomerName: string): Promise<void> {
+    try {
+      const { data: itemData, error: itemError } = await supabase
+        .from('order_items')
+        .select('id, order_id, price, quantity, cancelled_quantity')
+        .eq('id', itemId)
+        .single()
+      if (itemError) throw itemError
+      const item = itemData as unknown as { id: string; order_id: string; price: number; quantity: number; cancelled_quantity: number }
+
+      const { data: sourceOrderData, error: sourceOrderError } = await supabase
+        .from('orders')
+        .select('id, customer_name, total_amount')
+        .eq('id', item.order_id)
+        .single()
+      if (sourceOrderError) throw sourceOrderError
+      const sourceOrder = sourceOrderData as unknown as { id: string; customer_name: string | null; total_amount: number }
+
+      if (sourceOrder.customer_name === targetCustomerName) return
+
+      const activeQuantity = item.quantity - (item.cancelled_quantity || 0)
+      const amount = item.price * activeQuantity
+
+      const { data: targetOrdersData, error: targetOrdersError } = await supabase
+        .from('orders')
+        .select('id, total_amount')
+        .eq('table_id', tableId)
+        .eq('customer_name', targetCustomerName)
+        .eq('status', 'sent')
+        .limit(1)
+      if (targetOrdersError) throw targetOrdersError
+      const targetOrders = (targetOrdersData || []) as unknown as { id: string; total_amount: number }[]
+
+      let targetOrderId: string
+      if (targetOrders.length > 0) {
+        targetOrderId = targetOrders[0].id
+        const { error: updTargetError } = await (supabase as any)
+          .from('orders')
+          .update({ total_amount: targetOrders[0].total_amount + amount })
+          .eq('id', targetOrderId) as { error: Error | null }
+        if (updTargetError) throw updTargetError
+      } else {
+        const { data: newOrder, error: newOrderError } = await supabase
+          .from('orders')
+          .insert([{ table_id: tableId, customer_name: targetCustomerName, status: 'sent', total_amount: amount }] as any)
+          .select('id')
+          .single()
+        if (newOrderError) throw newOrderError
+        targetOrderId = (newOrder as unknown as { id: string }).id
+      }
+
+      const { error: moveError } = await (supabase as any)
+        .from('order_items')
+        .update({ order_id: targetOrderId })
+        .eq('id', itemId) as { error: Error | null }
+      if (moveError) throw moveError
+
+      const { error: updSourceError } = await (supabase as any)
+        .from('orders')
+        .update({ total_amount: Math.max(0, sourceOrder.total_amount - amount) })
+        .eq('id', sourceOrder.id) as { error: Error | null }
+      if (updSourceError) throw updSourceError
+    } catch (error) {
+      console.error('Error moviendo producto de cliente:', error)
+      throw error
+    }
+  },
 }

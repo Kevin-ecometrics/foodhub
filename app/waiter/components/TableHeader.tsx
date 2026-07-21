@@ -27,13 +27,25 @@ export default function TableHeader({
 }: TableHeaderProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [addStep, setAddStep] = useState<"products" | "customer">("products");
+  const [selectedCustomerName, setSelectedCustomerName] = useState("");
   const openAddModal = () => { setShowAddModal(true); onAddModalChange?.(true); };
-  const closeAddModal = () => { setShowAddModal(false); setSelectedProducts({}); setError(null); setSuccessCount(null); onAddModalChange?.(false); };
+  const closeAddModal = () => {
+    setShowAddModal(false); setSelectedProducts({}); setError(null); setSuccessCount(null);
+    setAddStep("products"); setSelectedCustomerName(""); onAddModalChange?.(false);
+  };
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<{ [k: number]: number }>({});
   const [addingOrder, setAddingOrder] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const activeCustomerNames = Array.from(new Set(
+    table.orders
+      .filter(o => o.status === "sent")
+      .map(o => o.customer_name?.trim())
+      .filter((n): n is string => !!n && n !== `Mesero ${table.number}`)
+  ));
 
   useEffect(() => { if (showAddModal) loadProducts(); }, [showAddModal]);
 
@@ -73,7 +85,15 @@ export default function TableHeader({
 
   const formatCurrency = (n: number) => new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" }).format(n);
 
+  const handleContinueToCustomerStep = () => {
+    if (getTotalItems() === 0) { setError("Por favor selecciona al menos un producto"); return; }
+    setError(null);
+    setAddStep("customer");
+  };
+
   const handleConfirmAddOrder = async () => {
+    const customerName = selectedCustomerName.trim();
+    if (!customerName) { setError("Selecciona el cliente al que se le asignan los productos"); return; }
     setAddingOrder(true); setError(null);
     try {
       const selectedItems = Object.entries(selectedProducts).filter(([,q]) => q > 0).map(([pid, qty]) => {
@@ -82,19 +102,54 @@ export default function TableHeader({
         return { product_id: p.id, product_name: p.name, price: p.price, quantity: qty, notes: "Agregado por el mesero" };
       });
       if (selectedItems.length === 0) { setError("Por favor selecciona al menos un producto"); return; }
-      const orderTotal = selectedItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const { data: order, error: orderError } = await supabase.from("orders")
-        .insert([{ table_id: table.id, customer_name: `Mesero ${table.number}`, status: "sent", total_amount: orderTotal }] as any)
-        .select().single();
-      if (orderError) throw new Error(orderError.message);
-      const { error: itemsError } = await supabase.from("order_items").insert(
-        selectedItems.map(i => ({ order_id: (order as any).id, product_id: i.product_id, product_name: i.product_name, price: i.price, quantity: i.quantity, notes: i.notes, status: "ordered" as const, cancelled_quantity: 0 })) as any
-      );
-      if (itemsError) { await supabase.from("orders").delete().eq("id", (order as any).id); throw new Error(itemsError.message); }
+
+      // Same product still pending (not yet in preparation, no cancellations) for this
+      // customer gets its quantity incremented instead of creating a duplicate line.
+      const customerPendingItems = table.orders
+        .filter(o => o.status === "sent" && o.customer_name === customerName)
+        .flatMap(o => o.order_items.map(oi => ({ ...oi, orderId: o.id, orderTotal: o.total_amount })));
+
+      const itemsToInsert: typeof selectedItems = [];
+      const itemsToUpdate: { id: string; orderId: string; newQuantity: number; addedAmount: number; orderTotal: number }[] = [];
+
+      for (const item of selectedItems) {
+        const existing = customerPendingItems.find(
+          oi => oi.product_id === item.product_id && oi.status === "ordered" && (oi.cancelled_quantity || 0) === 0
+        );
+        if (existing) {
+          itemsToUpdate.push({
+            id: existing.id, orderId: existing.orderId, orderTotal: existing.orderTotal,
+            newQuantity: existing.quantity + item.quantity, addedAmount: item.price * item.quantity,
+          });
+        } else {
+          itemsToInsert.push(item);
+        }
+      }
+
+      for (const u of itemsToUpdate) {
+        const { error: updItemError } = await (supabase as any).from("order_items").update({ quantity: u.newQuantity }).eq("id", u.id);
+        if (updItemError) throw new Error(updItemError.message);
+        const { error: updOrderError } = await (supabase as any).from("orders").update({ total_amount: u.orderTotal + u.addedAmount }).eq("id", u.orderId);
+        if (updOrderError) throw new Error(updOrderError.message);
+      }
+
+      if (itemsToInsert.length > 0) {
+        const orderTotal = itemsToInsert.reduce((s, i) => s + i.price * i.quantity, 0);
+        const { data: order, error: orderError } = await supabase.from("orders")
+          .insert([{ table_id: table.id, customer_name: customerName, status: "sent", total_amount: orderTotal }] as any)
+          .select().single();
+        if (orderError) throw new Error(orderError.message);
+        const { error: itemsError } = await supabase.from("order_items").insert(
+          itemsToInsert.map(i => ({ order_id: (order as any).id, product_id: i.product_id, product_name: i.product_name, price: i.price, quantity: i.quantity, notes: i.notes, status: "ordered" as const, cancelled_quantity: 0 })) as any
+        );
+        if (itemsError) { await supabase.from("orders").delete().eq("id", (order as any).id); throw new Error(itemsError.message); }
+      }
+
       setSuccessCount(selectedItems.length);
       setSelectedProducts({});
+      setSelectedCustomerName("");
       if (onOrderAdded) onOrderAdded();
-      setTimeout(() => { setShowAddModal(false); setSuccessCount(null); onAddModalChange?.(false); }, 1800);
+      setTimeout(() => { setShowAddModal(false); setSuccessCount(null); setAddStep("products"); onAddModalChange?.(false); }, 1800);
     } catch (e) { console.error(e); setError(`Error: ${e instanceof Error ? e.message : "Error desconocido"}`); }
     finally { setAddingOrder(false); }
   };
@@ -187,8 +242,12 @@ export default function TableHeader({
             {/* Modal header */}
             <div style={{ padding:"18px 22px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
               <div>
-                <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>Agregar Productos — Mesa {table.number}</p>
-                <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>Selecciona los productos que deseas agregar a la orden</p>
+                <p style={{ fontSize:17,fontWeight:800,color:"var(--text)",margin:0 }}>
+                  {addStep==="products" ? "Agregar Productos" : "Asignar Cliente"} — Mesa {table.number}
+                </p>
+                <p style={{ fontSize:12,color:"var(--muted)",margin:0,marginTop:2 }}>
+                  {addStep==="products" ? "Selecciona los productos que deseas agregar a la orden" : "Indica a qué cliente de la mesa se le asignan estos productos"}
+                </p>
               </div>
               <button onClick={() => { closeAddModal(); }} style={{ background:"none",border:"none",cursor:"pointer",color:"var(--muted)",padding:4,fontSize:18 }}>✕</button>
             </div>
@@ -211,7 +270,7 @@ export default function TableHeader({
             )}
 
             {/* Product grid */}
-            {successCount === null && <div style={{ overflowY:"auto",flex:1,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
+            {successCount === null && addStep === "products" && <div style={{ overflowY:"auto",flex:1,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
               {productsLoading ? (
                 <div style={{ gridColumn:"1/-1",textAlign:"center",padding:40,color:"var(--muted)" }}>
                   <div style={{ width:48,height:48,borderRadius:14,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 8px" }}>
@@ -242,16 +301,70 @@ export default function TableHeader({
               ))}
             </div>}
 
+            {/* Customer/cliente selection */}
+            {successCount === null && addStep === "customer" && (
+              <div style={{ overflowY:"auto",flex:1,padding:"16px 20px" }}>
+                <p style={{ fontSize:13,fontWeight:700,color:"var(--text)",margin:"0 0 10px" }}>Clientes activos en la mesa</p>
+                {activeCustomerNames.length > 0 ? (
+                  <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginBottom:16 }}>
+                    {activeCustomerNames.map(name => (
+                      <button
+                        key={name}
+                        onClick={() => setSelectedCustomerName(name)}
+                        style={{
+                          padding:"9px 16px",borderRadius:20,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,
+                          border:`1.5px solid ${selectedCustomerName===name?"var(--green)":"var(--border)"}`,
+                          background:selectedCustomerName===name?"var(--green-light)":"white",
+                          color:selectedCustomerName===name?"var(--green)":"var(--text)",
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize:13,color:"var(--muted)",margin:"0 0 16px" }}>No hay clientes activos en esta mesa todavía.</p>
+                )}
+
+                <p style={{ fontSize:12,color:"var(--muted)",margin:"0 0 6px" }}>O agrégalo sin cliente asignado:</p>
+                <button
+                  onClick={() => setSelectedCustomerName(`Mesero ${table.number}`)}
+                  style={{
+                    padding:"9px 16px",borderRadius:20,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,
+                    border:`1.5px dashed ${selectedCustomerName===`Mesero ${table.number}`?"var(--amber)":"var(--border)"}`,
+                    background:selectedCustomerName===`Mesero ${table.number}`?"var(--amber-light)":"white",
+                    color:selectedCustomerName===`Mesero ${table.number}`?"var(--amber)":"var(--muted)",
+                  }}
+                >
+                  Sin cliente (General)
+                </button>
+              </div>
+            )}
+
             {/* Footer */}
-            {successCount === null && (
+            {successCount === null && addStep === "products" && (
               <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
                 <div>
                   <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
                   <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
                 </div>
                 <div style={{ display:"flex",gap:10 }}>
-                  <button onClick={() => { closeAddModal(); }} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>Cancelar</button>
-                  <button onClick={handleConfirmAddOrder} disabled={addingOrder||getTotalItems()===0} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:getTotalItems()===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
+                  <button onClick={() => { closeAddModal(); }} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>Cancelar</button>
+                  <button onClick={handleContinueToCustomerStep} disabled={getTotalItems()===0} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:getTotalItems()===0?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6 }}>
+                    Continuar
+                  </button>
+                </div>
+              </div>
+            )}
+            {successCount === null && addStep === "customer" && (
+              <div style={{ padding:"14px 20px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+                <div>
+                  <p style={{ fontSize:13,color:"var(--muted)",margin:0 }}>Items: <strong style={{ color:"var(--text)" }}>{getTotalItems()}</strong></p>
+                  <p style={{ fontSize:14,fontWeight:700,color:"var(--green)",margin:0 }}>Total: {formatCurrency(getTotalAmount())}</p>
+                </div>
+                <div style={{ display:"flex",gap:10 }}>
+                  <button onClick={() => setAddStep("products")} disabled={addingOrder} style={{ padding:"11px 20px",borderRadius:10,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:13,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>← Volver</button>
+                  <button onClick={handleConfirmAddOrder} disabled={addingOrder||!selectedCustomerName.trim()} style={{ padding:"11px 20px",borderRadius:10,border:"none",background:(!selectedCustomerName.trim())?"var(--border)":"var(--green)",fontSize:13,fontWeight:700,color:"white",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,opacity:addingOrder?0.7:1 }}>
                     {addingOrder ? "↻ Agregando..." : `+ Agregar a Mesa ${table.number}`}
                   </button>
                 </div>
