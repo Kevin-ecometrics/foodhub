@@ -20,9 +20,10 @@ interface CustomerOrderSectionProps {
   onCancelModalChange?: (isOpen: boolean) => void;
   isGeneral?: boolean;
   onMoveItem?: (itemId: string) => void;
+  orderSteps?: string | null;
 }
 
-export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem, onCancelModalChange, isGeneral = false, onMoveItem }: CustomerOrderSectionProps) {
+export default function CustomerOrderSection({ customerSummary, processing, onUpdateItemStatus, onCancelItem, onCancelModalChange, isGeneral = false, onMoveItem, orderSteps }: CustomerOrderSectionProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const displayName = customerSummary.customerName;
 
@@ -75,6 +76,7 @@ export default function CustomerOrderSection({ customerSummary, processing, onUp
               onCancelItem={onCancelItem}
               onCancelModalChange={onCancelModalChange}
               draggable={!!onMoveItem}
+              orderSteps={orderSteps}
             />
           ))
         )}

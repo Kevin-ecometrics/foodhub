@@ -2106,6 +2106,7 @@ export default function WaiterDashboard() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [waiterName, setWaiterName] = useState("Mesero");
+  const [orderSteps, setOrderSteps] = useState<string | null>(null);
   const [attendedNotifications, setAttendedNotifications] = useState<
     Set<string>
   >(new Set());
@@ -2227,10 +2228,12 @@ export default function WaiterDashboard() {
     setLoading(true);
 
     try {
-      const [notifsData, tablesData] = await Promise.all([
+      const [notifsData, tablesData, stepsStr] = await Promise.all([
         waiterService.getPendingNotifications(),
         waiterService.getTablesWithOrders(),
+        settingsService.getSetting("order_steps").catch(() => null) as Promise<string | null>,
       ]);
+      setOrderSteps(stepsStr);
 
       let processedNotifications = [...notifsData];
       if (fcfsFilter) {
@@ -2892,6 +2895,7 @@ export default function WaiterDashboard() {
                 onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments || showCerrarPinModal; }}
                 onMoveItem={handleMoveItemToCustomer}
                 waiterName={waiterName}
+                orderSteps={orderSteps}
               />
             </>
           )}

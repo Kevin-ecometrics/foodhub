@@ -22,6 +22,7 @@ import {
 } from "@/app/lib/supabase/categories";
 import { settingsService } from "@/app/lib/supabase/settings";
 import { DEFAULT_CONFIG, CheckUiConfig } from "@/app/lib/checkUiTypes";
+import { parseOrderSteps } from "@/app/lib/orderSteps";
 
 const normalizeText = (s: string) =>
   s
@@ -1485,6 +1486,7 @@ export default function MenuPage() {
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [checkUiMode, setCheckUiMode] = useState("modern");
   const [, setCheckUiConfig] = useState<CheckUiConfig | null>(null);
+  const [orderSteps, setOrderSteps] = useState<string | null>(null);
   const [productNotesEnabled, setProductNotesEnabled] = useState(false);
   const [breakfastEndHour, setBreakfastEndHour] = useState("11:00");
   const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
@@ -1862,13 +1864,15 @@ export default function MenuPage() {
     try {
       await setCurrentUserOrder(oid, uid);
       if (currentTableId) await refreshOrder(currentTableId);
-      const [allProducts, recent, cats, hourSetting, checkUi] = await Promise.all([
+      const [allProducts, recent, cats, hourSetting, checkUi, orderStepsVal] = await Promise.all([
         productsService.getProducts(),
         getRecentOrdersItems(tid),
         categoriesService.getActiveCategories(),
         settingsService.getSetting("breakfast_end_hour").catch(() => '11:00'),
         settingsService.getSetting("default_check_ui").catch(() => 'modern'),
+        settingsService.getSetting("order_steps").catch(() => null) as Promise<string | null>,
       ]);
+      setOrderSteps(orderStepsVal);
       setCheckUiMode(checkUi || 'modern');
       if (checkUi) {
         fetch("/api/settings/public")
@@ -3567,19 +3571,9 @@ export default function MenuPage() {
                                       >
                                         {item.product_name}
                                       </span>
-                                      {!isFullCancelled && item.status === "ordered" && (
-                                        <span style={{ background: "var(--red-light)", color: "var(--red)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
-                                          ● Ord.
-                                        </span>
-                                      )}
-                                      {!isFullCancelled && item.status === "preparing" && (
-                                        <span style={{ background: "oklch(96% 0.06 70)", color: "var(--amber)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
-                                          ⏳ Prep.
-                                        </span>
-                                      )}
-                                      {!isFullCancelled && item.status === "served" && (
-                                        <span style={{ background: "var(--green-light)", color: "var(--green)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
-                                          ✓ Serv.
+                                      {!isFullCancelled && item.status !== "cancelled" && parseOrderSteps(orderSteps)[item.status] && (
+                                        <span style={{ background: parseOrderSteps(orderSteps)[item.status].bg, color: parseOrderSteps(orderSteps)[item.status].color, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                          {parseOrderSteps(orderSteps)[item.status].icon} {parseOrderSteps(orderSteps)[item.status].shortLabel}
                                         </span>
                                       )}
                                       {isFullCancelled && (
@@ -3725,48 +3719,19 @@ export default function MenuPage() {
                                         {item.product_name}
                                       </span>
                                       {!isFullCancelled &&
-                                        item.status === "ordered" && (
+                                        item.status !== "cancelled" &&
+                                        parseOrderSteps(orderSteps)[item.status] && (
                                           <span
                                             style={{
-                                              background: "var(--red-light)",
-                                              color: "var(--red)",
+                                              background: parseOrderSteps(orderSteps)[item.status].bg,
+                                              color: parseOrderSteps(orderSteps)[item.status].color,
                                               fontSize: 10,
                                               fontWeight: 700,
                                               padding: "2px 7px",
                                               borderRadius: 6,
                                             }}
                                           >
-                                            ● Ordenado
-                                          </span>
-                                        )}
-                                      {!isFullCancelled &&
-                                        item.status === "preparing" && (
-                                          <span
-                                            style={{
-                                              background: "oklch(96% 0.06 70)",
-                                              color: "var(--amber)",
-                                              fontSize: 10,
-                                              fontWeight: 700,
-                                              padding: "2px 7px",
-                                              borderRadius: 6,
-                                            }}
-                                          >
-                                            ⏳ En preparación
-                                          </span>
-                                        )}
-                                      {!isFullCancelled &&
-                                        item.status === "served" && (
-                                          <span
-                                            style={{
-                                              background: "var(--green-light)",
-                                              color: "var(--green)",
-                                              fontSize: 10,
-                                              fontWeight: 700,
-                                              padding: "2px 7px",
-                                              borderRadius: 6,
-                                            }}
-                                          >
-                                            ✓ Servido
+                                            {parseOrderSteps(orderSteps)[item.status].icon} {parseOrderSteps(orderSteps)[item.status].label}
                                           </span>
                                         )}
                                       {isFullCancelled && (

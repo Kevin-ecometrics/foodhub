@@ -29,13 +29,14 @@ interface TableCardProps {
   onAddModalChange?: (isOpen: boolean) => void;
   onMoveItem?: (itemId: string, tableId: number, targetCustomerName: string) => void;
   waiterName: string;
+  orderSteps?: string | null;
 }
 
 export default function TableCard({
   table, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, occupationTime, hasNotifications, isHighlighted = false,
-  onAddModalChange, onMoveItem, waiterName,
+  onAddModalChange, onMoveItem, waiterName, orderSteps,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
   const isOccupied = table.status === "occupied";
@@ -96,6 +97,7 @@ export default function TableCard({
           onCancelModalChange={onAddModalChange}
           isGeneral={cs.customerName === generalName}
           onMoveItem={onMoveItem ? (itemId) => onMoveItem(itemId, table.id, cs.customerName) : undefined}
+          orderSteps={orderSteps}
         />
       ))}
 

@@ -2,10 +2,12 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import { settingsService } from "@/app/lib/supabase/settings";
-import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette } from "react-icons/fa";
+import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette, FaList } from "react-icons/fa";
 import CheckUiPreview from "./CheckUiPreview";
 import CheckUiCustomizer from "./CheckUiCustomizer";
+import CheckUiCustomizerColor from "./CheckUiCustomizerColor";
 import { CheckUiConfig } from "@/app/lib/checkUiTypes";
+import { parseOrderSteps, getStepKeys, DEFAULT_ORDER_STEPS, OrderStep } from "@/app/lib/orderSteps";
 
 interface SettingsManagementProps {
   onError: (error: string) => void;
@@ -101,6 +103,9 @@ export default function SettingsManagement({
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
+  const [showOrderStepsEditor, setShowOrderStepsEditor] = useState(false);
+  const [orderStepsRaw, setOrderStepsRaw] = useState<string | null>(null);
+  const [orderStepsForm, setOrderStepsForm] = useState<Record<string, OrderStep>>({});
 
   useEffect(() => {
     loadSettings();
@@ -116,6 +121,9 @@ export default function SettingsManagement({
           setCheckUiCustomConfig(JSON.parse(data["check_ui_customization"]));
         } catch { /* keep null = use defaults */ }
       }
+      const stepsRaw = data["order_steps"] || null;
+      setOrderStepsRaw(stepsRaw);
+      setOrderStepsForm(structuredClone(parseOrderSteps(stepsRaw)));
     } catch {
       onError("Error cargando la configuración");
     } finally {
@@ -419,6 +427,36 @@ export default function SettingsManagement({
         </div>
       )}
 
+      {!loading && (
+        <div className="bg-white border border-slate-200 rounded-[14px]">
+          <div className="flex items-center justify-between gap-4 p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <FaList className="text-[oklch(62%_0.18_32)] text-sm" />
+              </div>
+              <div>
+                <p className="text-[14px] font-bold text-slate-900">
+                  Pasos del pedido
+                </p>
+                <p className="text-[12px] text-slate-500 mt-0.5 max-w-xl">
+                  Personaliza las etiquetas y colores de cada estado del pedido (Ordenado → Preparación → Listo → Servido).
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setOrderStepsForm(structuredClone(parseOrderSteps(orderStepsRaw)));
+                setShowOrderStepsEditor(true);
+              }}
+              className="px-4 py-2 rounded-[9px] bg-[oklch(62%_0.18_32)] text-xs font-bold text-white hover:brightness-110 transition cursor-pointer flex items-center gap-1.5"
+            >
+              <FaPalette className="text-[10px]" />
+              Personalizar
+            </button>
+          </div>
+        </div>
+      )}
+
       {showCheckUiPreview && (
         <div
           onClick={() => setShowCheckUiPreview(false)}
@@ -505,6 +543,113 @@ export default function SettingsManagement({
                 }}
                 onClose={() => setShowCheckUiCustomizer(false)}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOrderStepsEditor && (
+        <div
+          onClick={() => setShowOrderStepsEditor(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[18px] overflow-hidden shadow-2xl animate-[wr-scalein_0.22s_ease]"
+            style={{ width: "min(96vw, 600px)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+          >
+            <div className="flex items-center justify-between p-5 pb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center">
+                  <FaList className="text-[oklch(62%_0.18_32)] text-sm" />
+                </div>
+                <p className="text-[17px] font-extrabold text-slate-900">
+                  Pasos del pedido
+                </p>
+              </div>
+              <button
+                onClick={() => setShowOrderStepsEditor(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer bg-white flex-shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto" style={{ flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {getStepKeys().map((key) => {
+                  const s = orderStepsForm[key];
+                  if (!s) return null;
+                  return (
+                    <div key={key} style={{ border: "1.5px solid oklch(88% 0.01 260)", borderRadius: 12, padding: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                        <div style={{ width: 24, height: 24, borderRadius: 6, background: s.bg, border: "1.5px solid oklch(88% 0.01 260)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: s.color, flexShrink: 0 }}>{s.icon}</div>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: 0, textTransform: "capitalize" }}>{key}</p>
+                        <span style={{ fontSize: 11, color: s.color, fontWeight: 600, background: s.bg, padding: "2px 8px", borderRadius: 4 }}>{s.icon} {s.label}</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                        <div>
+                          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", margin: "0 0 4px" }}>Etiqueta</p>
+                          <input
+                            value={s.label}
+                            onChange={(e) => setOrderStepsForm((prev) => ({ ...prev, [key]: { ...prev[key], label: e.target.value } }))}
+                            style={{ width: "100%", padding: "8px 10px", border: "1.5px solid oklch(88% 0.01 260)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                          />
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", margin: "0 0 4px" }}>Etiqueta corta</p>
+                          <input
+                            value={s.shortLabel}
+                            onChange={(e) => setOrderStepsForm((prev) => ({ ...prev, [key]: { ...prev[key], shortLabel: e.target.value } }))}
+                            style={{ width: "100%", padding: "8px 10px", border: "1.5px solid oklch(88% 0.01 260)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <CheckUiCustomizerColor
+                            label="Fondo"
+                            value={s.bg}
+                            onChange={(v) => setOrderStepsForm((prev) => ({ ...prev, [key]: { ...prev[key], bg: v } }))}
+                          />
+                        </div>
+                        <div>
+                          <CheckUiCustomizerColor
+                            label="Texto"
+                            value={s.color}
+                            onChange={(v) => setOrderStepsForm((prev) => ({ ...prev, [key]: { ...prev[key], color: v } }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 pt-0">
+              <button
+                onClick={() => setShowOrderStepsEditor(false)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  const merged = parseOrderSteps(orderStepsRaw);
+                  for (const key of getStepKeys()) {
+                    merged[key] = { ...merged[key], ...orderStepsForm[key] };
+                  }
+                  await settingsService.updateSetting("order_steps", JSON.stringify(merged));
+                  setOrderStepsRaw(JSON.stringify(merged));
+                  toast("Pasos guardados", "success");
+                  setShowOrderStepsEditor(false);
+                }}
+                className="flex-1 py-3 rounded-xl border-none text-sm font-bold text-white bg-[oklch(62%_0.18_32)] cursor-pointer hover:brightness-110 transition-colors"
+              >
+                Guardar
+              </button>
             </div>
           </div>
         </div>

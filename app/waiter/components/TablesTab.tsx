@@ -16,12 +16,14 @@ interface TablesTabProps {
   onAddModalChange?: (isOpen: boolean) => void;
   onMoveItem?: (itemId: string, tableId: number, targetCustomerName: string) => void;
   waiterName: string;
+  orderSteps?: string | null;
 }
 
 export default function TablesTab({
   tables, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, tablesOrder, onAddModalChange, onMoveItem, waiterName,
+  orderSteps,
 }: TablesTabProps) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -105,6 +107,7 @@ export default function TablesTab({
                 onAddModalChange={onAddModalChange}
                 onMoveItem={onMoveItem}
                 waiterName={waiterName}
+                orderSteps={orderSteps}
               />
             </div>
           );

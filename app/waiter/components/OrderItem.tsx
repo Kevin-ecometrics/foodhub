@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import type { OrderItem } from "@/app/lib/supabase/order-items";
+import { parseOrderSteps } from "@/app/lib/orderSteps";
 
 interface OrderItemProps {
   item: OrderItem;
@@ -9,14 +10,12 @@ interface OrderItemProps {
   onCancelItem: (itemId: string, cancelQuantity: number) => void;
   onCancelModalChange?: (isOpen: boolean) => void;
   draggable?: boolean;
+  orderSteps?: string | null;
 }
 
-const STATUS_LABEL: Record<string, string> = { ordered:"Ordenado", preparing:"En Preparación", ready:"Listo", served:"Servido", cancelled:"Cancelado" };
-const STATUS_BG:    Record<string, string> = { ordered:"var(--red-light)", preparing:"var(--amber-light)", ready:"var(--blue-light)", served:"var(--green-light)", cancelled:"var(--surface)" };
-const STATUS_COLOR: Record<string, string> = { ordered:"var(--red)", preparing:"var(--amber)", ready:"var(--blue)", served:"var(--green)", cancelled:"var(--muted)" };
-const STATUS_NEXT:  Record<string, string> = { ordered:"preparing", preparing:"ready", ready:"served", served:"served", cancelled:"cancelled" };
-
-export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem, onCancelModalChange, draggable = false }: OrderItemProps) {
+export default function OrderItem({ item, processing, onUpdateStatus, onCancelItem, onCancelModalChange, draggable = false, orderSteps }: OrderItemProps) {
+  const steps = parseOrderSteps(orderSteps);
+  const step = steps[item.status] || steps.ordered;
   const { toast } = useToast();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelQuantity, setCancelQuantity] = useState(1);
@@ -32,7 +31,7 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
   const handleStatusClick = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (item.status === "served" || item.status === "cancelled") return;
-    onUpdateStatus(item.id, STATUS_NEXT[item.status] || item.status);
+    onUpdateStatus(item.id, step.next || item.status);
   };
 
   const handleCancelClick = (e: React.MouseEvent) => {
@@ -106,9 +105,9 @@ export default function OrderItem({ item, processing, onUpdateStatus, onCancelIt
             <button
               onClick={handleStatusClick}
               disabled={isProcessing || item.status==="served" || item.status==="cancelled" || remainingQuantity===0}
-              style={{ padding:"5px 12px",borderRadius:7,border:"none",background:STATUS_BG[item.status]||"var(--surface)",color:STATUS_COLOR[item.status]||"var(--muted)",fontSize:11,fontWeight:700,cursor:item.status==="served"||item.status==="cancelled"?"default":"pointer",fontFamily:"inherit",transition:"filter 0.15s",opacity:isProcessing?0.6:1 }}
+              style={{ padding:"5px 12px",borderRadius:7,border:"none",background:step.bg,color:step.color,fontSize:11,fontWeight:700,cursor:item.status==="served"||item.status==="cancelled"?"default":"pointer",fontFamily:"inherit",transition:"filter 0.15s",opacity:isProcessing?0.6:1 }}
             >
-              {isProcessing ? "↻" : STATUS_LABEL[item.status] || item.status}
+              {isProcessing ? "↻" : step.label}
             </button>
             {canCancel() && (
               <button
