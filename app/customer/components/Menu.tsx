@@ -1701,6 +1701,9 @@ export default function MenuPage() {
         } catch (e) {
           console.error(e);
         }
+        setHasCheckedSession(true);
+        setIsInitialLoad(false);
+        return;
       }
       if (tableId && orderId && userId) {
         setHasCheckedSession(true);
@@ -1715,11 +1718,8 @@ export default function MenuPage() {
 
   useEffect(() => {
     if (!hasCheckedSession || isInitialLoad) return;
+    if (!tableId || !orderId || !userId) return;
     const loadData = async () => {
-      if (!tableId || !orderId || !userId) {
-        router.push("/customer");
-        return;
-      }
       try {
         await loadInitialData(parseInt(tableId), orderId, userId);
       } catch (e) {

@@ -157,11 +157,11 @@ All tables have RLS enabled.
 ### `app_settings`
 | Column | Type | Default | Notes |
 |---|---|---|---|
-| key | text PK | — | ej. `product_notes_enabled`, `breakfast_end_hour`, `printing_enabled`, `default_check_ui`, `close_table_pin` |
-| value | text | `'false'` | toggles: `'true'`/`'false'`, time: `"HH:MM"`, select: string |
+| key | text PK | — | ej. `product_notes_enabled`, `breakfast_end_hour`, `printing_enabled`, `default_check_ui`, `close_table_pin`, `check_ui_customization`, `order_steps` |
+| value | text | `'false'` | toggles: `'true'`/`'false'`, time: `"HH:MM"`, select: string, JSON: `check_ui_customization` y `order_steps` |
 | updated_at | timestamptz | now() | trigger `set_updated_at` |
 
-> Feature flags configurables desde `/admin` → Configuración. Soporta tipos: toggle (`'true'`/`'false'`), time (`"HH:MM"`), select (string). Lectura pública (RLS `select` abierto), escritura solo admin/super_admin.
+> Feature flags configurables desde `/admin` → Configuración. Soporta tipos: toggle (`'true'`/`'false'`), time (`"HH:MM"`), select (string), JSON (`check_ui_customization` — diseño de cuenta personalizado, `order_steps` — etiquetas/colores de estados). Lectura pública (RLS `select` abierto), escritura solo admin/super_admin.
 
 ---
 
@@ -210,11 +210,20 @@ Admin (/admin)
   └─ Login JWT
   └─ Dashboard con métricas diarias (ingresos, propinas, órdenes, productos top)
   └─ CRUD: Mesas / Productos / Categorías
-  └─ Configuración con 7 settings:
+  └─ Configuración con 9 settings:
        ├─ Notas especiales en productos (toggle)
        ├─ Cambio de Desayuno a Comida (time picker)
        ├─ Impresión (toggle) — al activar muestra modal de pago simulado con tarjeta ($35 USD)
        ├─ Diseño de cuenta por defecto (select: Moderno/Clásico/Compacto)
+       │    └─ Vista Previa — modal con preview del ticket
+       │    └─ Personalizar — modal con editor completo de 3 modos (CheckUiCustomizer)
+       │         ├─ Tabs: Moderno / Clásico / Compacto
+       │         ├─ Secciones: Container, Header, Customers, Items, Totals, Footer
+       │         ├─ Color picker con 12 swatches de la paleta webapp + color nativo + texto OKLCH/hex
+       │         └─ Reset / Guardar — guarda en `check_ui_customization` + sincroniza `default_check_ui`
+       ├─ Pasos del pedido — editor de estados (ordenado→preparación→listo→servido→cancelado)
+       │    └─ Modal con campos: label, shortLabel, bg color, text color por paso
+       │    └─ Guarda en `order_steps` — usado por waiter y customer
        ├─ Cover del menú (preview + upload)
        ├─ Logo del negocio (preview + upload)
        └─ PIN para cerrar mesa (password)
@@ -230,18 +239,21 @@ app/
 ├── page.tsx                        # Landing / redirect
 ├── not-found.tsx
 │
-├── admin/
-│   ├── page.tsx                    # Admin shell + routing
-│   └── components/
-│       ├── LoginForm.tsx
-│       ├── Dashboard.tsx           # Analytics, stats, tips del día
-│       ├── TablesManagement.tsx    # CRUD mesas
-│       ├── TableForm.tsx
-│       ├── ProductsManagement.tsx  # CRUD productos
-│       ├── ProductForm.tsx
-│       ├── CategoriesManagement.tsx
-│       ├── SettingsManagement.tsx  # Panel de config (toggles, time, select, cover/logo upload)
-│       └── StarRating.tsx
+    ├── admin/
+    │   ├── page.tsx                    # Admin shell + routing
+    │   └── components/
+    │       ├── LoginForm.tsx
+    │       ├── Dashboard.tsx           # Analytics, stats, tips del día
+    │       ├── TablesManagement.tsx    # CRUD mesas
+    │       ├── TableForm.tsx
+    │       ├── ProductsManagement.tsx  # CRUD productos
+    │       ├── ProductForm.tsx
+    │       ├── CategoriesManagement.tsx
+    │       ├── SettingsManagement.tsx  # Panel de config (toggles, time, select, cover/logo upload)
+    │       ├── CheckUiCustomizer.tsx   # Editor completo de diseño de cuenta (3 modos)
+    │       ├── CheckUiCustomizerColor.tsx  # Color picker con paleta webapp + nativo + texto
+    │       ├── CheckUiPreview.tsx      # Preview visual de diseños de cuenta
+    │       └── StarRating.tsx
 │
 ├── customer/
 │   ├── page.tsx                    # Entry → nombre de cliente
@@ -279,24 +291,30 @@ app/
 │   ├── ToastContext.tsx
 │   └── ConfirmContext.tsx
 │
-├── lib/supabase/
-│   ├── client.ts                   # Supabase client singleton
-│   ├── config.ts                   # URL + anon key
-│   ├── types.ts                    # Tipos TypeScript de DB
-│   ├── orders.ts                   # CRUD órdenes
-│   ├── order-items.ts              # CRUD items de orden
-│   ├── products.ts                 # Catálogo
-│   ├── tables.ts                   # Gestión de mesas
-│   ├── categories.ts               # Categorías
-│   ├── waiter.ts                   # freeTableAndClean, notif management
-│   ├── notifications.ts            # Crear notificaciones
-│   ├── history.ts                  # requestBill, sales archival, historial
-│   └── tips.ts                     # insertTip, getTipsTotal, getTipsByDateRange
+├── lib/
+    │   ├── supabase/
+    │   │   ├── client.ts               # Supabase client singleton
+    │   │   ├── config.ts               # URL + anon key
+    │   │   ├── types.ts                # Tipos TypeScript de DB
+    │   │   ├── orders.ts               # CRUD órdenes
+    │   │   ├── order-items.ts          # CRUD items de orden
+    │   │   ├── products.ts             # Catálogo
+    │   │   ├── tables.ts               # Gestión de mesas
+    │   │   ├── categories.ts           # Categorías
+    │   │   ├── waiter.ts               # freeTableAndClean, notif management
+    │   │   ├── notifications.ts        # Crear notificaciones
+    │   │   ├── history.ts              # requestBill, sales archival, historial
+    │   │   ├── settings.ts             # settingsService — getSetting, getAllSettings, updateSetting
+    │   │   └── tips.ts                 # insertTip, getTipsTotal, getTipsByDateRange
+    │   ├── checkUiTypes.ts             # Tipos: ModeConfig, CheckUiConfig, DEFAULT_CONFIG, SPACING_MAP, etc.
+    │   ├── checkUiRenderer.ts          # configToStyles() → TicketStyles con CSSProperties
+    │   └── orderSteps.ts               # Tipos: OrderStep, OrderStepsConfig, DEFAULT_ORDER_STEPS, parseOrderSteps()
 │
 └── api/
     ├── admin/login/route.ts        # JWT login
     ├── admin/verify/route.ts       # JWT verify
-    └── invoice/route.ts            # Envío de factura por email
+    ├── invoice/route.ts            # Envío de factura por email
+    └── settings/public/route.ts    # GET — todas las settings (service_role, bypass RLS) para customer
 ```
 
 ---
@@ -356,14 +374,43 @@ app/
 - [x] CRUD Productos (imagen, precio, tiempo prep, disponibilidad, extras)
 - [x] CRUD Categorías (orden de display, activo/inactivo)
 - [x] CRUD Usuarios (`UsersManagement.tsx`) — crear/editar/desactivar/eliminar cuentas admin/waiter, PIN, ya verificadas sin correo
-- [x] Configuración (`SettingsManagement.tsx`) — panel de settings con 5 tipos: toggle, time picker, select dropdown, image upload (cover/logo), password
+- [x] Configuración (`SettingsManagement.tsx`) — panel de settings con 9 tipos: toggle, time picker, select dropdown, image upload (cover/logo), password, JSON (check_ui_customization + order_steps)
   - [x] Toggle: Notas especiales en productos, Impresión (con modal de pago simulado al activar)
   - [x] Time picker: Cambio de Desayuno a Comida
-  - [x] Select: Diseño de cuenta por defecto (Moderno/Clásico/Compacto)
+  - [x] Select: Diseño de cuenta por defecto (Moderno/Clásico/Compacto) — con botones "Vista Previa" y "Personalizar"
+  - [x] **Check UI Customizer** — modal con editor completo de diseño de cuenta en 3 modos (modern, classic, compact)
+    - [x] Tabs por modo con preview dinámica
+    - [x] Secciones: Container, Header, Customers, Items, Totals, Footer
+    - [x] Color picker (`CheckUiCustomizerColor.tsx`) con 12 swatches de la paleta webapp + input nativo + texto OKLCH/hex
+    - [x] Reset por modo, Guardar persiste en `check_ui_customization` + sincroniza `default_check_ui`
+    - [x] Cierre automático del modal al guardar
+  - [x] **Pasos del pedido editor** — modal con campos editables para cada estado (ordered, preparing, ready, served, cancelled)
+    - [x] Por paso: label, shortLabel, bg color, text color (usa CheckUiCustomizerColor)
+    - [x] Guarda en `order_steps`
   - [x] Image upload: Cover del menú + Logo del negocio (movidos del sidebar a settings)
   - [x] Password: PIN para cerrar mesa (input enmascarado + toggle visibilidad + auto-save)
 - [x] Upload de logo (Supabase Storage bucket `logo`) — ahora desde Configuración
 - [x] Upload de cover (Supabase Storage bucket `cover-image`) — ahora desde Configuración
+
+### Check UI Customization (Diseño de Cuenta)
+- [x] `app/lib/checkUiTypes.ts` — Tipos (`ModeConfig`, `CheckUiConfig`), defaults para 3 modos, `SPACING_MAP`, `BORDER_RADIUS_MAP`, `FONT_MAP`
+- [x] `app/lib/checkUiRenderer.ts` — `configToStyles()` → `TicketStyles` con CSSProperties para todas las secciones del ticket
+- [x] `app/admin/components/CheckUiCustomizer.tsx` — Panel de personalización con tabs por modo, secciones colapsables, reset/save
+- [x] `app/admin/components/CheckUiCustomizerColor.tsx` — Color picker popover con 12 swatches + color nativo + texto OKLCH/hex
+- [x] `app/admin/components/CheckUiPreview.tsx` — Preview visual de los 3 modos de ticket
+- [x] `app/api/settings/public/route.ts` — GET endpoint con service_role para que customer acceda a settings sin RLS
+- [x] `app/customer/components/Payment.tsx` — Render config-driven del ticket; carga settings desde `/api/settings/public`
+- [x] `app/customer/components/Menu.tsx` — Carga `check_ui_customization` en loadInitialData() para render del tab "Cuenta"
+- [x] Compact v2.0: sin sidebar, header transparente con texto navy, footer muted, borde sólido radius medium
+- [x] CSS variables en `configToStyles()` usan `var(--border)`, `var(--muted)`, `var(--text)`, `var(--navy)`, `var(--navy-light)`, `var(--red-light)` — consistentes con webapp palette
+
+### Order Steps (Pasos del Pedido Centralizados)
+- [x] `app/lib/orderSteps.ts` — Tipos (`OrderStep`, `OrderStepsConfig`), `DEFAULT_ORDER_STEPS`, `parseOrderSteps()`, `getStepKeys()`
+- [x] SQL: `INSERT INTO app_settings (key, value) VALUES ('order_steps', '{...}')` en Supabase
+- [x] **Waiter prop chain**: `waiter/page.tsx` → `TablesTab` → `TableCard` → `CustomerOrderSection` → `OrderItem`
+  - [x] Carga de `order_steps` en `loadData()` usando `settingsService.getSetting()`
+  - [x] `OrderItem.tsx` reemplaza `STATUS_LABEL/BG/COLOR/NEXT` hardcodeados por `parseOrderSteps(orderSteps)` dinámico
+- [x] **Customer Menu.tsx** — carga `order_steps` en `loadInitialData()`; badges en Cuenta tab reemplazados por render dinámico; **agregado badge `ready` que faltaba** en modo compact y normal
 
 ### Service Layer
 - [x] `tips.ts` — insertTip, getTipsTotal, getTipsByDateRange
@@ -401,6 +448,15 @@ app/
 | 2026-07-20 | — | `PasswordModal` refactorizado: elimina hardcode `"restaurant"`, valida contra `targetPin` prop |
 | 2026-07-20 | — | `waiterService.resetTable()` — elimina pedidos/notificaciones sin historial (como admin) |
 | 2026-07-20 | — | Modal de pago simulado para `printing_enabled` — formulario tipo Shopify con tarjeta, $35 USD, mock |
+| 2026-07-21 | — | `app/lib/checkUiTypes.ts` + `checkUiRenderer.ts` — sistema de diseño de cuenta configurable (3 modos: modern, classic, compact) |
+| 2026-07-21 | — | `app/admin/components/CheckUiCustomizer.tsx` + `CheckUiCustomizerColor.tsx` + `CheckUiPreview.tsx` — editor visual de diseño de cuenta |
+| 2026-07-21 | — | `app/api/settings/public/route.ts` — endpoint público para customer acceda a settings con service_role |
+| 2026-07-21 | — | `Payment.tsx` + `Menu.tsx` — customer usa diseño config-driven desde `/api/settings/public` |
+| 2026-07-21 | — | `app/lib/orderSteps.ts` — tipos, defaults y parser para configuración centralizada de pasos del pedido |
+| 2026-07-21 | — | SQL: `order_steps` agregado a `app_settings` |
+| 2026-07-21 | — | Waiter prop chain: `orderSteps` cargado en waiter/page y propagado hasta OrderItem, reemplazando STATUS_* hardcodeados |
+| 2026-07-21 | — | Menu.tsx: badges dinámicos en Cuenta tab + fix: agregado badge `ready` faltante |
+| 2026-07-21 | — | SettingsManagement.tsx: agregado editor de pasos del pedido (modal con label, shortLabel, bg, text color por paso) |
 
 ---
 

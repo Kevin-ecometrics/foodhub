@@ -135,6 +135,20 @@ export default function CustomerPage() {
 
   useEffect(() => {
     if (tableFromParams !== null && paramsChecked) {
+      const stored = localStorage.getItem("customerSession");
+      if (stored) {
+        try {
+          const data = JSON.parse(stored);
+          if (data.tableId && data.tableNumber && Date.now() - data.timestamp < 4 * 60 * 60 * 1000) {
+            const tableNumber = parseInt(tableFromParams);
+            if (data.tableNumber === tableNumber) {
+              setSession(data);
+              router.replace("/customer/menu");
+              return;
+            }
+          }
+        } catch { /* ignore */ }
+      }
       loadAllTables();
       checkURLParams();
     }
@@ -176,10 +190,17 @@ export default function CustomerPage() {
     try {
       const table = tables.find((t) => t.number === selectedTable);
       if (!table) { setError("Mesa no encontrada"); return; }
-      const order = await ordersService.createOrder(table.id, customerName.trim());
+      const trimmedName = customerName.trim();
+      const existing = await ordersService.getOrderByUser(table.id, trimmedName);
+      if (existing) {
+        setSession({ tableId: table.id.toString(), userId: existing.id, orderId: existing.id, customerName: trimmedName, tableNumber: table.number });
+        router.push("/customer/menu");
+        return;
+      }
+      const order = await ordersService.createOrder(table.id, trimmedName);
       if (table.status === "available") await tablesService.updateTableStatus(table.id, "occupied");
-      await notificationsService.createNotification(table.id, "new_order", `Nuevo cliente en Mesa ${table.number} - ${customerName.trim()}`, order.id);
-      setSession({ tableId: table.id.toString(), userId: order.id, orderId: order.id, customerName: customerName.trim(), tableNumber: table.number });
+      await notificationsService.createNotification(table.id, "new_order", `Nuevo cliente en Mesa ${table.number} - ${trimmedName}`, order.id);
+      setSession({ tableId: table.id.toString(), userId: order.id, orderId: order.id, customerName: trimmedName, tableNumber: table.number });
       router.push("/customer/menu");
     } catch (err) {
       setError("Error al crear la orden");
