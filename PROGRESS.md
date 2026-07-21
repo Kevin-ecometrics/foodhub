@@ -324,6 +324,8 @@ app/
 - [x] Encuesta de satisfacción post-pago (1–5 estrellas + comentario → `customer_feedback`)
 - [x] Solicitud de factura por email (`/api/invoice`)
 - [x] Generación de ticket PDF
+- [x] **Banner de portada rediseñado** (2026-07-21): degradado oscuro en la parte inferior de la imagen de portada para legibilidad, nombre del restaurante ("RioChia7") superpuesto en blanco sobre la imagen; el header debajo ahora muestra el nombre del cliente donde antes iba el nombre del restaurante, con "Mesa N" y el código de orden debajo
+- [x] **Buscador en el menú** (2026-07-21): input arriba de la barra de categorías en `Menu.tsx`; busca por nombre de producto y por nombre de categoría (insensible a acentos/mayúsculas vía `normalizeText`); resultados por nombre de producto salen primero (agrupados en una sección "Resultados para..."), seguidos de las categorías completas cuyo nombre coincide; ranking por relevancia con `getNameMatchRank` (coincidencia exacta > empieza con la búsqueda > alguna palabra empieza con la búsqueda) para evitar falsos positivos por substring (ej. buscar "té" ya no muestra "Latte")
 
 ### Waiter Dashboard
 - [x] Login en `/waiter/login` por correo+contraseña o PIN de 4 dígitos (Supabase Auth), protegido por `middleware.ts`
