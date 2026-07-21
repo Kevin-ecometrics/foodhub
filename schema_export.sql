@@ -81,7 +81,8 @@ create table if not exists public.order_items (
   status character varying default 'ordered'::character varying,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
-  cancelled_quantity integer default 0
+  cancelled_quantity integer default 0,
+  course smallint not null default 1 check (course >= 1 and course <= 3)
 );
 
 -- waiter_notifications
@@ -132,7 +133,10 @@ create table if not exists public.customer_feedback (
   comment text,
   order_count integer not null,
   total_amount numeric not null,
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  feedback_type text not null default 'general' check (feedback_type in ('general', 'product')),
+  product_id integer,
+  product_name character varying
 );
 
 -- tips
@@ -365,11 +369,24 @@ alter table public.app_settings alter column value type text using value::text;
 alter table public.app_settings alter column value set not null;
 alter table public.app_settings alter column value set default 'false'::text;
 
+-- 2026-07-21: add_feedback_type_to_customer_feedback
+-- Distingue reseñas generales de reseñas por producto en la encuesta post-pago
+alter table public.customer_feedback
+  add column if not exists feedback_type text not null default 'general' check (feedback_type in ('general', 'product'));
+alter table public.customer_feedback
+  add column if not exists product_id integer;
+alter table public.customer_feedback
+  add column if not exists product_name character varying;
+
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales
 -- ---------------------------------------------------------------------
 insert into public.app_settings (key, value)
 values ('product_notes_enabled', 'false')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('product_ratings_enabled', 'false')
 on conflict (key) do nothing;
 
 insert into public.app_settings (key, value)

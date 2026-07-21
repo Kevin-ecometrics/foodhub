@@ -25,6 +25,7 @@ export type OrderStatus        = 'active' | 'pending' | 'sent' | 'completed' | '
 export type PaymentMethod      = 'cash' | 'terminal' | 'usd' | 'mixed' | null
 export type UserRole           = 'super_admin' | 'admin' | 'waiter'
 export type MealType           = 'breakfast' | 'lunch' | 'both'
+export type FeedbackType       = 'general' | 'product'
 
 // ─── Shared Interfaces ────────────────────────────────────────────────────────
 
@@ -393,6 +394,9 @@ export interface Database {
           order_count: number
           total_amount: number
           created_at: string | null
+          feedback_type: FeedbackType
+          product_id: number | null
+          product_name: string | null
         }
         Insert: {
           id?: string
@@ -403,6 +407,9 @@ export interface Database {
           order_count: number
           total_amount: number
           created_at?: string | null
+          feedback_type?: FeedbackType
+          product_id?: number | null
+          product_name?: string | null
         }
         Update: {
           id?: string
@@ -413,6 +420,9 @@ export interface Database {
           order_count?: number
           total_amount?: number
           created_at?: string | null
+          feedback_type?: FeedbackType
+          product_id?: number | null
+          product_name?: string | null
         }
       }
 
