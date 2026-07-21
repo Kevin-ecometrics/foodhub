@@ -2,7 +2,10 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import { settingsService } from "@/app/lib/supabase/settings";
-import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette } from "react-icons/fa";
+import CheckUiPreview from "./CheckUiPreview";
+import CheckUiCustomizer from "./CheckUiCustomizer";
+import { CheckUiConfig } from "@/app/lib/checkUiTypes";
 
 interface SettingsManagementProps {
   onError: (error: string) => void;
@@ -89,6 +92,9 @@ export default function SettingsManagement({
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const [showCheckUiPreview, setShowCheckUiPreview] = useState(false);
+  const [showCheckUiCustomizer, setShowCheckUiCustomizer] = useState(false);
+  const [checkUiCustomConfig, setCheckUiCustomConfig] = useState<CheckUiConfig | null>(null);
   const [showPrintPaymentModal, setShowPrintPaymentModal] = useState(false);
   const [printPaymentLoading, setPrintPaymentLoading] = useState(false);
   const [cardName, setCardName] = useState("");
@@ -105,6 +111,11 @@ export default function SettingsManagement({
     try {
       const data = await settingsService.getAllSettings();
       setValues(data);
+      if (data["check_ui_customization"]) {
+        try {
+          setCheckUiCustomConfig(JSON.parse(data["check_ui_customization"]));
+        } catch { /* keep null = use defaults */ }
+      }
     } catch {
       onError("Error cargando la configuración");
     } finally {
@@ -262,20 +273,41 @@ export default function SettingsManagement({
 
     if (setting.type === "select") {
       const val = (values[setting.key] as string) ?? (setting.options?.[0]?.value ?? "");
+      const isCheckUi = setting.key === "default_check_ui";
       return (
-        <div className="relative flex-shrink-0">
-          <select
-            value={val}
-            onChange={(e) => handleSelectChange(setting.key, e.target.value)}
-            className="appearance-none px-3 py-1.5 pr-8 border border-slate-200 rounded-[9px] text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:border-[var(--color-accent)] cursor-pointer"
-          >
-            {setting.options?.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <FaChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <select
+              value={val}
+              onChange={(e) => handleSelectChange(setting.key, e.target.value)}
+              className="appearance-none px-3 py-1.5 pr-8 border border-slate-200 rounded-[9px] text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:border-[var(--color-accent)] cursor-pointer"
+            >
+              {setting.options?.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <FaChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none" />
+          </div>
+          {isCheckUi && (
+            <>
+              <button
+                onClick={() => setShowCheckUiPreview(true)}
+                className="px-3 py-1.5 rounded-[9px] border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer flex items-center gap-1.5"
+              >
+                <FaSearch className="text-[10px]" />
+                Vista Previa
+              </button>
+              <button
+                onClick={() => setShowCheckUiCustomizer(true)}
+                className="px-3 py-1.5 rounded-[9px] bg-[oklch(62%_0.18_32)] text-xs font-bold text-white hover:brightness-110 transition cursor-pointer flex items-center gap-1.5"
+              >
+                <FaPalette className="text-[10px]" />
+                Personalizar
+              </button>
+            </>
+          )}
         </div>
       );
     }
@@ -384,6 +416,97 @@ export default function SettingsManagement({
               {renderControl(setting)}
             </div>
           ))}
+        </div>
+      )}
+
+      {showCheckUiPreview && (
+        <div
+          onClick={() => setShowCheckUiPreview(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[18px] overflow-hidden shadow-2xl animate-[wr-scalein_0.22s_ease]"
+            style={{ width: "min(94vw, 480px)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+          >
+            <div className="flex items-center justify-between p-5 pb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center">
+                  <FaSearch className="text-[oklch(62%_0.18_32)] text-sm" />
+                </div>
+                <p className="text-[17px] font-extrabold text-slate-900">
+                  Vista Previa — Diseño {values["default_check_ui"] === "compact" ? "Compacto" : values["default_check_ui"] === "classic" ? "Clásico" : "Moderno"}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCheckUiPreview(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer bg-white flex-shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              <CheckUiPreview mode={values["default_check_ui"] || "modern"} customConfig={checkUiCustomConfig ?? undefined} />
+            </div>
+            <div className="p-5 pt-0">
+              <button
+                onClick={() => setShowCheckUiPreview(false)}
+                className="w-full py-3 rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCheckUiCustomizer && (
+        <div
+          onClick={() => setShowCheckUiCustomizer(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[18px] overflow-hidden shadow-2xl animate-[wr-scalein_0.22s_ease]"
+            style={{ width: "min(96vw, 960px)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+          >
+            <div className="flex items-center justify-between p-5 pb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center">
+                  <FaPalette className="text-[oklch(62%_0.18_32)] text-sm" />
+                </div>
+                <p className="text-[17px] font-extrabold text-slate-900">
+                  Personalizar diseños de cuenta
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCheckUiCustomizer(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer bg-white flex-shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto" style={{ flex: 1 }}>
+              <CheckUiCustomizer
+                initialConfig={checkUiCustomConfig ?? undefined}
+                initialMode={values["default_check_ui"] || "modern"}
+                onSave={async (config, activeMode) => {
+                  await settingsService.updateSetting("check_ui_customization", JSON.stringify(config));
+                  await settingsService.updateSetting("default_check_ui", activeMode);
+                  setCheckUiCustomConfig(config);
+                  setValues((prev) => ({ ...prev, default_check_ui: activeMode }));
+                  toast("Configuración guardada", "success");
+                }}
+                onClose={() => setShowCheckUiCustomizer(false)}
+              />
+            </div>
+          </div>
         </div>
       )}
 

@@ -7,6 +7,8 @@ import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems, OrderItemWithProduct } from "@/app/lib/supabase/history";
 import { useToast } from "@/app/context/ToastContext";
 import { supabase } from "@/app/lib/supabase/client";
+import { DEFAULT_CONFIG, CheckUiConfig, ModeConfig } from "@/app/lib/checkUiTypes";
+import { configToStyles } from "@/app/lib/checkUiRenderer";
 import axios from "axios";
 
 // ─── Design CSS ──────────────────────────────────────────────────────────────
@@ -200,11 +202,66 @@ const formatNotesForPDF = (notes: string) => {
   return `<div class="notes-main"><strong>Nota:</strong> ${notes}</div>`;
 };
 
-const renderOrderItem = (item: OrderItemWithProduct) => {
+const renderOrderItem = (item: OrderItemWithProduct, mode: string) => {
   const cancelledQty = item.cancelled_quantity || 0;
   const activeQuantity = item.quantity - cancelledQty;
   const isCancelled = activeQuantity === 0;
   const isPartiallyCancelled = cancelledQty > 0 && activeQuantity > 0;
+  const compact = mode === "compact";
+  const classic = mode === "classic";
+
+  if (compact) {
+    return (
+      <div key={item.id} style={{ padding:"7px 16px",borderBottom:"1px solid var(--border)",background:isCancelled?"oklch(98% 0.03 20)":"white" }}>
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:6,flex:1,minWidth:0 }}>
+            <span style={{ fontSize:13,fontWeight:600,color:isCancelled?"var(--red)":"var(--text)",textDecoration:isCancelled?"line-through":"none",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>
+              {item.product_name}
+            </span>
+            {isCancelled && <span style={{ background:"var(--red-light)",color:"var(--red)",fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:4,flexShrink:0 }}>Cancelado</span>}
+            {isPartiallyCancelled && <span style={{ background:"var(--amber-light)",color:"var(--amber)",fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:4,flexShrink:0 }}>Parcial</span>}
+          </div>
+          <span style={{ fontSize:12,fontWeight:700,color:isCancelled?"var(--muted)":"var(--text)",flexShrink:0,marginLeft:8 }}>
+            {activeQuantity > 0 ? `${activeQuantity} × ${formatCurrency(item.price)}` : formatCurrency(item.price * item.quantity)}
+          </span>
+        </div>
+        {cancelledQty > 0 && !isCancelled && (
+          <p style={{ fontSize:10,color:"var(--red)",margin:0,marginTop:2 }}>{cancelledQty} cancelado{cancelledQty>1?"s":""} ({formatCurrency(item.price * cancelledQty)})</p>
+        )}
+        {item.notes && (
+          <div style={{ fontSize:10,color:"var(--muted)",marginTop:2 }}>
+            📝 {item.notes}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (classic) {
+    return (
+      <div key={item.id} style={{ padding:"8px 24px",borderBottom:"1px dotted var(--border)",background:"transparent" }}>
+        <div style={{ display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8 }}>
+          <span style={{ fontFamily:"Georgia, serif",fontSize:13,color:isCancelled?"var(--red)":"var(--text)",textDecoration:isCancelled?"line-through":"none",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:1 }}>
+            {activeQuantity}x {item.product_name}
+          </span>
+          <span style={{ flex:1,minWidth:16,height:1,borderBottom:"1px dotted var(--border)",margin:"0 4px" }} />
+          <span style={{ fontFamily:"Georgia, serif",fontSize:13,fontWeight:600,color:isCancelled?"var(--muted)":"var(--text)",whiteSpace:"nowrap",flexShrink:0 }}>
+            {isCancelled ? "Cancelado" : formatCurrency(item.price * activeQuantity)}
+          </span>
+        </div>
+        {cancelledQty > 0 && (
+          <p style={{ fontFamily:"Georgia, serif",fontSize:11,color:"var(--red)",margin:0,marginTop:2,fontStyle:"italic" }}>
+            ({cancelledQty} cancelado{cancelledQty>1?"s":""} — {formatCurrency(item.price * cancelledQty)})
+          </p>
+        )}
+        {item.notes && (
+          <div style={{ fontSize:10,color:"var(--muted)",marginTop:2,fontStyle:"italic" }}>
+            📝 {item.notes}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div key={item.id} style={{ padding:"12px 18px",borderBottom:"1px solid var(--border)",background:isCancelled?"oklch(98% 0.03 20)":"white" }}>
@@ -218,7 +275,7 @@ const renderOrderItem = (item: OrderItemWithProduct) => {
             {isPartiallyCancelled && <span style={{ background:"var(--amber-light)",color:"var(--amber)",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:6 }}>Parcialmente Cancelado</span>}
           </div>
           <p style={{ fontSize:12,color:"var(--muted)",margin:0 }}>
-            Cantidad activa: <strong>{activeQuantity}</strong>
+            Cantidad: <strong>{activeQuantity}</strong>
             {cancelledQty > 0 && <span style={{ color:"var(--red)",textDecoration:"line-through",marginLeft:4 }}>(de {item.quantity})</span>}
             {" "}• {formatCurrency(item.price)} c/u
           </p>
@@ -396,6 +453,28 @@ export default function PaymentPage() {
   const [tipCustom, setTipCustom] = useState<string>("");
   const [tipSaved, setTipSaved] = useState(false);
   const [tipSaving, setTipSaving] = useState(false);
+  const [checkUiMode, setCheckUiMode] = useState("modern");
+  const [checkUiConfig, setCheckUiConfig] = useState<CheckUiConfig | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/public")
+      .then((res) => res.json())
+      .then((data) => {
+        const mode = data["default_check_ui"];
+        const configStr = data["check_ui_customization"];
+        if (mode && mode !== 'false') setCheckUiMode(mode);
+        if (configStr) {
+          try { setCheckUiConfig(JSON.parse(configStr)); } catch { /* use defaults */ }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const modeConfig: ModeConfig = checkUiConfig
+    ? (checkUiConfig[checkUiMode as keyof CheckUiConfig] ?? DEFAULT_CONFIG[checkUiMode as keyof CheckUiConfig] ?? DEFAULT_CONFIG.modern)
+    : DEFAULT_CONFIG[checkUiMode as keyof CheckUiConfig] ?? DEFAULT_CONFIG.modern;
+
+  const ticketStyles = configToStyles(modeConfig);
 
   useEffect(() => {
     if (!paymentConfirmed || showSurvey) return;
@@ -755,84 +834,160 @@ export default function PaymentPage() {
 
         <main style={{ maxWidth:540,margin:"0 auto",padding:"20px 16px 32px" }}>
           {/* Ticket card */}
-          <div style={{ border:"1.5px solid var(--border)",borderRadius:14,overflow:"hidden",marginBottom:20,animation:"pay-fadeup 0.35s ease both" }}>
-            {/* Navy header */}
-            <div style={{ background:"var(--navy)",padding:"20px 24px",textAlign:"center" }}>
-              <p style={{ fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",color:"oklch(65% 0.01 260)",marginBottom:4,margin:0 }}>RESTAURANTE</p>
-              <p style={{ fontSize:13,color:"oklch(75% 0.01 260)",margin:0 }}>Mesa {tableNumber}</p>
-              {mesaCancelledUnits > 0 && <p style={{ fontSize:11,color:"oklch(75% 0.10 20)",margin:0,marginTop:4 }}>{mesaCancelledUnits} unidad(es) cancelada(s) excluida(s)</p>}
-            </div>
-
-            {/* Customer sections */}
-            <div style={{ background:"white" }}>
-              {customerSummaries.map((cs, ci) => (
-                <div key={cs.customerName}>
-                  {/* Customer header */}
-                  <div style={{ padding:"16px 24px 12px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-                    <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                      <div style={{ width:32,height:32,borderRadius:9,background:"var(--navy-light)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--navy)" }}><IUser /></div>
-                      <div>
-                        <p style={{ fontSize:14,fontWeight:700,color:"var(--text)",margin:0 }}>{cs.customerName}</p>
-                        <p style={{ fontSize:11,color:"var(--muted)",margin:0 }}>
-                          {cs.itemsCount} ítem{cs.itemsCount>1?"s":""} activo{cs.itemsCount>1?"s":""}
-                          {cs.cancelledUnitsCount > 0 && ` • ${cs.cancelledUnitsCount} cancelado(s)`}
-                        </p>
-                      </div>
-                    </div>
-                    <span style={{ fontSize:14,fontWeight:700,color:"var(--text)" }}>{formatCurrency(cs.total)}</span>
-                  </div>
-
-                  {/* Items */}
-                  {cs.orders.map((order, oi) => (
-                    <div key={order.id}>
-                      {cs.orders.length > 1 && (
-                        <p style={{ fontSize:11,color:"var(--muted)",padding:"8px 24px 4px",background:"var(--surface)",margin:0 }}>Orden #{order.id.slice(-8)}</p>
-                      )}
-                      {order.order_items.map(item => renderOrderItem(item))}
-                      {oi < cs.orders.length - 1 && <div style={{ height:1,background:"var(--border)",margin:"0 24px" }} />}
-                    </div>
-                  ))}
-
-                  {/* Customer total */}
-                  <div style={{ padding:"12px 24px",display:"flex",justifyContent:"space-between",borderBottom:ci<customerSummaries.length-1?"1px solid var(--border)":"none" }}>
-                    <span style={{ fontSize:14,fontWeight:700,color:"var(--text)" }}>Total de {cs.customerName}:</span>
-                    <span style={{ fontSize:14,fontWeight:800,color:"var(--text)" }}>{formatCurrency(cs.total)}</span>
-                  </div>
-                  {cs.cancelledUnitsCount > 0 && (
-                    <div style={{ padding:"0 24px 12px" }}>
-                      <p style={{ fontSize:11,color:"var(--red)",margin:0 }}>• {cs.cancelledUnitsCount} unidad(es) cancelada(s)</p>
-                      <p style={{ fontSize:11,color:"var(--red)",margin:0 }}>• {formatCurrency(cs.cancelledAmount)} excluido(s) del total</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Grand total */}
-              <div style={{ padding:"0 24px 16px",borderTop:"1px solid var(--border)" }}>
-                <div style={{ padding:"12px 0",borderBottom:"1px dashed var(--border)",display:"flex",justifyContent:"space-between" }}>
-                  <span style={{ fontSize:13,color:"var(--muted)" }}>Subtotal total:</span>
-                  <span style={{ fontSize:13,color:"var(--muted)" }}>{formatCurrency(paymentSummary.subtotal)}</span>
-                </div>
-                <div style={{ padding:"8px 0",display:"flex",justifyContent:"space-between" }}>
-                  <span style={{ fontSize:13,color:"var(--muted)" }}>Impuestos (8%):</span>
-                  <span style={{ fontSize:13,color:"var(--muted)" }}>{formatCurrency(paymentSummary.taxAmount)}</span>
-                </div>
-                <div style={{ padding:"12px 0 0",borderTop:"2px solid var(--text)",display:"flex",justifyContent:"space-between" }}>
-                  <span style={{ fontSize:16,fontWeight:800,color:"var(--text)" }}>TOTAL GENERAL:</span>
-                  <span style={{ fontSize:16,fontWeight:800,color:"var(--text)" }}>{formatCurrency(paymentSummary.total)}</span>
-                </div>
+          <div
+            style={{
+              display: modeConfig.container.sidebarWidth > 0 ? "flex" : undefined,
+              borderRadius: ticketStyles.container.borderRadius,
+              overflow: "hidden",
+              marginBottom: 20,
+              animation: "pay-fadeup 0.35s ease both",
+            }}
+          >
+            {modeConfig.container.sidebarWidth > 0 && (
+              <div style={{
+                width: modeConfig.container.sidebarWidth,
+                background: modeConfig.container.sidebarColor,
+                flexShrink: 0,
+                borderRadius: `${ticketStyles.container.borderRadius}px 0 0 ${ticketStyles.container.borderRadius}px`,
+              } as React.CSSProperties} />
+            )}
+            <div style={{
+              flex: modeConfig.container.sidebarWidth > 0 ? 1 : undefined,
+              ...ticketStyles.container,
+              borderRadius: modeConfig.container.sidebarWidth > 0 ? 0 : ticketStyles.container.borderRadius,
+              marginBottom: 0,
+              animation: "none",
+            } as React.CSSProperties}>
+              {/* Header */}
+              <div style={ticketStyles.header as React.CSSProperties}>
+                {modeConfig.header.showDecoration && (
+                  <div style={{ borderTop: "1px solid " + modeConfig.header.textColor, width: "50%", margin: "0 auto 8px", opacity: 0.5 }} />
+                )}
+                {modeConfig.header.showName && <p style={ticketStyles.headerTitle as React.CSSProperties}>RESTAURANTE</p>}
+                {modeConfig.header.showTable && <p style={ticketStyles.headerSubtitle as React.CSSProperties}>Mesa {tableNumber}</p>}
+                {mesaCancelledUnits > 0 && (
+                  <p style={{
+                    fontSize: 11, ...(modeConfig.header.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
+                    color: "var(--red)", margin: "4px 0 0",
+                  }}>{mesaCancelledUnits} unidad(es) cancelada(s) excluida(s)</p>
+                )}
+                {modeConfig.header.showDecoration && (
+                  <div style={{ borderTop: "1px solid " + modeConfig.header.textColor, width: "50%", margin: "8px auto 0", opacity: 0.5 }} />
+                )}
               </div>
 
-              {paymentSummary.cancelledUnitsCount > 0 && (
-                <div style={{ margin:"0 24px 16px",background:"var(--red-light)",borderRadius:10,padding:"12px 14px" }}>
-                  <p style={{ fontSize:12,color:"var(--red)",margin:0 }}><strong>Nota:</strong> Se excluyen {paymentSummary.cancelledUnitsCount} unidad(es) cancelada(s) por un total de {formatCurrency(paymentSummary.cancelledAmount)}</p>
-                </div>
-              )}
+              <div style={ticketStyles.customerSection as React.CSSProperties}>
+                {customerSummaries.map((cs, ci) => (
+                  <div key={cs.customerName}>
+                    {/* Customer header */}
+                    <div style={ticketStyles.customerHeader as React.CSSProperties}>
+                      <div style={{ display: "flex", alignItems: "center", gap: modeConfig.customers.showIcons ? 10 : 0 }}>
+                        {modeConfig.customers.showIcons && (
+                          <div style={ticketStyles.customerIconBox as React.CSSProperties}>
+                            <IUser s={modeConfig.container.spacing === "compact" ? 11 : 16} />
+                          </div>
+                        )}
+                        <div>
+                          <p style={ticketStyles.customerName as React.CSSProperties}>{cs.customerName}</p>
+                          <p style={ticketStyles.customerSubtitle as React.CSSProperties}>
+                            {cs.itemsCount} ítem{cs.itemsCount > 1 ? "s" : ""} activo{cs.itemsCount > 1 ? "s" : ""}
+                            {cs.cancelledUnitsCount > 0 && ` • ${cs.cancelledUnitsCount} cancelado(s)`}
+                          </p>
+                        </div>
+                      </div>
+                      <span style={ticketStyles.customerTotal as React.CSSProperties}>{formatCurrency(cs.total)}</span>
+                    </div>
 
-              {/* Footer */}
-              <div style={{ padding:"14px 24px 16px",borderTop:"1px solid var(--border)",textAlign:"center" }}>
-                <p style={{ fontSize:13,fontWeight:600,color:"var(--green)",margin:0,marginBottom:4 }}>✅ ¡Gracias por su visita!</p>
-                <p style={{ fontSize:12,color:"var(--muted)",margin:0 }}>Permanezca en la mesa cuando haya completado el pago</p>
+                    {/* Items */}
+                    {cs.orders.map((order, oi) => (
+                      <div key={order.id}>
+                        {cs.orders.length > 1 && (
+                          <p style={{
+                            fontSize: modeConfig.container.spacing === "compact" ? 9 : 11,
+                            color: "var(--muted)",
+                            padding: modeConfig.container.spacing === "compact" ? "4px 16px 2px" : "8px 24px 4px",
+                            background: "var(--surface)",
+                            margin: 0,
+                            ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
+                          }}>Orden #{order.id.slice(-8)}</p>
+                        )}
+                        {order.order_items.map(item => renderOrderItem(item, checkUiMode))}
+                        {oi < cs.orders.length - 1 && <div style={ticketStyles.sectionDivider as React.CSSProperties} />}
+                      </div>
+                    ))}
+
+                    {cs.cancelledUnitsCount > 0 && (
+                      <div style={{ padding: modeConfig.container.spacing === "compact" ? "0 16px 8px" : "0 24px 12px" }}>
+                        <p style={{
+                          fontSize: modeConfig.container.spacing === "compact" ? 10 : 11,
+                          color: "var(--red)",
+                          margin: 0,
+                          ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
+                        }}>• {cs.cancelledUnitsCount} unidad(es) cancelada(s) — {formatCurrency(cs.cancelledAmount)} excluido(s)</p>
+                      </div>
+                    )}
+                    {ci < customerSummaries.length - 1 && <div style={ticketStyles.sectionDivider as React.CSSProperties} />}
+                  </div>
+                ))}
+
+                {/* Totals */}
+                <div style={ticketStyles.totalSection as React.CSSProperties}>
+                  <div style={{
+                    padding: modeConfig.container.spacing === "compact" ? "8px 0" : "12px 0",
+                    borderBottom: "1px dashed var(--border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}>
+                    <span style={ticketStyles.totalLabel as React.CSSProperties}>Subtotal total:</span>
+                    <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.subtotal)}</span>
+                  </div>
+                  <div style={{
+                    padding: modeConfig.container.spacing === "compact" ? "6px 0" : "8px 0",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}>
+                    <span style={ticketStyles.totalLabel as React.CSSProperties}>Impuestos (8%):</span>
+                    <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.taxAmount)}</span>
+                  </div>
+                  <div style={{
+                    padding: modeConfig.container.spacing === "compact" ? "8px 0 0" : "12px 0 0",
+                    borderTop: "2px solid var(--text)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}>
+                    <span style={ticketStyles.totalFinalLabel as React.CSSProperties}>TOTAL GENERAL:</span>
+                    <span style={ticketStyles.totalFinalValue as React.CSSProperties}>{formatCurrency(paymentSummary.total)}</span>
+                  </div>
+                </div>
+
+                {paymentSummary.cancelledUnitsCount > 0 && (
+                  <div style={ticketStyles.cancelledNotice as React.CSSProperties}>
+                    <p style={{
+                      fontSize: modeConfig.container.spacing === "compact" ? 10 : 12,
+                      color: "var(--red)",
+                      margin: 0,
+                      ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
+                    }}><strong>Nota:</strong> Se excluyen {paymentSummary.cancelledUnitsCount} unidad(es) cancelada(s) por un total de {formatCurrency(paymentSummary.cancelledAmount)}</p>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={ticketStyles.footer as React.CSSProperties}>
+                  {modeConfig.footer.showDecoration && <div style={ticketStyles.footerDecoration as React.CSSProperties} />}
+                  <p style={ticketStyles.footerText as React.CSSProperties}>
+                    {modeConfig.footer.text.split(" — ")[0]}
+                  </p>
+                  {modeConfig.footer.text.includes(" — ") && (
+                    <p style={{
+                      fontSize: modeConfig.container.spacing === "compact" ? 10 : modeConfig.footer.fontFamily === "serif" ? 11 : 12,
+                      color: "var(--muted)",
+                      margin: "2px 0 0",
+                      ...(modeConfig.footer.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
+                    }}>
+                      {modeConfig.footer.text.split(" — ")[1]}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

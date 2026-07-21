@@ -21,6 +21,7 @@ import {
   Category,
 } from "@/app/lib/supabase/categories";
 import { settingsService } from "@/app/lib/supabase/settings";
+import { DEFAULT_CONFIG, CheckUiConfig } from "@/app/lib/checkUiTypes";
 
 // ─── Design Tokens & Animations ─────────────────────────────────────────────
 const DESIGN_CSS = `
@@ -1446,6 +1447,8 @@ export default function MenuPage() {
   const [recentItems, setRecentItems] = useState<Product[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<Product[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
+  const [checkUiMode, setCheckUiMode] = useState("modern");
+  const [, setCheckUiConfig] = useState<CheckUiConfig | null>(null);
   const [productNotesEnabled, setProductNotesEnabled] = useState(false);
   const [breakfastEndHour, setBreakfastEndHour] = useState("11:00");
   const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
@@ -1823,12 +1826,23 @@ export default function MenuPage() {
     try {
       await setCurrentUserOrder(oid, uid);
       if (currentTableId) await refreshOrder(currentTableId);
-      const [allProducts, recent, cats, hourSetting] = await Promise.all([
+      const [allProducts, recent, cats, hourSetting, checkUi] = await Promise.all([
         productsService.getProducts(),
         getRecentOrdersItems(tid),
         categoriesService.getActiveCategories(),
         settingsService.getSetting("breakfast_end_hour").catch(() => '11:00'),
+        settingsService.getSetting("default_check_ui").catch(() => 'modern'),
       ]);
+      setCheckUiMode(checkUi || 'modern');
+      if (checkUi) {
+        fetch("/api/settings/public")
+          .then((res) => res.json())
+          .then((data) => {
+            const configStr = data["check_ui_customization"];
+            if (configStr) try { setCheckUiConfig(JSON.parse(configStr)); } catch { /* defaults */ }
+          })
+          .catch(() => {});
+      }
       const endHour = hourSetting && hourSetting !== 'false' ? hourSetting : '11:00';
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -3296,117 +3310,294 @@ export default function MenuPage() {
                   la Mesa
                 </h2>
               </div>
-              {groups.map((group, gi) => (
-                <div
-                  key={gi}
-                  className="anim-fadeup"
-                  style={{
-                    border: "1.5px solid var(--border)",
-                    borderRadius: 14,
-                    overflow: "hidden",
-                    marginBottom: 16,
-                  }}
-                >
+              {checkUiMode === "compact" ? (
+                groups.map((group, gi) => (
                   <div
+                    key={gi}
+                    className="anim-fadeup"
                     style={{
-                      background: "var(--navy)",
-                      padding: "12px 18px",
                       display: "flex",
-                      alignItems: "center",
-                      gap: 10,
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      marginBottom: 12,
+                      border: "1.5px solid var(--border)",
+                    }}
+                  >
+                    <div style={{ width:4,background:"var(--navy)",flexShrink:0,borderRadius:"12px 0 0 12px" }} />
+                    <div style={{ flex:1 }}>
+                    <div
+                      style={{
+                        background: "var(--navy)",
+                        padding: "10px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div
+                          style={{
+                            width: 26, height: 26, borderRadius: 7,
+                            background: "oklch(32% 0.04 260)",
+                            display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11,
+                          }}
+                        >
+                          <IUser />
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>
+                          {group.name}
+                        </span>
+                        <span style={{ fontSize: 11, color: "oklch(75% 0.01 260)" }}>
+                          {group.items} ítem{group.items !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "white" }}>
+                        ${group.subtotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={{ background: "white" }}>
+                      {group.orders.map((order, oi) => (
+                        <div key={oi}>
+                          <p
+                            style={{
+                              fontSize: 10,
+                              color: "var(--muted)",
+                              padding: "6px 16px 2px",
+                              margin: 0,
+                            }}
+                          >
+                            {new Date(order.created_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                          {order.order_items.map(
+                            (item: OrderItemWithProduct, ii: number) => {
+                              const cancelled = item.cancelled_quantity || 0;
+                              const active = item.quantity - cancelled;
+                              const isFullCancelled = active === 0 && cancelled > 0;
+                              return (
+                                <div
+                                  key={ii}
+                                  style={{
+                                    padding: "7px 16px",
+                                    borderBottom: "1px solid var(--border)",
+                                    background: isFullCancelled ? "oklch(98% 0.03 20)" : "white",
+                                  }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                                      <span
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: 600,
+                                          color: isFullCancelled ? "var(--red)" : "var(--text)",
+                                          textDecoration: isFullCancelled ? "line-through" : "none",
+                                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                        }}
+                                      >
+                                        {item.product_name}
+                                      </span>
+                                      {!isFullCancelled && item.status === "ordered" && (
+                                        <span style={{ background: "var(--red-light)", color: "var(--red)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                          ● Ord.
+                                        </span>
+                                      )}
+                                      {!isFullCancelled && item.status === "preparing" && (
+                                        <span style={{ background: "oklch(96% 0.06 70)", color: "var(--amber)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                          ⏳ Prep.
+                                        </span>
+                                      )}
+                                      {!isFullCancelled && item.status === "served" && (
+                                        <span style={{ background: "var(--green-light)", color: "var(--green)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                          ✓ Serv.
+                                        </span>
+                                      )}
+                                      {isFullCancelled && (
+                                        <span style={{ background: "var(--red-light)", color: "var(--red)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                                          Cancelado
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: isFullCancelled ? "var(--muted)" : "var(--text)", flexShrink: 0, marginLeft: 8 }}>
+                                      {active > 0
+                                        ? `${active} × $${item.price.toFixed(2)}`
+                                        : `$${(item.price * item.quantity).toFixed(2)}`}
+                                    </span>
+                                  </div>
+                                  {cancelled > 0 && !isFullCancelled && (
+                                    <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, marginTop: 2 }}>
+                                      ({cancelled} cancelado{cancelled > 1 ? "s" : ""})
+                                    </p>
+                                  )}
+                                  {item.notes && (
+                                    <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, marginTop: 2 }}>
+                                      📝 {item.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            },
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                      </div>
+                  </div>
+                ))
+              ) : (
+                groups.map((group, gi) => (
+                  <div
+                    key={gi}
+                    className="anim-fadeup"
+                    style={{
+                      border: "1.5px solid var(--border)",
+                      borderRadius: 14,
+                      overflow: "hidden",
+                      marginBottom: 16,
                     }}
                   >
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 9,
-                        background: "oklch(32% 0.04 260)",
+                        background: "var(--navy)",
+                        padding: "12px 18px",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        color: "white",
+                        gap: 10,
                       }}
                     >
-                      <IUser />
-                    </div>
-                    <div>
-                      <p
+                      <div
                         style={{
-                          fontSize: 14,
-                          fontWeight: 700,
+                          width: 32,
+                          height: 32,
+                          borderRadius: 9,
+                          background: "oklch(32% 0.04 260)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                           color: "white",
                         }}
                       >
-                        {group.name}
-                      </p>
-                      <p style={{ fontSize: 12, color: "oklch(75% 0.01 260)" }}>
-                        • {group.items} ítem{group.items !== 1 ? "s" : ""} •
-                        Total: ${group.subtotal.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ background: "white" }}>
-                    {group.orders.map((order, oi) => (
-                      <div key={oi}>
+                        <IUser />
+                      </div>
+                      <div>
                         <p
                           style={{
-                            fontSize: 11,
-                            color: "var(--muted)",
-                            padding: "10px 18px 6px",
-                            borderBottom: "1px solid var(--border)",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "white",
                           }}
                         >
-                          {new Date(order.created_at).toLocaleString("es-MX")}
+                          {group.name}
                         </p>
-                        {order.order_items.map(
-                          (item: OrderItemWithProduct, ii: number) => {
-                            const cancelled = item.cancelled_quantity || 0;
-                            const active = item.quantity - cancelled;
-                            const isFullCancelled =
-                              active === 0 && cancelled > 0;
-                            return (
-                              <div
-                                key={ii}
-                                style={{
-                                  padding: "12px 18px",
-                                  borderBottom: "1px solid var(--border)",
-                                  background: isFullCancelled
-                                    ? "oklch(98% 0.03 20)"
-                                    : "white",
-                                }}
-                              >
+                        <p style={{ fontSize: 12, color: "oklch(75% 0.01 260)" }}>
+                          • {group.items} ítem{group.items !== 1 ? "s" : ""} •
+                          Total: ${group.subtotal.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ background: "white" }}>
+                      {group.orders.map((order, oi) => (
+                        <div key={oi}>
+                          <p
+                            style={{
+                              fontSize: 11,
+                              color: "var(--muted)",
+                              padding: "10px 18px 6px",
+                              borderBottom: "1px solid var(--border)",
+                            }}
+                          >
+                            {new Date(order.created_at).toLocaleString("es-MX")}
+                          </p>
+                          {order.order_items.map(
+                            (item: OrderItemWithProduct, ii: number) => {
+                              const cancelled = item.cancelled_quantity || 0;
+                              const active = item.quantity - cancelled;
+                              const isFullCancelled =
+                                active === 0 && cancelled > 0;
+                              return (
                                 <div
+                                  key={ii}
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    marginBottom: 4,
+                                    padding: "12px 18px",
+                                    borderBottom: "1px solid var(--border)",
+                                    background: isFullCancelled
+                                      ? "oklch(98% 0.03 20)"
+                                      : "white",
                                   }}
                                 >
                                   <div
                                     style={{
                                       display: "flex",
                                       alignItems: "center",
-                                      gap: 8,
+                                      justifyContent: "space-between",
+                                      marginBottom: 4,
                                     }}
                                   >
-                                    <span
+                                    <div
                                       style={{
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        color: isFullCancelled
-                                          ? "var(--red)"
-                                          : "var(--text)",
-                                        textDecoration: isFullCancelled
-                                          ? "line-through"
-                                          : "none",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
                                       }}
                                     >
-                                      {item.product_name}
-                                    </span>
-                                    {!isFullCancelled &&
-                                      item.status === "ordered" && (
+                                      <span
+                                        style={{
+                                          fontSize: 14,
+                                          fontWeight: 600,
+                                          color: isFullCancelled
+                                            ? "var(--red)"
+                                            : "var(--text)",
+                                          textDecoration: isFullCancelled
+                                            ? "line-through"
+                                            : "none",
+                                        }}
+                                      >
+                                        {item.product_name}
+                                      </span>
+                                      {!isFullCancelled &&
+                                        item.status === "ordered" && (
+                                          <span
+                                            style={{
+                                              background: "var(--red-light)",
+                                              color: "var(--red)",
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              padding: "2px 7px",
+                                              borderRadius: 6,
+                                            }}
+                                          >
+                                            ● Ordenado
+                                          </span>
+                                        )}
+                                      {!isFullCancelled &&
+                                        item.status === "preparing" && (
+                                          <span
+                                            style={{
+                                              background: "oklch(96% 0.06 70)",
+                                              color: "var(--amber)",
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              padding: "2px 7px",
+                                              borderRadius: 6,
+                                            }}
+                                          >
+                                            ⏳ En preparación
+                                          </span>
+                                        )}
+                                      {!isFullCancelled &&
+                                        item.status === "served" && (
+                                          <span
+                                            style={{
+                                              background: "var(--green-light)",
+                                              color: "var(--green)",
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              padding: "2px 7px",
+                                              borderRadius: 6,
+                                            }}
+                                          >
+                                            ✓ Servido
+                                          </span>
+                                        )}
+                                      {isFullCancelled && (
                                         <span
                                           style={{
                                             background: "var(--red-light)",
@@ -3417,135 +3608,60 @@ export default function MenuPage() {
                                             borderRadius: 6,
                                           }}
                                         >
-                                          ● Ordenado
+                                          Cancelado
                                         </span>
                                       )}
-                                    {!isFullCancelled &&
-                                      item.status === "preparing" && (
-                                        <span
-                                          style={{
-                                            background: "oklch(96% 0.06 70)",
-                                            color: "var(--amber)",
-                                            fontSize: 10,
-                                            fontWeight: 700,
-                                            padding: "2px 7px",
-                                            borderRadius: 6,
-                                          }}
-                                        >
-                                          ⏳ En preparación
-                                        </span>
-                                      )}
-                                    {!isFullCancelled &&
-                                      item.status === "served" && (
-                                        <span
-                                          style={{
-                                            background: "var(--green-light)",
-                                            color: "var(--green)",
-                                            fontSize: 10,
-                                            fontWeight: 700,
-                                            padding: "2px 7px",
-                                            borderRadius: 6,
-                                          }}
-                                        >
-                                          ✓ Servido
-                                        </span>
-                                      )}
-                                    {isFullCancelled && (
-                                      <span
-                                        style={{
-                                          background: "var(--red-light)",
-                                          color: "var(--red)",
-                                          fontSize: 10,
-                                          fontWeight: 700,
-                                          padding: "2px 7px",
-                                          borderRadius: 6,
-                                        }}
-                                      >
-                                        Cancelado
-                                      </span>
-                                    )}
+                                    </div>
+                                    <span
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: 700,
+                                        color: isFullCancelled
+                                          ? "var(--muted)"
+                                          : "var(--text)",
+                                      }}
+                                    >
+                                      $
+                                      {(
+                                        item.price *
+                                        (isFullCancelled ? 0 : active)
+                                      ).toFixed(2)}
+                                    </span>
                                   </div>
-                                  <span
-                                    style={{
-                                      fontSize: 14,
-                                      fontWeight: 700,
-                                      color: isFullCancelled
-                                        ? "var(--muted)"
-                                        : "var(--text)",
-                                    }}
-                                  >
-                                    $
-                                    {(
-                                      item.price *
-                                      (isFullCancelled ? 0 : active)
-                                    ).toFixed(2)}
-                                  </span>
-                                </div>
-                                <p
-                                  style={{
-                                    fontSize: 12,
-                                    color: "var(--muted)",
-                                  }}
-                                >
-                                  Cantidad:{" "}
-                                  {isFullCancelled ? item.quantity : active}
-                                  {cancelled > 0 &&
-                                    !isFullCancelled &&
-                                    ` (${cancelled} cancelado${cancelled > 1 ? "s" : ""})`}{" "}
-                                  • ${item.price.toFixed(2)} c/u
-                                </p>
-                                {item.notes && (
                                   <p
                                     style={{
-                                      fontSize: 11,
+                                      fontSize: 12,
                                       color: "var(--muted)",
-                                      marginTop: 4,
                                     }}
                                   >
-                                    📝 {item.notes}
+                                    Cantidad:{" "}
+                                    {isFullCancelled ? item.quantity : active}
+                                    {cancelled > 0 &&
+                                      !isFullCancelled &&
+                                      ` (${cancelled} cancelado${cancelled > 1 ? "s" : ""})`}{" "}
+                                    • ${item.price.toFixed(2)} c/u
                                   </p>
-                                )}
-                              </div>
-                            );
-                          },
-                        )}
-                        <div
-                          style={{
-                            padding: "12px 18px",
-                            display: "flex",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: "var(--text)",
-                            }}
-                          >
-                            Total de {order.customer_name}:
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 14,
-                              fontWeight: 800,
-                              color: "var(--text)",
-                            }}
-                          >
-                            $
-                            {order.order_items
-                              .reduce((s: number, i: OrderItemWithProduct) => {
-                                const c = i.cancelled_quantity || 0;
-                                return s + i.price * (i.quantity - c);
-                              }, 0)
-                              .toFixed(2)}
-                          </span>
-                        </div>
+                                  {item.notes && (
+                                    <p
+                                      style={{
+                                        fontSize: 11,
+                                        color: "var(--muted)",
+                                        marginTop: 4,
+                                      }}
+                                    >
+                                      📝 {item.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            },
+                          )}
                       </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </>
           )}
         </main>
