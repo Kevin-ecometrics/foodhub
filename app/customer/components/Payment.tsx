@@ -296,19 +296,92 @@ const renderOrderItem = (item: OrderItemWithProduct, mode: string) => {
 
 
 // ─── SatisfactionSurvey ───────────────────────────────────────────────────────
-const SatisfactionSurvey = ({ onSubmit, onSkip }: {
-  onSubmit: (rating: number, comment: string) => void;
+interface ProductReviewItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+}
+
+interface ProductReviewInput {
+  product_id: number;
+  product_name: string;
+  rating: number;
+  comment: string;
+}
+
+const SatisfactionSurvey = ({ onSubmit, onSkip, items }: {
+  onSubmit: (rating: number, comment: string, productReviews: ProductReviewInput[]) => void;
   onSkip: () => void;
   customerName?: string;
+  items: ProductReviewItem[];
 }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [hovered, setHovered] = useState(0);
+  const [productRatings, setProductRatings] = useState<{ [productId: number]: number }>({});
+  const [productHovered, setProductHovered] = useState<{ [productId: number]: number }>({});
+  const [productComments, setProductComments] = useState<{ [productId: number]: string }>({});
 
   const LABELS = ["","Muy mala","Mala","Regular","Buena","Excelente"];
 
+  const handleSubmit = () => {
+    if (rating === 0) return;
+    const productReviews: ProductReviewInput[] = items
+      .filter(item => (productRatings[item.product_id] || 0) > 0)
+      .map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        rating: productRatings[item.product_id],
+        comment: productComments[item.product_id]?.trim() || "",
+      }));
+    onSubmit(rating, comment, productReviews);
+  };
+
   return (
     <div style={{ border:"1.5px solid var(--border)",borderRadius:18,padding:"28px 24px",maxWidth:480,width:"100%",margin:"0 auto",background:"white",animation:"pay-fadeup 0.4s ease both" }}>
+      {items.length > 0 && (
+        <div style={{ marginBottom:28 }}>
+          <h4 style={{ fontSize:15,fontWeight:800,color:"var(--text)",marginBottom:4 }}>Califica tus productos</h4>
+          <p style={{ fontSize:12,color:"var(--muted)",marginBottom:14 }}>Opcional — cuéntanos qué te pareció cada platillo</p>
+          <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+            {items.map(item => {
+              const r = productRatings[item.product_id] || 0;
+              const hv = productHovered[item.product_id] || 0;
+              return (
+                <div key={item.product_id} style={{ border:"1.5px solid var(--border)",borderRadius:12,padding:"10px 12px" }}>
+                  <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap" }}>
+                    <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>
+                      {item.product_name}{item.quantity > 1 ? ` ×${item.quantity}` : ""}
+                    </span>
+                    <div style={{ display:"flex",gap:2 }}>
+                      {[1,2,3,4,5].map(star => (
+                        <button key={star} type="button"
+                          onClick={() => setProductRatings(prev => ({ ...prev, [item.product_id]: star }))}
+                          onMouseEnter={() => setProductHovered(prev => ({ ...prev, [item.product_id]: star }))}
+                          onMouseLeave={() => setProductHovered(prev => ({ ...prev, [item.product_id]: 0 }))}
+                          style={{ background:"none",border:"none",cursor:"pointer",padding:2 }}
+                        >
+                          <IStar filled={star <= (hv || r)} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {r > 0 && (
+                    <textarea
+                      value={productComments[item.product_id] || ""}
+                      onChange={e => setProductComments(prev => ({ ...prev, [item.product_id]: e.target.value }))}
+                      placeholder="Comentario opcional sobre este producto"
+                      rows={2}
+                      style={{ width:"100%",marginTop:8,border:"1.5px solid var(--border)",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"inherit",resize:"none",color:"var(--text)",background:"var(--surface)",outline:"none",boxSizing:"border-box" }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ textAlign:"center",marginBottom:24 }}>
         <div style={{ width:56,height:56,borderRadius:"50%",background:"var(--amber-light)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:28 }}>⭐</div>
         <h3 style={{ fontSize:20,fontWeight:800,color:"var(--text)",marginBottom:6 }}>¡Cuéntanos tu experiencia!</h3>
@@ -347,7 +420,7 @@ const SatisfactionSurvey = ({ onSubmit, onSkip }: {
         <button onClick={onSkip} style={{ flex:1,padding:"12px",borderRadius:11,border:"1.5px solid var(--border)",background:"var(--surface)",fontSize:14,fontWeight:600,color:"var(--muted)",cursor:"pointer",fontFamily:"inherit" }}>
           Omitir
         </button>
-        <button onClick={() => { if (rating > 0) onSubmit(rating, comment); }} disabled={rating === 0}
+        <button onClick={handleSubmit} disabled={rating === 0}
           style={{ flex:1,padding:"12px",borderRadius:11,border:"none",background:rating===0?"var(--border)":"var(--accent)",fontSize:14,fontWeight:700,color:"white",cursor:rating===0?"not-allowed":"pointer",fontFamily:"inherit",opacity:rating===0?0.6:1,transition:"background 0.15s" }}
         >
           Enviar Encuesta
@@ -504,15 +577,32 @@ export default function PaymentPage() {
     finally { setLoading(false); }
   };
 
-  const saveSurveyToDatabase = async (rating: number, comment: string) => {
+  const saveSurveyToDatabase = async (rating: number, comment: string, productReviews: ProductReviewInput[] = []) => {
     try {
-      const { error } = await supabase.from("customer_feedback").insert([{
-        table_id: tableId || currentTableId,
-        customer_name: customerSummaries[0]?.customerName || "Cliente",
-        rating, comment: comment || null,
-        order_count: allOrders.length, total_amount: paymentSummary.total,
-        created_at: new Date().toISOString(),
-      }] as never);
+      const targetTableId = tableId || currentTableId;
+      const customerName = customerSummaries[0]?.customerName || "Cliente";
+      const createdAt = new Date().toISOString();
+      const rows = [
+        {
+          table_id: targetTableId,
+          customer_name: customerName,
+          rating, comment: comment || null,
+          order_count: allOrders.length, total_amount: paymentSummary.total,
+          created_at: createdAt,
+          feedback_type: "general" as const,
+          product_id: null, product_name: null,
+        },
+        ...productReviews.map(pr => ({
+          table_id: targetTableId,
+          customer_name: customerName,
+          rating: pr.rating, comment: pr.comment || null,
+          order_count: allOrders.length, total_amount: paymentSummary.total,
+          created_at: createdAt,
+          feedback_type: "product" as const,
+          product_id: pr.product_id, product_name: pr.product_name,
+        })),
+      ];
+      const { error } = await supabase.from("customer_feedback").insert(rows as never);
       if (error) throw error;
       return true;
     } catch (e) { console.error(e); return false; }
@@ -590,6 +680,16 @@ export default function PaymentPage() {
   const paymentSummary = calculateTotalPaymentSummary();
   const mesaCancelledAmount = customerSummaries.reduce((t, c) => t + c.cancelledAmount, 0);
   const mesaCancelledUnits = customerSummaries.reduce((t, c) => t + c.cancelledUnitsCount, 0);
+  const myReviewItems: ProductReviewItem[] = (customerSummaries[0]?.orders ?? [])
+    .flatMap(o => o.order_items)
+    .reduce((acc: ProductReviewItem[], item) => {
+      const activeQuantity = item.quantity - (item.cancelled_quantity || 0);
+      if (activeQuantity <= 0) return acc;
+      const existing = acc.find(x => x.product_id === item.product_id);
+      if (existing) existing.quantity += activeQuantity;
+      else acc.push({ product_id: item.product_id, product_name: item.product_name, quantity: activeQuantity });
+      return acc;
+    }, []);
 
   // Realtime subscriptions (logic unchanged)
   useEffect(() => {
@@ -639,9 +739,9 @@ export default function PaymentPage() {
     return () => clearInterval(interval);
   }, [tableId, currentTableId, notificationState.hasPendingBill, paymentConfirmed]);
 
-  const handleSurveySubmit = async (rating: number, comment: string) => {
+  const handleSurveySubmit = async (rating: number, comment: string, productReviews: ProductReviewInput[]) => {
     setCountdown(10);
-    try { await saveSurveyToDatabase(rating, comment); } catch (e) { console.error(e); }
+    try { await saveSurveyToDatabase(rating, comment, productReviews); } catch (e) { console.error(e); }
     setSurveyCompleted(true); setShowSurvey(false);
   };
   const handleSurveySkip = () => { setSurveyCompleted(true); setShowSurvey(false); setCountdown(10); };
@@ -790,7 +890,7 @@ export default function PaymentPage() {
           )}
         </div>
 
-        {showSurvey && <SatisfactionSurvey onSubmit={handleSurveySubmit} onSkip={handleSurveySkip} customerName={customerSummaries[0]?.customerName || "Cliente"} />}
+        {showSurvey && <SatisfactionSurvey onSubmit={handleSurveySubmit} onSkip={handleSurveySkip} customerName={customerSummaries[0]?.customerName || "Cliente"} items={myReviewItems} />}
 
         {!showSurvey && (
           <div style={{ textAlign:"center" }}>

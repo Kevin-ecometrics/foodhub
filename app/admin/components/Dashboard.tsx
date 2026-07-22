@@ -84,6 +84,9 @@ interface CustomerFeedback {
   order_count: number;
   total_amount: number;
   created_at: string;
+  feedback_type: "general" | "product";
+  product_id: number | null;
+  product_name: string | null;
 }
 
 // Interfaz para producto agrupado - ACTUALIZADA CON CANCELADOS
@@ -295,6 +298,7 @@ export default function Dashboard({
       const { data, error } = await supabase
         .from("customer_feedback")
         .select("*")
+        .eq("feedback_type", "general")
         .gte("created_at", startDate.toISOString())
         .lt("created_at", endDate.toISOString())
         .order("created_at", { ascending: false });
@@ -328,6 +332,7 @@ export default function Dashboard({
       const { data, error } = await supabase
         .from("customer_feedback")
         .select("*")
+        .eq("feedback_type", "general")
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())
         .order("created_at", { ascending: false });

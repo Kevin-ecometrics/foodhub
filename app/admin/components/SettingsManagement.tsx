@@ -34,6 +34,13 @@ const SETTINGS: SettingDef[] = [
     type: "toggle",
   },
   {
+    key: "product_ratings_enabled",
+    label: "Calificación de productos en el menú",
+    description:
+      "Muestra el promedio de estrellas y número de reseñas de cada producto (calculado de las encuestas post-pago) al abrir sus detalles en el menú.",
+    type: "toggle",
+  },
+  {
     key: "breakfast_end_hour",
     label: "Cambio de Desayuno a Comida",
     description:

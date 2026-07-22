@@ -139,6 +139,9 @@ All tables have RLS enabled.
 | order_count | integer | — | |
 | total_amount | numeric | — | |
 | created_at | timestamptz | now() | nullable |
+| feedback_type | text | `'general'` | CHECK IN (general, product) — distingue reseña general del servicio vs. reseña de un producto específico |
+| product_id | integer | — | nullable, solo si `feedback_type='product'`; sin FK a propósito (preserva histórico si se borra el producto) |
+| product_name | varchar | — | nullable, snapshot del nombre al momento de la reseña |
 
 ### `users`
 | Column | Type | Default | Notes |
@@ -157,7 +160,7 @@ All tables have RLS enabled.
 ### `app_settings`
 | Column | Type | Default | Notes |
 |---|---|---|---|
-| key | text PK | — | ej. `product_notes_enabled`, `breakfast_end_hour`, `printing_enabled`, `default_check_ui`, `close_table_pin`, `check_ui_customization`, `order_steps` |
+| key | text PK | — | ej. `product_notes_enabled`, `product_ratings_enabled`, `breakfast_end_hour`, `printing_enabled`, `default_check_ui`, `close_table_pin`, `check_ui_customization`, `order_steps` |
 | value | text | `'false'` | toggles: `'true'`/`'false'`, time: `"HH:MM"`, select: string, JSON: `check_ui_customization` y `order_steps` |
 | updated_at | timestamptz | now() | trigger `set_updated_at` |
 
@@ -212,6 +215,7 @@ Admin (/admin)
   └─ CRUD: Mesas / Productos / Categorías
   └─ Configuración con 9 settings:
        ├─ Notas especiales en productos (toggle)
+       ├─ Calificación de productos en el menú (toggle) — promedio de estrellas por producto en su modal de detalle
        ├─ Cambio de Desayuno a Comida (time picker)
        ├─ Impresión (toggle) — al activar muestra modal de pago simulado con tarjeta ($35 USD)
        ├─ Diseño de cuenta por defecto (select: Moderno/Clásico/Compacto)
@@ -305,11 +309,11 @@ app/
     │   │   ├── notifications.ts        # Crear notificaciones
     │   │   ├── history.ts              # requestBill, sales archival, historial
     │   │   ├── settings.ts             # settingsService — getSetting, getAllSettings, updateSetting
-    │   │   └── tips.ts                 # insertTip, getTipsTotal, getTipsByDateRange
+    │   │   ├── tips.ts                 # insertTip, getTipsTotal, getTipsByDateRange
+    │   │   └── feedback.ts             # getProductRatingSummaries, getGoodGeneralReviews
     │   ├── checkUiTypes.ts             # Tipos: ModeConfig, CheckUiConfig, DEFAULT_CONFIG, SPACING_MAP, etc.
     │   ├── checkUiRenderer.ts          # configToStyles() → TicketStyles con CSSProperties
     │   └── orderSteps.ts               # Tipos: OrderStep, OrderStepsConfig, DEFAULT_ORDER_STEPS, parseOrderSteps()
-│
 └── api/
     ├── admin/login/route.ts        # JWT login
     ├── admin/verify/route.ts       # JWT verify
@@ -340,8 +344,13 @@ app/
 - [x] Página de pago — ticket completo con totales por comensal
 - [x] **Selector de propina para el cliente** — 10%/15%/20%/personalizado; se guarda en `waiter_notifications.tip_amount` vía realtime; visible para el mesero al cobrar
 - [x] Encuesta de satisfacción post-pago (1–5 estrellas + comentario → `customer_feedback`)
+  - [x] **Reseñas por producto** (2026-07-21): arriba de la encuesta general se listan los productos activos de la orden del cliente (deduplicados, cantidad neta de cancelaciones), cada uno con su propio selector de 1-5 estrellas y comentario opcional; al enviar, se insertan como filas separadas (`feedback_type='product'`, `product_id`, `product_name`) junto a la fila general (`feedback_type='general'`) en una sola llamada — la general sigue siendo la única obligatoria
 - [x] Solicitud de factura por email (`/api/invoice`)
 - [x] Generación de ticket PDF
+- [x] **Calificación de productos en el menú** (2026-07-21): en el modal de detalle de producto (`ProductModal`), si el toggle `app_settings.product_ratings_enabled` está activo (apagado por defecto), se muestra el promedio de estrellas y número de reseñas de ese producto — calculado de `customer_feedback` (`feedback_type='product'`) vía `feedbackService.getProductRatingSummaries()`, cargado una sola vez al abrir el menú
+- [x] **Pestaña "Reseñas"** (2026-07-21): 4ta pestaña en `/customer/menu` (junto a Menú/Cuenta/Mi QR) que muestra las reseñas generales del servicio con 4-5 estrellas (`feedbackService.getGoodGeneralReviews(4)`), carga perezosa al entrar al tab
+  - [x] Animación de aparición por scroll (`RevealOnScroll`, IntersectionObserver con `rootMargin` de anticipación para evitar el "flash en blanco" en scroll rápido): efecto escalera para las tarjetas visibles al entrar al tab (delay escalonado por índice, tope 6 ítems), y aparición fluida una por una para las reveladas después por scroll (sin delay)
+  - [x] Botón "Ver más/Ver menos" (`ReviewCard`) cuando el comentario supera 160 caracteres
 - [x] **Banner de portada rediseñado** (2026-07-21): degradado oscuro en la parte inferior de la imagen de portada para legibilidad, nombre del restaurante ("RioChia7") superpuesto en blanco sobre la imagen; el header debajo ahora muestra el nombre del cliente donde antes iba el nombre del restaurante, con "Mesa N" y el código de orden debajo
 - [x] **Buscador en el menú** (2026-07-21): input arriba de la barra de categorías en `Menu.tsx`; busca por nombre de producto y por nombre de categoría (insensible a acentos/mayúsculas vía `normalizeText`); resultados por nombre de producto salen primero (agrupados en una sección "Resultados para..."), seguidos de las categorías completas cuyo nombre coincide; ranking por relevancia con `getNameMatchRank` (coincidencia exacta > empieza con la búsqueda > alguna palabra empieza con la búsqueda) para evitar falsos positivos por substring (ej. buscar "té" ya no muestra "Latte")
 
@@ -375,7 +384,7 @@ app/
 - [x] CRUD Categorías (orden de display, activo/inactivo)
 - [x] CRUD Usuarios (`UsersManagement.tsx`) — crear/editar/desactivar/eliminar cuentas admin/waiter, PIN, ya verificadas sin correo
 - [x] Configuración (`SettingsManagement.tsx`) — panel de settings con 9 tipos: toggle, time picker, select dropdown, image upload (cover/logo), password, JSON (check_ui_customization + order_steps)
-  - [x] Toggle: Notas especiales en productos, Impresión (con modal de pago simulado al activar)
+  - [x] Toggle: Notas especiales en productos, Calificación de productos en el menú, Impresión (con modal de pago simulado al activar)
   - [x] Time picker: Cambio de Desayuno a Comida
   - [x] Select: Diseño de cuenta por defecto (Moderno/Clásico/Compacto) — con botones "Vista Previa" y "Personalizar"
   - [x] **Check UI Customizer** — modal con editor completo de diseño de cuenta en 3 modos (modern, classic, compact)
@@ -417,6 +426,7 @@ app/
 - [x] `history.ts` — requestBill (con tip_amount), archival de ventas
 - [x] `waiter.ts` — freeTableAndClean, resetTable, moveOrderItemToCustomer (reasignación de producto entre clientes de una mesa)
 - [x] `notifications.ts` — creación de alertas
+- [x] `feedback.ts` — getProductRatingSummaries (promedio/conteo por producto), getGoodGeneralReviews (reseñas generales 4-5★)
 - [x] Todos los servicios CRUD de entidades
 
 ### TypeScript & Code Quality (2026-06-15)
@@ -457,6 +467,8 @@ app/
 | 2026-07-21 | — | Waiter prop chain: `orderSteps` cargado en waiter/page y propagado hasta OrderItem, reemplazando STATUS_* hardcodeados |
 | 2026-07-21 | — | Menu.tsx: badges dinámicos en Cuenta tab + fix: agregado badge `ready` faltante |
 | 2026-07-21 | — | SettingsManagement.tsx: agregado editor de pasos del pedido (modal con label, shortLabel, bg, text color por paso) |
+| 2026-07-21 | `add_feedback_type_to_customer_feedback` | Columnas `feedback_type text NOT NULL DEFAULT 'general' CHECK (IN ('general','product'))`, `product_id integer` (sin FK), `product_name character varying` en `customer_feedback` — distingue reseña general de reseña por producto |
+| 2026-07-21 | `seed_product_ratings_enabled_setting` | Seed `product_ratings_enabled = 'false'` en `app_settings` — toggle para mostrar calificación de productos en el menú |
 
 ---
 

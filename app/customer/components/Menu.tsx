@@ -21,6 +21,7 @@ import {
   Category,
 } from "@/app/lib/supabase/categories";
 import { settingsService } from "@/app/lib/supabase/settings";
+import { feedbackService, ProductRatingSummary, GeneralReview } from "@/app/lib/supabase/feedback";
 import { DEFAULT_CONFIG, CheckUiConfig } from "@/app/lib/checkUiTypes";
 import { parseOrderSteps } from "@/app/lib/orderSteps";
 
@@ -342,12 +343,12 @@ const ICopy = () => (
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 );
-const IStar = () => (
+const IStar = ({ filled = true, s = 12 }: { filled?: boolean; s?: number }) => (
   <svg
-    width="12"
-    height="12"
+    width={s}
+    height={s}
     viewBox="0 0 24 24"
-    fill="currentColor"
+    fill={filled ? "currentColor" : "none"}
     stroke="currentColor"
     strokeWidth="1"
   >
@@ -881,6 +882,145 @@ const CartDrawer = ({
   );
 };
 
+// ─── Reveal-on-scroll wrapper (fade + slide up, once, when it enters view) ────
+const RevealOnScroll = ({
+  children,
+  style,
+  index = 0,
+}: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  index?: number;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const mountedAtRef = useRef(0);
+  const [visible, setVisible] = useState(false);
+  const [delayMs, setDelayMs] = useState(0);
+
+  useEffect(() => {
+    mountedAtRef.current = performance.now();
+    const el = ref.current;
+    if (!el) return;
+    // rootMargin gives the callback a head start before the card is actually
+    // on screen, so the fade-in has time to run as it scrolls into place
+    // instead of flashing in blank and only resolving once scrolling pauses
+    // (some browsers throttle/batch IntersectionObserver during fast scroll).
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          // Only stagger cards that were already on screen when the list
+          // mounted (a staircase on tab entry). Cards reached later by
+          // scrolling reveal immediately, one by one, following the scroll.
+          const elapsedSinceMount = performance.now() - mountedAtRef.current;
+          setDelayMs(elapsedSinceMount < 250 ? Math.min(index, 6) * 90 : 0);
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0, rootMargin: "0px 0px 80px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [index]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(28px)",
+        transition: `opacity 0.45s ease ${delayMs}ms, transform 0.45s ease ${delayMs}ms`,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+// ─── Review card (with "ver más / ver menos" for long comments) ──────────────
+const REVIEW_COMMENT_TRUNCATE_LENGTH = 160;
+
+const ReviewCard = ({ review }: { review: GeneralReview }) => {
+  const [expanded, setExpanded] = useState(false);
+  const comment = review.comment || "";
+  const isLong = comment.length > REVIEW_COMMENT_TRUNCATE_LENGTH;
+  const displayText =
+    !isLong || expanded
+      ? comment
+      : `${comment.slice(0, REVIEW_COMMENT_TRUNCATE_LENGTH).trimEnd()}…`;
+
+  return (
+    <div
+      style={{
+        border: "1.5px solid var(--border)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        background: "white",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
+          {review.customer_name}
+        </span>
+        <div style={{ display: "flex", gap: 1, color: "var(--amber)" }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <IStar key={i} filled={i <= review.rating} s={13} />
+          ))}
+        </div>
+      </div>
+      {comment && (
+        <>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--text)",
+              lineHeight: 1.5,
+              marginBottom: isLong ? 2 : 6,
+            }}
+          >
+            “{displayText}”
+          </p>
+          {isLong && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                marginBottom: 6,
+                cursor: "pointer",
+                color: "var(--accent)",
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: "inherit",
+              }}
+            >
+              {expanded ? "Ver menos" : "Ver más"}
+            </button>
+          )}
+        </>
+      )}
+      {review.created_at && (
+        <p style={{ fontSize: 11, color: "var(--muted)" }}>
+          {new Date(review.created_at).toLocaleDateString("es-MX", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}
+        </p>
+      )}
+    </div>
+  );
+};
+
 // ─── Product Modal (new design, preserves all extras/notes logic) ─────────────
 const COURSE_OPTIONS = [
   { value: 1, label: "Primer tiempo", short: "1er" },
@@ -894,12 +1034,14 @@ const ProductModal = ({
   onAdd,
   adding,
   notesEnabled,
+  ratingSummary,
 }: {
   product: Product;
   onClose: () => void;
   onAdd: (notes: string, qty: number, extras: { [k: string]: boolean }, course: number) => void;
   adding: boolean;
   notesEnabled: boolean;
+  ratingSummary?: ProductRatingSummary;
 }) => {
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
@@ -1037,6 +1179,28 @@ const ProductModal = ({
               >
                 {product.name}
               </p>
+              {ratingSummary && ratingSummary.count > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 6,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 1, color: "var(--amber)" }}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <IStar key={i} filled={i <= Math.round(ratingSummary.average)} s={13} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
+                    {ratingSummary.average.toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                    ({ratingSummary.count} reseña{ratingSummary.count !== 1 ? "s" : ""})
+                  </span>
+                </div>
+              )}
               <p
                 style={{
                   fontSize: 13,
@@ -1461,6 +1625,8 @@ export default function MenuPage() {
   const [, setCheckUiConfig] = useState<CheckUiConfig | null>(null);
   const [orderSteps, setOrderSteps] = useState<string | null>(null);
   const [productNotesEnabled, setProductNotesEnabled] = useState(false);
+  const [productRatingsEnabled, setProductRatingsEnabled] = useState(false);
+  const [productRatingSummaries, setProductRatingSummaries] = useState<Record<number, ProductRatingSummary>>({});
   const [breakfastEndHour, setBreakfastEndHour] = useState("11:00");
   const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1489,7 +1655,10 @@ export default function MenuPage() {
   const coverBannerRef = useRef<HTMLDivElement>(null);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<"menu" | "cuenta" | "qr">("menu");
+  const [activeTab, setActiveTab] = useState<"menu" | "cuenta" | "qr" | "resenas">("menu");
+  const [generalReviews, setGeneralReviews] = useState<GeneralReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
 
   // ── History / Cuenta state ──
   const [orderHistory, setOrderHistory] = useState<OrderWithItems[]>([]);
@@ -1550,14 +1719,23 @@ export default function MenuPage() {
     Promise.all([
       settingsService.getSetting("product_notes_enabled"),
       settingsService.getSetting("breakfast_end_hour"),
+      settingsService.getSetting("product_ratings_enabled"),
     ])
-      .then(([notesVal, hourVal]) => {
+      .then(([notesVal, hourVal, ratingsVal]) => {
         setProductNotesEnabled(notesVal === 'true');
         setBreakfastEndHour(hourVal && hourVal !== 'false' ? hourVal : '11:00');
+        const ratingsEnabled = ratingsVal === 'true';
+        setProductRatingsEnabled(ratingsEnabled);
+        if (ratingsEnabled) {
+          feedbackService.getProductRatingSummaries()
+            .then(setProductRatingSummaries)
+            .catch(() => setProductRatingSummaries({}));
+        }
       })
       .catch(() => {
         setProductNotesEnabled(false);
         setBreakfastEndHour('11:00');
+        setProductRatingsEnabled(false);
       });
   }, []);
 
@@ -2135,6 +2313,15 @@ export default function MenuPage() {
   useEffect(() => {
     if (activeTab === "cuenta" && tableId) loadHistory();
   }, [activeTab, tableId]);
+
+  useEffect(() => {
+    if (activeTab !== "resenas" || reviewsLoaded) return;
+    setReviewsLoading(true);
+    feedbackService.getGoodGeneralReviews(4)
+      .then((reviews) => { setGeneralReviews(reviews); setReviewsLoaded(true); })
+      .catch((e) => console.error(e))
+      .finally(() => setReviewsLoading(false));
+  }, [activeTab, reviewsLoaded]);
 
   const handleBillConfirm = async () => {
     if (!tableId) return;
@@ -4096,6 +4283,96 @@ export default function MenuPage() {
     );
   };
 
+  const renderResenasTab = () => {
+    return (
+      <>
+        <header
+          style={{
+            padding: "12px 20px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "white",
+            flexShrink: 0,
+          }}
+        >
+          <div>
+            <p
+              style={{
+                fontSize: 17,
+                fontWeight: 800,
+                color: "var(--navy)",
+                letterSpacing: "-0.3px",
+              }}
+            >
+              Reseñas
+            </p>
+            <p style={{ fontSize: 11, color: "var(--muted)" }}>
+              Lo que dicen nuestros clientes
+            </p>
+          </div>
+        </header>
+
+        <main
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "20px",
+            animation: "menuFadeUp 0.3s ease",
+          }}
+        >
+          {reviewsLoading ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                gap: 12,
+                color: "var(--muted)",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  animation: "menuSpin 0.9s linear infinite",
+                }}
+              >
+                <IRefresh />
+              </span>
+              Cargando reseñas...
+            </div>
+          ) : generalReviews.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 20px",
+                color: "var(--muted)",
+              }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 10 }}>⭐</div>
+              <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                Aún no hay reseñas
+              </p>
+              <p style={{ fontSize: 12 }}>
+                Sé de los primeros en compartir tu experiencia al pagar.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {generalReviews.map((review, index) => (
+                <RevealOnScroll key={review.id} index={index}>
+                  <ReviewCard review={review} />
+                </RevealOnScroll>
+              ))}
+            </div>
+          )}
+        </main>
+      </>
+    );
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // Notes/Extras Modal (full existing logic, new design)
   // ─────────────────────────────────────────────────────────────────────────
@@ -4111,6 +4388,7 @@ export default function MenuPage() {
         onAdd={handleConfirmAdd}
         adding={addingProduct === selectedProduct.id}
         notesEnabled={productNotesEnabled}
+        ratingSummary={productRatingsEnabled ? productRatingSummaries[selectedProduct.id] : undefined}
       />
     );
   };
@@ -4126,6 +4404,7 @@ export default function MenuPage() {
       icon: <span style={{ fontSize: 18 }}>↩</span>,
     },
     { id: "qr", label: "Mi QR", icon: <IQR /> },
+    { id: "resenas", label: "Reseñas", icon: <IStar s={18} /> },
   ] as const;
 
   return (
@@ -4144,6 +4423,7 @@ export default function MenuPage() {
         {activeTab === "menu" && renderMenuTab()}
         {activeTab === "cuenta" && renderCuentaTab()}
         {activeTab === "qr" && renderQRTab()}
+        {activeTab === "resenas" && renderResenasTab()}
       </div>
 
       {/* Bottom nav */}
