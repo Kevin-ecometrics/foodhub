@@ -326,6 +326,7 @@ export interface Database {
           order_count: number
           item_count: number
           payment_method: string | null
+          waiter_name: string | null
           created_at: string
           closed_at: string
         }
@@ -338,6 +339,7 @@ export interface Database {
           order_count: number
           item_count: number
           payment_method?: string | null
+          waiter_name?: string | null
           created_at?: string
           closed_at?: string
         }
@@ -350,6 +352,7 @@ export interface Database {
           order_count?: number
           item_count?: number
           payment_method?: string | null
+          waiter_name?: string | null
           created_at?: string
           closed_at?: string
         }

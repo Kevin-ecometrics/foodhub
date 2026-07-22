@@ -2792,6 +2792,7 @@ export default function WaiterDashboard() {
         selectedTableForSeparate.id,
         selectedTableForSeparate.number,
         paymentMethod,
+        waiterName,
       );
 
       toast(`Mesa ${selectedTableForSeparate.number} cobrada — $${selectedTableForSeparate.total.toFixed(2)} · ${payments.length} comensales`, "success");
@@ -2830,6 +2831,7 @@ export default function WaiterDashboard() {
         selectedTableForPayment.id,
         selectedTableForPayment.number,
         paymentMethod,
+        waiterName,
       );
 
       if (paymentData.tip > 0) {
@@ -2973,6 +2975,7 @@ export default function WaiterDashboard() {
                 onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments || showCerrarPinModal; }}
                 onMoveItem={handleMoveItemToCustomer}
                 waiterName={waiterName}
+                waiterId={activeSession?.waiter_id}
                 orderSteps={orderSteps}
               />
             </>

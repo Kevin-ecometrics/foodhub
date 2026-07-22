@@ -163,7 +163,8 @@ export const waiterService = {
   async saveSalesHistory(
     tableId: number,
     tableNumber: number,
-    paymentMethod: PaymentMethod = null
+    paymentMethod: PaymentMethod = null,
+    waiterName?: string | null
   ): Promise<string> {
     try {
       console.log(`💰 Guardando historial de venta para mesa ${tableNumber}, método: ${paymentMethod}`)
@@ -211,6 +212,7 @@ export const waiterService = {
         order_count: orderCount,
         item_count: itemCount,
         payment_method: paymentMethod,
+        waiter_name: waiterName ?? null,
         closed_at: new Date().toISOString(),
       }
 
@@ -259,18 +261,25 @@ export const waiterService = {
   async freeTableAndClean(
     tableId: number,
     tableNumber: number,
-    paymentMethod: PaymentMethod = null
+    paymentMethod: PaymentMethod = null,
+    waiterName?: string | null
   ): Promise<string> {
     try {
       console.log(`🔄 Iniciando proceso completo para mesa ${tableNumber}, método: ${paymentMethod}`)
 
-      const saleId = await this.saveSalesHistory(tableId, tableNumber, paymentMethod)
+      const saleId = await this.saveSalesHistory(tableId, tableNumber, paymentMethod, waiterName)
 
       const { error: notifError } = await supabase
         .from('waiter_notifications')
         .delete()
         .eq('table_id', tableId)
       if (notifError) throw notifError
+
+      const { error: assignError } = await supabase
+        .from('table_waiter_assignments')
+        .delete()
+        .eq('table_id', tableId)
+      if (assignError) throw assignError
 
       const { data: orderRows, error: ordersError } = await supabase
         .from('orders')
@@ -318,6 +327,12 @@ export const waiterService = {
         .delete()
         .eq('table_id', tableId)
       if (notifError) throw notifError
+
+      const { error: assignError } = await supabase
+        .from('table_waiter_assignments')
+        .delete()
+        .eq('table_id', tableId)
+      if (assignError) throw assignError
 
       const { data: orderRows, error: ordersError } = await supabase
         .from('orders')

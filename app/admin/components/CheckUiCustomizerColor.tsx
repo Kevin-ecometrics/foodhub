@@ -38,7 +38,8 @@ export default function CheckUiCustomizerColor({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const isOklch = value.startsWith("oklch");
+  const v = value ?? "";
+  const isOklch = v.startsWith("oklch");
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -70,13 +71,13 @@ export default function CheckUiCustomizerColor({
             width: 28,
             height: 28,
             borderRadius: 8,
-            background: value,
+            background: v,
             border: "1.5px solid var(--check-border, oklch(88% 0.01 260))",
             flexShrink: 0,
           }}
         />
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--check-text, oklch(20% 0.02 260))", flex: 1, textAlign: "left" }}>
-          {value.length > 28 ? value.slice(0, 26) + "…" : value}
+          {v.length > 28 ? v.slice(0, 26) + "…" : v}
         </span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--check-muted, oklch(55% 0.02 260))" strokeWidth="2.5" strokeLinecap="round">
           <polyline points="6 9 12 15 18 9" />
@@ -151,7 +152,7 @@ export default function CheckUiCustomizerColor({
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <input
                   type="color"
-                  value={isOklch ? "#e8634a" : customHex || value}
+                  value={isOklch ? "#e8634a" : customHex || v}
                   onChange={(e) => {
                     setCustomHex(e.target.value);
                     onChange(e.target.value);
@@ -168,7 +169,7 @@ export default function CheckUiCustomizerColor({
                 />
                 <input
                   type="text"
-                  value={isOklch ? value : customHex || value}
+                  value={isOklch ? v : customHex || v}
                   onChange={(e) => {
                     setCustomHex(e.target.value);
                     onChange(e.target.value);

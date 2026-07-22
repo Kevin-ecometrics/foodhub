@@ -10,6 +10,7 @@
 --   - waiter_notifications → Waiter (dashboard)
 --   - waiter_sessions → Admin (Dashboard + SessionsView)
 --   - sales_history   → Admin (Dashboard)
+--   - table_waiter_assignments → Customer (assigned waiter display)
 -- =====================================================================
 
 begin;
@@ -195,6 +196,15 @@ create table if not exists public.waiter_sessions (
   created_at timestamptz not null default now()
 );
 
+-- table_waiter_assignments: asignacion de mesero a mesa por el cliente
+create table if not exists public.table_waiter_assignments (
+  id bigint generated always as identity primary key,
+  table_id bigint not null references public.tables(id),
+  waiter_id uuid not null,
+  waiter_name text not null,
+  assigned_at timestamptz default now()
+);
+
 -- ---------------------------------------------------------------------
 -- Indices adicionales (fuera de PK/UNIQUE ya creados por las tablas)
 -- ---------------------------------------------------------------------
@@ -259,6 +269,7 @@ alter table public.customer_feedback enable row level security;
 alter table public.tips enable row level security;
 alter table public.users enable row level security;
 alter table public.waiter_sessions enable row level security;
+alter table public.table_waiter_assignments enable row level security;
 alter table public.app_settings enable row level security;
 
 drop policy if exists "Allow all for all roles" on public.categories;
@@ -334,6 +345,18 @@ create policy "users_delete" on public.users
 drop policy if exists "Allow all for waiter_sessions" on public.waiter_sessions;
 create policy "Allow all for waiter_sessions" on public.waiter_sessions
   for all to public using (true);
+
+drop policy if exists "Anyone can read table_waiter_assignments" on public.table_waiter_assignments;
+create policy "Anyone can read table_waiter_assignments" on public.table_waiter_assignments
+  for select to public using (true);
+
+drop policy if exists "Anyone can insert table_waiter_assignments" on public.table_waiter_assignments;
+create policy "Anyone can insert table_waiter_assignments" on public.table_waiter_assignments
+  for insert to public with check (true);
+
+drop policy if exists "Anyone can delete table_waiter_assignments" on public.table_waiter_assignments;
+create policy "Anyone can delete table_waiter_assignments" on public.table_waiter_assignments
+  for delete to public using (true);
 
 -- app_settings: lectura publica (customer sin login la necesita), escritura solo admin
 drop policy if exists "app_settings_select_public" on public.app_settings;

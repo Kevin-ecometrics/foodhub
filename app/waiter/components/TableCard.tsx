@@ -29,6 +29,7 @@ interface TableCardProps {
   onAddModalChange?: (isOpen: boolean) => void;
   onMoveItem?: (itemId: string, tableId: number, targetCustomerName: string) => void;
   waiterName: string;
+  waiterId?: string;
   orderSteps?: string | null;
 }
 
@@ -36,7 +37,7 @@ export default function TableCard({
   table, processing, onUpdateItemStatus, onCancelItem,
   onCobrarMesa, onPagarPorSeparado, onCerrarMesa, calculateTableTotal,
   notifications, occupationTime, hasNotifications, isHighlighted = false,
-  onAddModalChange, onMoveItem, waiterName, orderSteps,
+  onAddModalChange, onMoveItem, waiterName, waiterId, orderSteps,
 }: TableCardProps) {
   const tableTotal = calculateTableTotal(table);
   const isOccupied = table.status === "occupied";
@@ -53,12 +54,6 @@ export default function TableCard({
       g.subtotal += sub;
       g.itemsCount += order.order_items.length;
     });
-    // Keep an always-visible general (no-client) drop zone whenever the table has
-    // other items, so waiters can drag a misassigned product into it even when
-    // it currently has none of its own.
-    if (t.status === "occupied" && t.orders.length > 0 && !map.has(generalName)) {
-      map.set(generalName, { customerName: generalName, orders: [], subtotal: 0, taxAmount: 0, total: 0, itemsCount: 0 });
-    }
     const taxRate = 0.16;
     map.forEach(g => { g.taxAmount = g.subtotal * taxRate; g.total = g.subtotal + g.taxAmount; });
     return Array.from(map.values()).sort((a, b) => {
@@ -85,6 +80,7 @@ export default function TableCard({
         occupationTime={occupationTime}
         onAddModalChange={onAddModalChange}
         waiterName={waiterName}
+        waiterId={waiterId}
       />
 
       {customerSummaries.map(cs => (

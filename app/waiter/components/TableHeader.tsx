@@ -22,6 +22,7 @@ interface TableHeaderProps {
   isHighlighted?: boolean;
   occupationTime?: string;
   waiterName: string;
+  waiterId?: string;
 }
 
 export default function TableHeader({
@@ -36,6 +37,7 @@ export default function TableHeader({
   isHighlighted = false,
   occupationTime,
   waiterName,
+  waiterId,
 }: TableHeaderProps) {
   const selfName = `Mesero - ${waiterName}`;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -64,6 +66,39 @@ export default function TableHeader({
   const [addingOrder, setAddingOrder] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assignedWaiter, setAssignedWaiter] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState(false);
+
+  useEffect(() => {
+    if (!waiterId) return;
+    setAssignedWaiter(null);
+    (async () => {
+      try {
+        const { data } = await (supabase as any)
+          .from("table_waiter_assignments")
+          .select("waiter_name")
+          .eq("table_id", table.id)
+          .eq("waiter_id", waiterId)
+          .limit(1)
+          .single();
+        if (data?.waiter_name) setAssignedWaiter(data.waiter_name);
+      } catch { /* no assignment */ }
+    })();
+  }, [table.id, waiterId, table.status]);
+
+  const handleAssignMe = async () => {
+    setAssigning(true);
+    try {
+      await (supabase as any).from("table_waiter_assignments").delete().eq("table_id", table.id);
+      await (supabase as any).from("table_waiter_assignments").insert({
+        table_id: table.id,
+        waiter_id: waiterId ?? "",
+        waiter_name: waiterName,
+      });
+      setAssignedWaiter(waiterName);
+    } catch { /* ignore */ }
+    finally { setAssigning(false); }
+  };
 
   const activeCustomerNames = Array.from(
     new Set(
@@ -373,6 +408,34 @@ export default function TableHeader({
               Mesa {table.number}
             </span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {table.status === "occupied" && assignedWaiter === waiterName && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--navy)", padding: "6px 10px", background: "var(--navy-light)", borderRadius: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                  ✓ {assignedWaiter}
+                </span>
+              )}
+              {table.status === "occupied" && assignedWaiter !== waiterName && (
+                <button
+                  onClick={handleAssignMe}
+                  disabled={assigning}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "1.5px solid var(--navy)",
+                    background: "transparent",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "var(--navy)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    opacity: assigning ? 0.6 : 1,
+                  }}
+                >
+                  {assigning ? "↻" : "⇽ Asignarme"}
+                </button>
+              )}
               {(table.status === "occupied" || table.status === "reserved") && (
                 <button
                   onClick={openAddModal}

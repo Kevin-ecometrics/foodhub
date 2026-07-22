@@ -469,6 +469,8 @@ app/
 | 2026-07-21 | — | SettingsManagement.tsx: agregado editor de pasos del pedido (modal con label, shortLabel, bg, text color por paso) |
 | 2026-07-21 | `add_feedback_type_to_customer_feedback` | Columnas `feedback_type text NOT NULL DEFAULT 'general' CHECK (IN ('general','product'))`, `product_id integer` (sin FK), `product_name character varying` en `customer_feedback` — distingue reseña general de reseña por producto |
 | 2026-07-21 | `seed_product_ratings_enabled_setting` | Seed `product_ratings_enabled = 'false'` en `app_settings` — toggle para mostrar calificación de productos en el menú |
+| 2026-07-22 | `create_table_waiter_assignments` | Nueva tabla `table_waiter_assignments` (table_id, waiter_id, waiter_name, assigned_at) + RLS público — permite al cliente asignar un mesero a su mesa desde el tab Cuenta |
+| 2026-07-22 | `add_delete_policy_table_waiter_assignments` | Política `for delete to public` en `table_waiter_assignments` — faltaba y RLS bloqueaba el DELETE en `freeTableAndClean`/`resetTable` |
 
 ---
 
@@ -802,6 +804,76 @@ Canal `waiter-tips` escucha `INSERT` en `tips` con filtro `waiter_id=eq.${waiter
 
 ---
 ## 12. Settings UI — Unificado + Fixes finales
+
+### Settings — UI consistente
+
+"Pasos del pedido" y "Distribución de propinas" se integraron al array `SETTINGS` principal con tipo `"action"` (vs. standalone cards separados), usando el mismo patrón de ícono + label + descripción + control que el resto de settings. Ya no son tarjetas sueltas con estilo distinto.
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/admin/components/SettingsManagement.tsx` | `SETTINGS` ahora incluye `order_steps` y `tip_distribution` con `type: "action"`; `renderControl` añade caso `"action"` que renderiza un botón "Personalizar"/"Editar" igual que los demás controles; eliminadas las 2 secciones standalone duplicadas |
+
+### Customer Realtime — Fix currentTableId
+
+El `useEffect` de Realtime para actualizar la cuenta del customer en vivo usaba `tableId` directamente, pero cuando el customer entra vía QR session el valor real está en `currentTableId` (localStorage). Ahora usa `const tid = tableId || currentTableId;` como el resto de subscriptions, con `[tableId, currentTableId]` en dependencias.
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/customer/components/Menu.tsx` | Subscription Realtime corregida: `tid = tableId \|\| currentTableId`, dependencias incluyen ambos |
+
+### Waiter — Badge de course eliminado
+
+El badge azul `T1`/`T2`/`T3` que aparecía al lado del nombre del producto en el panel del mesero fue removido. El course se sigue viendo en la agrupación por tiempo dentro de cada cliente (`CustomerOrderSection.tsx`).
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/waiter/components/OrderItem.tsx` | Eliminado `<span>` del badge de course T1/T2/T3 (líneas 87-91) |
+
+---
+
+## 13. Asignación de Mesero a Mesa
+
+### Problema
+En `Payment.tsx`, el nombre del mesero se cargaba desde la sesión activa más reciente de `waiter_sessions` (cualquier mesero, no uno asignado a la mesa), mostrando un nombre de mesero aleatorio por defecto.
+
+### Solución
+Nueva tabla `table_waiter_assignments` y botón "⇽ Asignarme" en cada tarjeta de mesa para que el mesero se asigne manualmente. Si no hay asignación, se muestra `"—"`.
+
+### SQL aplicado en Supabase
+- ✅ `CREATE TABLE table_waiter_assignments` con `table_id`, `waiter_id`, `waiter_name`, `assigned_at`
+- ✅ RLS: `SELECT`, `INSERT` y `DELETE` públicos
+- ✅ Migration: `add_delete_policy_table_waiter_assignments` — agrega política `for delete to public`
+
+### Bugs corregidos
+
+1. **Stale state en `assignedWaiter`**: El `useEffect` cargaba la asignación con `[table.id, waiterId]`. Cuando la mesa se cobraba/reseteaba y luego un nuevo cliente se conectaba, `table.id` y `waiterId` eran los mismos → el efecto no se re-ejecutaba, y `assignedWaiter` mantenía el valor de la sesión anterior. El badge "✓ {nombre}" se mostraba en la nueva sesión sin que el mesero se hubiera asignado.  
+   **Fix**: agregado `table.status` a dependencias + `setAssignedWaiter(null)` al inicio del efecto.
+
+2. **RLS bloqueaba DELETE**: El `table_waiter_assignments` no tenía política `for delete`, así que el `DELETE` en `freeTableAndClean` y `resetTable` fallaba silenciosamente vía RLS, dejando la asignación vieja en la BD.  
+   **Fix**: agregada política `"Anyone can delete table_waiter_assignments"` vía migration + datos stale limpiados manualmente.
+
+3. **PERSONAS contaba al mesero**: En `Payment.tsx`, `customerSummaries.length` incluía el grupo "Mesero - dev" como si fuera un comensal.  
+   **Fix**: `realCustomerSummaries` filtra grupos `startsWith("Mesero - ")`.
+
+### Flujo
+1. Mesero ve la mesa en el tab Mesas
+2. Hace clic en **⇽ Asignarme** en el header de la tarjeta
+3. Se upserta en `table_waiter_assignments` (delete previo + insert nuevo)
+4. El botón se reemplaza por un badge **✓ {nombre}** indicando que ya está asignado
+5. Customer en `Payment.tsx` consulta `table_waiter_assignments` por `table_id`
+6. Si nadie se ha asignado → se muestra `"—"`
+7. Se eliminó la sección "Mesero - {name}" vacía que aparecía por defecto en las tarjetas de mesa
+8. Al cobrar/cerrar mesa: `freeTableAndClean` / `resetTable` borran `table_waiter_assignments` para que la próxima sesión comience sin asignación
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/waiter/components/TableHeader.tsx` | `useEffect` depende de `[table.id, waiterId, table.status]` + resetea `assignedWaiter` a null antes de cada query |
+| `app/waiter/components/TableCard.tsx` | Eliminado el auto-create de sección "Mesero - dev" vacía; propagada prop `waiterId` |
+| `app/waiter/components/TablesTab.tsx` | Prop `waiterId` agregada y propagada a TableCard |
+| `app/waiter/page.tsx` | Pasa `activeSession?.waiter_id` como `waiterId` a TablesTab |
+| `app/customer/components/Payment.tsx` | Query de `waiter_sessions` → `table_waiter_assignments` por `table_id`; si no hay asignación, `"—"`; `realCustomerSummaries` para conteo de PERSONAS |
+| `app/lib/supabase/waiter.ts` | `freeTableAndClean` y `resetTable` ahora borran `table_waiter_assignments` |
+| `schema_export.sql` | Política `for delete to public` agregada |
 
 ### Settings — UI consistente
 

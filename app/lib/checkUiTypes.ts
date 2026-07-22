@@ -1,57 +1,20 @@
-export interface ContainerConfig {
-  background: string;
-  borderStyle: "solid" | "dotted" | "none";
-  borderRadius: "none" | "small" | "medium" | "large";
+export interface TicketConfig {
+  containerBg: string;
+  containerBorder: "solid" | "dotted" | "none";
+  containerRadius: "none" | "small" | "medium" | "large";
   spacing: "compact" | "normal" | "spacious";
-  sidebarWidth: number;
-  sidebarColor: string;
-}
-
-export interface HeaderConfig {
-  background: string;
-  textColor: string;
-  fontFamily: "sans" | "serif";
-  showDecoration: boolean;
-  showName: boolean;
-  showTable: boolean;
-}
-
-export interface CustomersConfig {
-  showIcons: boolean;
+  headerColor: string;
+  headerBg: string;
   accentColor: string;
   fontFamily: "sans" | "serif";
-}
-
-export interface ItemsConfig {
-  format: "detailed" | "dots" | "inline";
-  fontFamily: "sans" | "serif";
-}
-
-export interface TotalsConfig {
-  accentColor: string;
-  fontFamily: "sans" | "serif";
-}
-
-export interface FooterConfig {
-  text: string;
-  color: string;
-  fontFamily: "sans" | "serif";
-  showDecoration: boolean;
-}
-
-export interface ModeConfig {
-  container: ContainerConfig;
-  header: HeaderConfig;
-  customers: CustomersConfig;
-  items: ItemsConfig;
-  totals: TotalsConfig;
-  footer: FooterConfig;
+  footerText: string;
+  footerColor: string;
 }
 
 export interface CheckUiConfig {
-  modern: ModeConfig;
-  classic: ModeConfig;
-  compact: ModeConfig;
+  modern: TicketConfig;
+  classic: TicketConfig;
+  compact: TicketConfig;
 }
 
 const NAVY = "oklch(22% 0.04 260)";
@@ -62,144 +25,62 @@ const MUTED = "oklch(55% 0.02 260)";
 const TEXT = "oklch(20% 0.02 260)";
 const BORDER = "oklch(88% 0.01 260)";
 const GREEN = "oklch(52% 0.16 145)";
-const NAVY_75 = "oklch(65% 0.01 260)";
 
 export const DEFAULT_CONFIG: CheckUiConfig = {
   modern: {
-    container: {
-      background: WHITE,
-      borderStyle: "solid",
-      borderRadius: "large",
-      spacing: "normal",
-      sidebarWidth: 0,
-      sidebarColor: NAVY,
-    },
-    header: {
-      background: NAVY,
-      textColor: NAVY_75,
-      fontFamily: "sans",
-      showDecoration: false,
-      showName: true,
-      showTable: true,
-    },
-    customers: {
-      showIcons: true,
-      accentColor: TEXT,
-      fontFamily: "sans",
-    },
-    items: {
-      format: "detailed",
-      fontFamily: "sans",
-    },
-    totals: {
-      accentColor: TEXT,
-      fontFamily: "sans",
-    },
-    footer: {
-      text: "✅ ¡Gracias por su visita!",
-      color: GREEN,
-      fontFamily: "sans",
-      showDecoration: false,
-    },
+    containerBg: WHITE,
+    containerBorder: "solid",
+    containerRadius: "large",
+    spacing: "normal",
+    headerColor: WHITE,
+    headerBg: NAVY,
+    accentColor: TEXT,
+    fontFamily: "sans",
+    footerText: "GRACIAS POR SU PREFERENCIA",
+    footerColor: GREEN,
   },
   classic: {
-    container: {
-      background: SURFACE,
-      borderStyle: "dotted",
-      borderRadius: "small",
-      spacing: "normal",
-      sidebarWidth: 0,
-      sidebarColor: ACCENT,
-    },
-    header: {
-      background: "transparent",
-      textColor: ACCENT,
-      fontFamily: "serif",
-      showDecoration: true,
-      showName: true,
-      showTable: true,
-    },
-    customers: {
-      showIcons: false,
-      accentColor: ACCENT,
-      fontFamily: "serif",
-    },
-    items: {
-      format: "dots",
-      fontFamily: "serif",
-    },
-    totals: {
-      accentColor: ACCENT,
-      fontFamily: "serif",
-    },
-    footer: {
-      text: "¡Gracias por su preferencia! — Vuelva pronto",
-      color: ACCENT,
-      fontFamily: "serif",
-      showDecoration: true,
-    },
+    containerBg: SURFACE,
+    containerBorder: "dotted",
+    containerRadius: "small",
+    spacing: "normal",
+    headerColor: ACCENT,
+    headerBg: "transparent",
+    accentColor: ACCENT,
+    fontFamily: "serif",
+    footerText: "GRACIAS POR SU PREFERENCIA",
+    footerColor: ACCENT,
   },
   compact: {
-    container: {
-      background: WHITE,
-      borderStyle: "solid",
-      borderRadius: "medium",
-      spacing: "compact",
-      sidebarWidth: 0,
-      sidebarColor: NAVY,
-    },
-    header: {
-      background: "transparent",
-      textColor: NAVY,
-      fontFamily: "sans",
-      showDecoration: false,
-      showName: true,
-      showTable: true,
-    },
-    customers: {
-      showIcons: true,
-      accentColor: TEXT,
-      fontFamily: "sans",
-    },
-    items: {
-      format: "inline",
-      fontFamily: "sans",
-    },
-    totals: {
-      accentColor: TEXT,
-      fontFamily: "sans",
-    },
-    footer: {
-      text: "✅ Gracias por su visita",
-      color: MUTED,
-      fontFamily: "sans",
-      showDecoration: false,
-    },
+    containerBg: WHITE,
+    containerBorder: "solid",
+    containerRadius: "medium",
+    spacing: "compact",
+    headerColor: NAVY,
+    headerBg: "transparent",
+    accentColor: TEXT,
+    fontFamily: "sans",
+    footerText: "GRACIAS POR SU PREFERENCIA",
+    footerColor: MUTED,
   },
 };
 
-export function getDefaultConfig(mode: string): ModeConfig {
+export function getDefaultConfig(mode: string): TicketConfig {
   switch (mode) {
-    case "classic":
-      return structuredClone(DEFAULT_CONFIG.classic);
-    case "compact":
-      return structuredClone(DEFAULT_CONFIG.compact);
-    default:
-      return structuredClone(DEFAULT_CONFIG.modern);
+    case "classic": return structuredClone(DEFAULT_CONFIG.classic);
+    case "compact": return structuredClone(DEFAULT_CONFIG.compact);
+    default: return structuredClone(DEFAULT_CONFIG.modern);
   }
 }
 
 export const SPACING_MAP = {
-  compact: { containerPadding: "12px", customerPadding: "10px 16px", itemPadding: "6px 16px", sectionGap: "8px" },
-  normal: { containerPadding: "24px", customerPadding: "16px 24px 12px", itemPadding: "12px 18px", sectionGap: "16px" },
-  spacious: { containerPadding: "32px", customerPadding: "20px 32px 16px", itemPadding: "16px 24px", sectionGap: "24px" },
+  compact: { pad: "12px", padSm: "6px 12px", gap: "6px", fs: 9 },
+  normal: { pad: "20px", padSm: "10px 20px", gap: "10px", fs: 10 },
+  spacious: { pad: "28px", padSm: "14px 28px", gap: "14px", fs: 11 },
 } as const;
 
 export const BORDER_RADIUS_MAP = {
-  none: "0px",
-  small: "8px",
-  medium: "12px",
-  large: "16px",
+  none: "0px", small: "8px", medium: "12px", large: "16px",
 } as const;
 
 export const FONT_MAP = {

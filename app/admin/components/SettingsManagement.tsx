@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import { settingsService } from "@/app/lib/supabase/settings";
-import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette, FaList, FaPercentage } from "react-icons/fa";
+import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette, FaDollarSign, FaBuilding, FaList, FaPercentage } from "react-icons/fa";
 import CheckUiPreview from "./CheckUiPreview";
 import CheckUiCustomizer from "./CheckUiCustomizer";
 import CheckUiCustomizerColor from "./CheckUiCustomizerColor";
@@ -21,10 +21,11 @@ interface SettingDef {
   key: string;
   label: string;
   description: string;
-  type: "toggle" | "time" | "select" | "cover" | "password" | "action";
+  type: "toggle" | "time" | "select" | "cover" | "password" | "action" | "text" | "number";
   options?: { label: string; value: string }[];
   actionLabel?: string;
   actionIcon?: React.ReactNode;
+  placeholder?: string;
 }
 
 const SETTINGS: SettingDef[] = [
@@ -90,6 +91,22 @@ const SETTINGS: SettingDef[] = [
     type: "password",
   },
   {
+    key: "business_data",
+    label: "Datos del negocio",
+    description: "Nombre, propietario, RFC, dirección y sucursal que aparecen en el encabezado del ticket.",
+    type: "action",
+    actionLabel: "Editar",
+    actionIcon: <FaBuilding className="text-[10px]" />,
+  },
+  {
+    key: "iva_usd_rates",
+    label: "IVA y tipo de cambio",
+    description: "Tasa de IVA (%) y tipo de cambio USD/MXN para el cálculo de totales en el ticket.",
+    type: "action",
+    actionLabel: "Editar",
+    actionIcon: <FaDollarSign className="text-[10px]" />,
+  },
+  {
     key: "order_steps",
     label: "Pasos del pedido",
     description:
@@ -135,6 +152,10 @@ export default function SettingsManagement({
   const [orderStepsForm, setOrderStepsForm] = useState<Record<string, OrderStep>>({});
   const [showTipDistributionEditor, setShowTipDistributionEditor] = useState(false);
   const [tipDistributionForm, setTipDistributionForm] = useState<Record<string, string>>({});
+  const [showBusinessModal, setShowBusinessModal] = useState(false);
+  const [businessForm, setBusinessForm] = useState<Record<string, string>>({});
+  const [showRatesModal, setShowRatesModal] = useState(false);
+  const [ratesForm, setRatesForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadSettings();
@@ -265,7 +286,11 @@ export default function SettingsManagement({
     }
   };
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: string, key: string) => {
+    if (key === "business_data")
+      return <FaBuilding className="text-[oklch(62%_0.18_32)] text-sm" />;
+    if (key === "iva_usd_rates")
+      return <FaDollarSign className="text-[oklch(62%_0.18_32)] text-sm" />;
     switch (type) {
       case "time":
         return <FaClock className="text-[oklch(62%_0.18_32)] text-sm" />;
@@ -404,6 +429,21 @@ export default function SettingsManagement({
               setShowOrderStepsEditor(true);
             } else if (setting.key === "tip_distribution") {
               setShowTipDistributionEditor(true);
+            } else if (setting.key === "business_data") {
+              setBusinessForm({
+                business_name: values["business_name"] ?? "",
+                business_owner: values["business_owner"] ?? "",
+                business_rfc: values["business_rfc"] ?? "",
+                business_address: values["business_address"] ?? "",
+                business_sucursal: values["business_sucursal"] ?? "",
+              });
+              setShowBusinessModal(true);
+            } else if (setting.key === "iva_usd_rates") {
+              setRatesForm({
+                iva_rate: values["iva_rate"] ?? "16",
+                usd_rate: values["usd_rate"] ?? "20.50",
+              });
+              setShowRatesModal(true);
             }
           }}
           className="px-4 py-2 rounded-[9px] bg-[oklch(62%_0.18_32)] text-xs font-bold text-white hover:brightness-110 transition cursor-pointer flex items-center gap-1.5 flex-shrink-0"
@@ -411,6 +451,39 @@ export default function SettingsManagement({
           {setting.actionIcon}
           {setting.actionLabel}
         </button>
+      );
+    }
+
+    if (setting.type === "text" || setting.type === "number") {
+      const val = (values[setting.key] as string) ?? "";
+      const isSaving = savingKey === setting.key;
+      return (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <input
+            type={setting.type === "number" ? "number" : "text"}
+            value={val}
+            onChange={(e) => {
+              const v = e.target.value;
+              setValues((prev) => ({ ...prev, [setting.key]: v }));
+            }}
+            onBlur={async (e) => {
+              const v = e.target.value;
+              if (v === (values[setting.key] ?? "")) return;
+              setSavingKey(setting.key);
+              try {
+                await settingsService.updateSetting(setting.key, v);
+                toast("Guardado", "success");
+              } catch {
+                onError("Error guardando");
+              } finally {
+                setSavingKey(null);
+              }
+            }}
+            placeholder={setting.placeholder ?? ""}
+            className="w-48 px-3 py-1.5 border border-slate-200 rounded-[9px] text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:border-[var(--color-accent)]"
+          />
+          {isSaving && <FaSpinner className="animate-spin text-[11px] text-slate-400" />}
+        </div>
       );
     }
 
@@ -471,7 +544,7 @@ export default function SettingsManagement({
             >
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                  {getIcon(setting.type)}
+                  {getIcon(setting.type, setting.key)}
                 </div>
                 <div>
                   <p className="text-[14px] font-bold text-slate-900">
@@ -795,6 +868,152 @@ export default function SettingsManagement({
                   await settingsService.updateSetting("tip_distribution", JSON.stringify(numericMap));
                   toast("Distribución de propinas guardada", "success");
                   setShowTipDistributionEditor(false);
+                }}
+                className="flex-1 py-3 rounded-xl border-none text-sm font-bold text-white bg-[oklch(62%_0.18_32)] cursor-pointer hover:brightness-110 transition-colors"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBusinessModal && (
+        <div
+          onClick={() => setShowBusinessModal(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[18px] overflow-hidden shadow-2xl animate-[wr-scalein_0.22s_ease]"
+            style={{ width: "min(94vw, 480px)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+          >
+            <div className="flex items-center justify-between p-5 pb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center">
+                  <FaBuilding className="text-[oklch(62%_0.18_32)] text-sm" />
+                </div>
+                <p className="text-[17px] font-extrabold text-slate-900">Datos del negocio</p>
+              </div>
+              <button
+                onClick={() => setShowBusinessModal(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer bg-white flex-shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto" style={{ flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {[
+                  { key: "business_name", label: "Nombre del negocio" },
+                  { key: "business_owner", label: "Propietario" },
+                  { key: "business_rfc", label: "RFC" },
+                  { key: "business_address", label: "Dirección" },
+                  { key: "business_sucursal", label: "Sucursal" },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 4px" }}>{field.label}</p>
+                    <input
+                      value={businessForm[field.key] ?? ""}
+                      onChange={(e) => setBusinessForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                      style={{ width: "100%", padding: "9px 12px", border: "1.5px solid oklch(88% 0.01 260)", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 pt-0">
+              <button
+                onClick={() => setShowBusinessModal(false)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  for (const [k, v] of Object.entries(businessForm)) {
+                    await settingsService.updateSetting(k, v);
+                  }
+                  setValues((prev) => ({ ...prev, ...businessForm }));
+                  toast("Datos del negocio guardados", "success");
+                  setShowBusinessModal(false);
+                }}
+                className="flex-1 py-3 rounded-xl border-none text-sm font-bold text-white bg-[oklch(62%_0.18_32)] cursor-pointer hover:brightness-110 transition-colors"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRatesModal && (
+        <div
+          onClick={() => setShowRatesModal(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[18px] overflow-hidden shadow-2xl animate-[wr-scalein_0.22s_ease]"
+            style={{ width: "min(94vw, 420px)" }}
+          >
+            <div className="flex items-center justify-between p-5 pb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center">
+                  <FaDollarSign className="text-[oklch(62%_0.18_32)] text-sm" />
+                </div>
+                <p className="text-[17px] font-extrabold text-slate-900">IVA y tipo de cambio</p>
+              </div>
+              <button
+                onClick={() => setShowRatesModal(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer bg-white flex-shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 4px" }}>Tasa de IVA (%)</p>
+                <input
+                  type="number"
+                  value={ratesForm["iva_rate"] ?? ""}
+                  onChange={(e) => setRatesForm((prev) => ({ ...prev, iva_rate: e.target.value }))}
+                  placeholder="16"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid oklch(88% 0.01 260)", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                />
+              </div>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 4px" }}>Tipo de cambio USD/MXN</p>
+                <input
+                  type="number"
+                  value={ratesForm["usd_rate"] ?? ""}
+                  onChange={(e) => setRatesForm((prev) => ({ ...prev, usd_rate: e.target.value }))}
+                  placeholder="20.50"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid oklch(88% 0.01 260)", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 pt-0">
+              <button
+                onClick={() => setShowRatesModal(false)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  for (const [k, v] of Object.entries(ratesForm)) {
+                    await settingsService.updateSetting(k, v);
+                  }
+                  setValues((prev) => ({ ...prev, ...ratesForm }));
+                  toast("Tasas guardadas", "success");
+                  setShowRatesModal(false);
                 }}
                 className="flex-1 py-3 rounded-xl border-none text-sm font-bold text-white bg-[oklch(62%_0.18_32)] cursor-pointer hover:brightness-110 transition-colors"
               >
