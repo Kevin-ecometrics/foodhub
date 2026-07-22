@@ -1,16 +1,19 @@
-"use client"
+"use client";
 
 interface EndShiftModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: () => void
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
   session: {
-    waiterName: string
-    startedAt: string
-    totalSales: number
-    totalTips: number
-  }
-  distribution: Record<string, number>
+    waiterName: string;
+    startedAt: string;
+    totalSales: number;
+    totalTips: number;
+    tipsCash: number;
+    tipsTerminal: number;
+    tipsUsd: number;
+  };
+  distribution: Record<string, number>;
 }
 
 export default function EndShiftModal({
@@ -20,28 +23,45 @@ export default function EndShiftModal({
   session,
   distribution,
 }: EndShiftModalProps) {
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   const formatCurrency = (n: number) =>
-    n.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 2 })
+    n.toLocaleString("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 2,
+    });
 
-  const totalPct = Object.values(distribution).reduce((s, v) => s + v, 0)
-  const now = new Date()
+  const totalPct = Object.values(distribution).reduce((s, v) => s + v, 0);
+  const distributionTotal = session.totalTips * (totalPct / 100);
+  const waiterShare = session.totalTips - distributionTotal;
+  // La repartición se paga en efectivo. El mesero solo puede entregar hasta lo
+  // que trae físicamente en efectivo (mustProvide); si eso no alcanza para
+  // cubrir el monto a repartir, la diferencia (cashShortfall) no se le puede
+  // pedir "de la nada" — se descuenta de lo que se le debe por sus propinas en
+  // tarjeta/dólares (stillOwed), en vez de mostrarse como un faltante aparte.
+  const mustProvide = Math.min(session.tipsCash, distributionTotal);
+  const cashShortfall = Math.max(0, distributionTotal - session.tipsCash);
+  const stillOwed = Math.max(0, session.tipsTerminal + session.tipsUsd - cashShortfall);
+  const now = new Date();
   const fecha = now.toLocaleDateString("es-MX", {
     year: "numeric",
     month: "long",
     day: "numeric",
-  })
-  const hora = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
+  });
+  const hora = now.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   const start = session.startedAt
     ? new Date(session.startedAt).toLocaleTimeString("es-MX", {
         hour: "2-digit",
         minute: "2-digit",
       })
-    : "—"
+    : "—";
 
-  const entries = Object.entries(distribution).filter(([, pct]) => pct > 0)
+  const entries = Object.entries(distribution).filter(([, pct]) => pct > 0);
 
   return (
     <div
@@ -80,7 +100,14 @@ export default function EndShiftModal({
             textAlign: "center",
           }}
         >
-          <p style={{ fontSize: 18, fontWeight: 800, color: "var(--navy)", margin: 0 }}>
+          <p
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: "var(--navy)",
+              margin: 0,
+            }}
+          >
             Cierre de Turno
           </p>
           <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
@@ -97,21 +124,45 @@ export default function EndShiftModal({
               marginBottom: 14,
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>Mesero</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                Mesero
+              </span>
+              <span
+                style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}
+              >
                 {session.waiterName}
               </span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>Inicio de turno</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                Inicio de turno
+              </span>
+              <span
+                style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}
+              >
                 {start}
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>Total ventas</span>
-              <span style={{ fontSize: 16, fontWeight: 800, color: "var(--green)" }}>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                Total ventas
+              </span>
+              <span
+                style={{ fontSize: 16, fontWeight: 800, color: "var(--green)" }}
+              >
                 {formatCurrency(session.totalSales)}
               </span>
             </div>
@@ -126,13 +177,53 @@ export default function EndShiftModal({
               border: "1.5px solid var(--accent)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--accent)" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "var(--accent)",
+                }}
+              >
                 Propinas recolectadas
               </span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>
+              <span
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "var(--accent)",
+                }}
+              >
                 {formatCurrency(session.totalTips)}
               </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 10,
+                paddingTop: 10,
+                borderTop: "1px solid rgba(0,0,0,0.08)",
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: "var(--accent)" }}>
+                Efectivo: <strong>{formatCurrency(session.tipsCash)}</strong>
+              </span>
+              <span style={{ color: "var(--accent)" }}>
+                Tarjeta: <strong>{formatCurrency(session.tipsTerminal)}</strong>
+              </span>
+              {session.tipsUsd > 0 && (
+                <span style={{ color: "var(--accent)" }}>
+                  Dólares: <strong>{formatCurrency(session.tipsUsd)}</strong>
+                </span>
+              )}
             </div>
           </div>
 
@@ -164,7 +255,7 @@ export default function EndShiftModal({
               </div>
               <div style={{ padding: "8px 18px" }}>
                 {entries.map(([role, pct]) => {
-                  const amount = session.totalTips * (pct / 100)
+                  const amount = session.totalTips * (pct / 100);
                   return (
                     <div
                       key={role}
@@ -179,14 +270,12 @@ export default function EndShiftModal({
                       <span style={{ fontWeight: 600, color: "var(--text)" }}>
                         {role}
                       </span>
-                      <span style={{ color: "var(--muted)" }}>
-                        {pct}%
-                      </span>
+                      <span style={{ color: "var(--muted)" }}>{pct}%</span>
                       <span style={{ fontWeight: 700, color: "var(--green)" }}>
                         {formatCurrency(amount)}
                       </span>
                     </div>
-                  )
+                  );
                 })}
                 <div
                   style={{
@@ -198,12 +287,79 @@ export default function EndShiftModal({
                     color: "var(--text)",
                   }}
                 >
-                  <span>Total %</span>
-                  <span>{totalPct.toFixed(1)}%</span>
+                  <span>Total distribución ({totalPct.toFixed(1)}%)</span>
+                  <span>{formatCurrency(distributionTotal)}</span>
                 </div>
               </div>
             </div>
           )}
+
+          <div
+            style={{
+              background: "var(--surface)",
+              borderRadius: 12,
+              padding: "14px 18px",
+              marginTop: 14,
+              border: "1.5px solid var(--border)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}
+              >
+                Te toca de propina
+              </span>
+              <span
+                style={{ fontSize: 20, fontWeight: 800, color: "var(--green)" }}
+              >
+                {formatCurrency(waiterShare)}
+              </span>
+            </div>
+            {mustProvide > 0 && (
+              <div
+                style={{
+                  marginTop: 10,
+                  paddingTop: 10,
+                  borderTop: "1px solid var(--border)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "#b91c1c" }}>
+                  Sobrante
+                </span>
+                <span style={{ fontWeight: 800, color: "#b91c1c" }}>
+                  {formatCurrency(mustProvide)}
+                </span>
+              </div>
+            )}
+            {stillOwed > 0 && (
+              <div
+                style={{
+                  marginTop: 10,
+                  paddingTop: 10,
+                  borderTop: "1px solid var(--border)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "var(--muted)" }}>
+                  Faltante
+                </span>
+                <span style={{ fontWeight: 800, color: "var(--text)" }}>
+                  {formatCurrency(stillOwed)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div
@@ -252,5 +408,5 @@ export default function EndShiftModal({
         </div>
       </div>
     </div>
-  )
+  );
 }

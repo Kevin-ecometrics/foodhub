@@ -290,6 +290,7 @@ export interface Database {
           customer_name: string
           amount: number
           payment_method: string | null
+          payment_breakdown: Json | null
           waiter_id: string | null
           created_at: string
         }
@@ -300,6 +301,7 @@ export interface Database {
           customer_name: string
           amount: number
           payment_method?: string | null
+          payment_breakdown?: Json | null
           waiter_id?: string | null
           created_at?: string
         }
@@ -310,6 +312,7 @@ export interface Database {
           customer_name?: string
           amount?: number
           payment_method?: string | null
+          payment_breakdown?: Json | null
           waiter_id?: string | null
           created_at?: string
         }
@@ -326,6 +329,8 @@ export interface Database {
           order_count: number
           item_count: number
           payment_method: string | null
+          payment_breakdown: Json | null
+          waiter_name: string | null
           created_at: string
           closed_at: string
         }
@@ -338,6 +343,8 @@ export interface Database {
           order_count: number
           item_count: number
           payment_method?: string | null
+          payment_breakdown?: Json | null
+          waiter_name?: string | null
           created_at?: string
           closed_at?: string
         }
@@ -350,6 +357,8 @@ export interface Database {
           order_count?: number
           item_count?: number
           payment_method?: string | null
+          payment_breakdown?: Json | null
+          waiter_name?: string | null
           created_at?: string
           closed_at?: string
         }
@@ -494,6 +503,9 @@ export interface Database {
           started_at: string
           ended_at: string | null
           total_sales: number
+          tips_collected: number
+          tips_paid_out: number
+          tip_distribution_snapshot: Json | null
           created_at: string
         }
         Insert: {
@@ -503,6 +515,9 @@ export interface Database {
           started_at?: string
           ended_at?: string | null
           total_sales?: number
+          tips_collected?: number
+          tips_paid_out?: number
+          tip_distribution_snapshot?: Json | null
           created_at?: string
         }
         Update: {
@@ -512,6 +527,9 @@ export interface Database {
           started_at?: string
           ended_at?: string | null
           total_sales?: number
+          tips_collected?: number
+          tips_paid_out?: number
+          tip_distribution_snapshot?: Json | null
           created_at?: string
         }
       }
@@ -524,22 +542,24 @@ export interface Database {
           opened_at: string
           closed_at: string | null
           opening_cash: number
+          cash_deposits: number
+          cash_withdrawals: number
           counted_cash: number | null
           notes: string | null
           cash_sales: number
           terminal_sales: number
           usd_sales: number
-          mixed_sales: number
           total_sales: number
           cash_tips: number
           terminal_tips: number
           usd_tips: number
-          mixed_tips: number
           total_tips: number
           paid_accounts_count: number
           average_ticket: number
           subtotal: number
           tax_amount: number
+          tax_rate: number
+          tips_paid: number
           expected_cash: number
           cash_difference: number
           opened_by: string | null
@@ -552,22 +572,24 @@ export interface Database {
           opened_at?: string
           closed_at?: string | null
           opening_cash?: number
+          cash_deposits?: number
+          cash_withdrawals?: number
           counted_cash?: number | null
           notes?: string | null
           cash_sales?: number
           terminal_sales?: number
           usd_sales?: number
-          mixed_sales?: number
           total_sales?: number
           cash_tips?: number
           terminal_tips?: number
           usd_tips?: number
-          mixed_tips?: number
           total_tips?: number
           paid_accounts_count?: number
           average_ticket?: number
           subtotal?: number
           tax_amount?: number
+          tax_rate?: number
+          tips_paid?: number
           expected_cash?: number
           cash_difference?: number
           opened_by?: string | null
@@ -580,26 +602,96 @@ export interface Database {
           opened_at?: string
           closed_at?: string | null
           opening_cash?: number
+          cash_deposits?: number
+          cash_withdrawals?: number
           counted_cash?: number | null
           notes?: string | null
           cash_sales?: number
           terminal_sales?: number
           usd_sales?: number
-          mixed_sales?: number
           total_sales?: number
           cash_tips?: number
           terminal_tips?: number
           usd_tips?: number
-          mixed_tips?: number
           total_tips?: number
           paid_accounts_count?: number
           average_ticket?: number
           subtotal?: number
           tax_amount?: number
+          tax_rate?: number
+          tips_paid?: number
           expected_cash?: number
           cash_difference?: number
           opened_by?: string | null
           closed_by?: string | null
+          created_at?: string
+        }
+      }
+
+      // ── tip_ledger_entries ─────────────────────────────────────────────────────
+      tip_ledger_entries: {
+        Row: {
+          id: string
+          waiter_session_id: string | null
+          recipient_type: string
+          recipient_key: string
+          recipient_name: string
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          waiter_session_id?: string | null
+          recipient_type: string
+          recipient_key: string
+          recipient_name: string
+          amount?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          waiter_session_id?: string | null
+          recipient_type?: string
+          recipient_key?: string
+          recipient_name?: string
+          amount?: number
+          created_at?: string
+        }
+      }
+
+      // ── tip_payouts ────────────────────────────────────────────────────────────
+      tip_payouts: {
+        Row: {
+          id: string
+          recipient_type: string
+          recipient_key: string
+          recipient_name: string
+          amount: number
+          paid_at: string
+          paid_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipient_type: string
+          recipient_key: string
+          recipient_name: string
+          amount?: number
+          paid_at?: string
+          paid_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recipient_type?: string
+          recipient_key?: string
+          recipient_name?: string
+          amount?: number
+          paid_at?: string
+          paid_by?: string | null
+          notes?: string | null
           created_at?: string
         }
       }

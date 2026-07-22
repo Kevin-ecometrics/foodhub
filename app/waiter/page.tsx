@@ -2196,6 +2196,9 @@ export default function WaiterDashboard() {
   const [endShiftData, setEndShiftData] = useState<{
     totalSales: number;
     totalTips: number;
+    tipsCash: number;
+    tipsTerminal: number;
+    tipsUsd: number;
     distribution: Record<string, number>;
   } | null>(null);
 
@@ -2249,11 +2252,18 @@ export default function WaiterDashboard() {
       return;
     }
     try {
-      const [totalTips, distribution] = await Promise.all([
-        sessionsService.getTipsForSession(activeSession.id),
+      const [tipsBreakdown, distribution] = await Promise.all([
+        sessionsService.getTipsBreakdownForSession(activeSession.waiter_id, activeSession.started_at),
         sessionsService.getTipDistributionConfig(),
       ]);
-      setEndShiftData({ totalSales: activeSession.total_sales, totalTips, distribution });
+      setEndShiftData({
+        totalSales: activeSession.total_sales,
+        totalTips: tipsBreakdown.total,
+        tipsCash: tipsBreakdown.cash,
+        tipsTerminal: tipsBreakdown.terminal,
+        tipsUsd: tipsBreakdown.usd,
+        distribution,
+      });
       setShowEndShiftModal(true);
     } catch (e) {
       console.error("Error obteniendo datos de cierre:", e);
@@ -2265,7 +2275,18 @@ export default function WaiterDashboard() {
   const handleEndShiftConfirm = async () => {
     if (!activeSession) return;
     try {
-      await sessionsService.endSession(activeSession.id);
+      await sessionsService.endSession(
+        activeSession.id,
+        activeSession.waiter_id,
+        waiterName,
+        {
+          cash: endShiftData?.tipsCash ?? 0,
+          terminal: endShiftData?.tipsTerminal ?? 0,
+          usd: endShiftData?.tipsUsd ?? 0,
+          total: endShiftData?.totalTips ?? 0,
+        },
+        endShiftData?.distribution ?? {},
+      );
     } catch (e) {
       console.error("Error cerrando sesión:", e);
     }
@@ -2792,6 +2813,7 @@ export default function WaiterDashboard() {
         selectedTableForSeparate.id,
         selectedTableForSeparate.number,
         paymentMethod,
+        waiterName,
       );
 
       toast(`Mesa ${selectedTableForSeparate.number} cobrada — $${selectedTableForSeparate.total.toFixed(2)} · ${payments.length} comensales`, "success");
@@ -2826,10 +2848,27 @@ export default function WaiterDashboard() {
         paymentMethod = "mixed";
       }
 
+      // Desglose en MXN de todo pago que involucra efectivo (100% efectivo o
+      // mixto), para que el corte de caja sepa cuanto de esta cuenta fue
+      // efectivo real vs. tarjeta/dolares, y cuanto entro/salio de la caja en
+      // efectivo bruto (deposito) y cambio (retiro). El cambio se asume
+      // entregado desde la parte en efectivo.
+      const paymentBreakdown = paymentData.cash > 0
+        ? {
+            cash: paymentMethod === "mixed" ? Math.max(0, paymentData.cash - paymentData.change) : 0,
+            terminal: paymentData.terminal,
+            usd: paymentData.usd * (paymentData.usdRate || 0),
+            cashTendered: paymentData.cash,
+            change: paymentData.change,
+          }
+        : null;
+
       const saleId = await waiterService.freeTableAndClean(
         selectedTableForPayment.id,
         selectedTableForPayment.number,
         paymentMethod,
+        waiterName,
+        paymentBreakdown,
       );
 
       if (paymentData.tip > 0) {
@@ -2973,6 +3012,7 @@ export default function WaiterDashboard() {
                 onAddModalChange={(isOpen) => { modalOpenRef.current = isOpen || showPaymentCalculator || showSeparatePayments || showCerrarPinModal; }}
                 onMoveItem={handleMoveItemToCustomer}
                 waiterName={waiterName}
+                waiterId={activeSession?.waiter_id}
                 orderSteps={orderSteps}
               />
             </>
@@ -3074,6 +3114,9 @@ export default function WaiterDashboard() {
           startedAt: activeSession?.started_at || "",
           totalSales: endShiftData?.totalSales || 0,
           totalTips: endShiftData?.totalTips || 0,
+          tipsCash: endShiftData?.tipsCash || 0,
+          tipsTerminal: endShiftData?.tipsTerminal || 0,
+          tipsUsd: endShiftData?.tipsUsd || 0,
         }}
         distribution={endShiftData?.distribution || {}}
       />

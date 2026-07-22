@@ -1,6 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './client'
 
+// Desglose en MXN de un pago que involucra efectivo ('cash' puro o 'mixed').
+// - cash/terminal/usd: neto por metodo, usado para repartir cobros 'mixed'
+//   entre cash_sales/terminal_sales/usd_sales (se asume que el cambio sale de
+//   la parte en efectivo).
+// - cashTendered/change: el efectivo BRUTO entregado por el cliente y el
+//   cambio devuelto, usados por cash_reports para calcular depositos/retiros
+//   de efectivo automaticamente (sin importar si el pago fue 100% efectivo o
+//   mixto).
+export interface PaymentBreakdown {
+  cash: number
+  terminal: number
+  usd: number
+  cashTendered: number
+  change: number
+}
+
 export interface Tip {
   id: string
   order_id: string | null
@@ -8,6 +24,7 @@ export interface Tip {
   customer_name: string
   amount: number
   payment_method: string | null
+  payment_breakdown: PaymentBreakdown | null
   waiter_id: string | null
   created_at: string
 }
@@ -19,6 +36,7 @@ export const tipsService = {
     customer_name: string
     amount: number
     payment_method?: string | null
+    paymentBreakdown?: PaymentBreakdown | null
     waiter_id?: string | null
   }): Promise<void> {
     const { error } = await (supabase as any).from('tips').insert({
@@ -27,6 +45,7 @@ export const tipsService = {
       customer_name: tip.customer_name,
       amount: tip.amount,
       payment_method: tip.payment_method ?? null,
+      payment_breakdown: tip.paymentBreakdown ?? null,
       waiter_id: tip.waiter_id ?? null,
     }) as { error: Error | null }
     if (error) throw error

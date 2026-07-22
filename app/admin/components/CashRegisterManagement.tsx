@@ -15,6 +15,7 @@ import {
   FaSpinner,
   FaTrash,
   FaTimes,
+  FaPrint,
 } from "react-icons/fa";
 
 interface CashRegisterManagementProps {
@@ -37,7 +38,6 @@ const PAYMENT_LABELS: Record<string, string> = {
   cash: "Efectivo",
   terminal: "Tarjeta",
   usd: "Dólares",
-  mixed: "Mixto",
 };
 
 export default function CashRegisterManagement({ onError }: CashRegisterManagementProps) {
@@ -131,7 +131,7 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
   };
 
   const expectedCash = openReport && closePreview
-    ? openReport.opening_cash + closePreview.cash_sales - closePreview.cash_tips
+    ? openReport.opening_cash + closePreview.cash_deposits - closePreview.cash_withdrawals - closePreview.tips_paid
     : 0;
   const cashDifference = numOr0(countedCash) - expectedCash;
 
@@ -161,6 +161,97 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
       onError("Error cerrando la caja");
     } finally {
       setClosing(false);
+    }
+  };
+
+  const printCashReportTicket = (report: CashReport) => {
+    const row = (label: string, value: string) =>
+      `<div class="row"><span>${label}</span><span>${value}</span></div>`;
+
+    const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Corte de Caja #${report.report_number}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; font-size: 12px; max-width: 300px; margin: 0 auto; padding: 10px; }
+          .header { text-align: center; margin-bottom: 12px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
+          .restaurant-name { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+          .period { font-size: 10px; color: #444; }
+          .section { margin-top: 14px; padding-top: 8px; border-top: 1px dashed #000; }
+          .section-title { font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
+          .row { display: flex; justify-content: space-between; margin: 2px 0; }
+          .row.total { font-weight: bold; border-top: 1px dotted #999; padding-top: 4px; margin-top: 4px; }
+          .footer { text-align: center; margin-top: 20px; font-size: 10px; padding-top: 10px; border-top: 1px dashed #000; }
+          .note { margin-top: 4px; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="restaurant-name">RIOCHIA7</div>
+          <div>*** CORTE DE CAJA #${report.report_number} ***</div>
+          <div class="period">Del ${formatDateTime(report.opened_at)}${report.closed_at ? ` al ${formatDateTime(report.closed_at)}` : ""}</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Caja</div>
+          ${row("Efectivo inicial", formatCurrency(report.opening_cash))}
+          ${row("Depósitos efectivo", formatCurrency(report.cash_deposits))}
+          ${row("Retiros efectivo", formatCurrency(report.cash_withdrawals))}
+          ${row("Propinas pagadas", formatCurrency(report.tips_paid))}
+          <div class="row total"><span>Saldo final</span><span>${formatCurrency(report.expected_cash)}</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Forma de pago ventas</div>
+          ${row("Efectivo", formatCurrency(report.cash_sales))}
+          ${row("Tarjeta", formatCurrency(report.terminal_sales))}
+          ${row("Dólares", formatCurrency(report.usd_sales))}
+          <div class="row total"><span>Total</span><span>${formatCurrency(report.total_sales)}</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Forma de pago propina</div>
+          ${row("Efectivo", formatCurrency(report.cash_tips))}
+          ${row("Tarjeta", formatCurrency(report.terminal_tips))}
+          ${row("Dólares", formatCurrency(report.usd_tips))}
+          <div class="row total"><span>Total</span><span>${formatCurrency(report.total_tips)}</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Venta (no incluye impuestos)</div>
+          ${row("Subtotal", formatCurrency(report.subtotal))}
+          ${row(`Impuestos (${report.tax_rate}%)`, formatCurrency(report.tax_amount))}
+          <div class="row total"><span>Venta con impuestos</span><span>${formatCurrency(report.total_sales)}</span></div>
+          ${row("Cuentas normal", String(report.paid_accounts_count))}
+          ${row("Cuenta promedio", formatCurrency(report.average_ticket))}
+          ${row("Propinas", formatCurrency(report.total_tips))}
+        </div>
+
+        <div class="section">
+          <div class="section-title">Declaración de cajero</div>
+          ${row("Efectivo", formatCurrency(report.counted_cash ?? 0))}
+          <div class="row total"><span>Total</span><span>${formatCurrency(report.counted_cash ?? 0)}</span></div>
+          <div class="row total"><span>${report.cash_difference >= 0 ? "Sobrante" : "Faltante"}</span><span>${formatCurrency(Math.abs(report.cash_difference))}</span></div>
+        </div>
+
+        ${report.notes ? `<div class="section"><div class="section-title">Notas</div><div class="note">${report.notes}</div></div>` : ""}
+
+        <div class="footer">
+          <div>*** FIN DEL CORTE ***</div>
+          <div>RioChia7</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(content);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 500);
     }
   };
 
@@ -197,13 +288,10 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
   };
 
   const paymentBreakdown = (preview: CashReportPreview, kind: "sales" | "tips") => (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-      {(["cash", "terminal", "usd", "mixed"] as const).map((m) => (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+      {(["cash", "terminal", "usd"] as const).map((m) => (
         <div key={m}>
-          <p className="text-slate-500">
-            {PAYMENT_LABELS[m]}
-            {m === "mixed" && <span className="text-amber-600"> (no incluido)</span>}
-          </p>
+          <p className="text-slate-500">{PAYMENT_LABELS[m]}</p>
           <p className="font-bold text-slate-900">
             {formatCurrency(preview[`${m}_${kind}` as keyof CashReportPreview] as number)}
           </p>
@@ -314,7 +402,7 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
             <div>
               <p className="text-[15px] font-extrabold text-[oklch(18%_0.02_260)] leading-tight">Cerrar Caja</p>
               <p className="text-[11px] text-[oklch(55%_0.02_260)]">
-                Periodo: {formatDateTime(openReport.opened_at)} → ahora. Tasa de impuesto: 16%.
+                Periodo: {formatDateTime(openReport.opened_at)} → ahora.
               </p>
             </div>
           </div>
@@ -334,13 +422,20 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Subtotal: <strong className="text-slate-900">{formatCurrency(closePreview.subtotal)}</strong></span>
-                  <span className="text-slate-500">Impuestos (16%): <strong className="text-slate-900">{formatCurrency(closePreview.tax_amount)}</strong></span>
+                  <span className="text-slate-500">Impuestos ({closePreview.tax_rate}%): <strong className="text-slate-900">{formatCurrency(closePreview.tax_amount)}</strong></span>
                   <span className="text-slate-500">Total: <strong className="text-slate-900">{formatCurrency(closePreview.total_sales)}</strong></span>
                 </div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pt-2">Propinas del periodo (calculado)</p>
                 {paymentBreakdown(closePreview, "tips")}
                 <div className="text-xs">
                   <span className="text-slate-500">Total propinas: <strong className="text-slate-900">{formatCurrency(closePreview.total_tips)}</strong></span>
+                </div>
+                <div className="flex justify-between border-t border-[oklch(90%_0.01_260)] pt-3 text-xs">
+                  <span className="text-slate-500">Depósitos efectivo: <strong className="text-slate-900">{formatCurrency(closePreview.cash_deposits)}</strong></span>
+                  <span className="text-slate-500">Retiros efectivo (cambio): <strong className="text-slate-900">{formatCurrency(closePreview.cash_withdrawals)}</strong></span>
+                </div>
+                <div className="text-xs">
+                  <span className="text-slate-500">Propinas pagadas (reparto al cerrar turno): <strong className="text-slate-900">{formatCurrency(closePreview.tips_paid)}</strong></span>
                 </div>
               </div>
             )}
@@ -436,15 +531,26 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                   <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-900">{formatCurrency(r.total_sales)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{diffBadge(r.cash_difference)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(r);
-                      }}
-                      className="p-1.5 rounded-[7px] text-red-400 hover:text-red-600 hover:bg-red-50 transition"
-                    >
-                      <FaTrash className="text-[11px]" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          printCashReportTicket(r);
+                        }}
+                        className="p-1.5 rounded-[7px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                      >
+                        <FaPrint className="text-[11px]" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(r);
+                        }}
+                        className="p-1.5 rounded-[7px] text-red-400 hover:text-red-600 hover:bg-red-50 transition"
+                      >
+                        <FaTrash className="text-[11px]" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -471,9 +577,18 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                   {formatDateTime(selectedReport.opened_at)} → {selectedReport.closed_at ? formatDateTime(selectedReport.closed_at) : "—"}
                 </p>
               </div>
-              <button onClick={() => setSelectedReport(null)} className="text-slate-400 hover:text-slate-600">
-                <FaTimes />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => printCashReportTicket(selectedReport)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition"
+                >
+                  <FaPrint className="text-[11px]" />
+                  Imprimir
+                </button>
+                <button onClick={() => setSelectedReport(null)} className="text-slate-400 hover:text-slate-600">
+                  <FaTimes />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-5 text-sm">
@@ -483,7 +598,6 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                   <p className="text-slate-500">Efectivo: <strong className="text-slate-900">{formatCurrency(selectedReport.cash_sales)}</strong></p>
                   <p className="text-slate-500">Tarjeta: <strong className="text-slate-900">{formatCurrency(selectedReport.terminal_sales)}</strong></p>
                   <p className="text-slate-500">Dólares: <strong className="text-slate-900">{formatCurrency(selectedReport.usd_sales)}</strong></p>
-                  <p className="text-slate-500">Mixto <span className="text-amber-600">(no incluido)</span>: <strong className="text-slate-900">{formatCurrency(selectedReport.mixed_sales)}</strong></p>
                 </div>
                 <p className="text-xs mt-2 text-slate-500">Total ventas: <strong className="text-slate-900">{formatCurrency(selectedReport.total_sales)}</strong></p>
               </div>
@@ -494,7 +608,6 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                   <p className="text-slate-500">Efectivo: <strong className="text-slate-900">{formatCurrency(selectedReport.cash_tips)}</strong></p>
                   <p className="text-slate-500">Tarjeta: <strong className="text-slate-900">{formatCurrency(selectedReport.terminal_tips)}</strong></p>
                   <p className="text-slate-500">Dólares: <strong className="text-slate-900">{formatCurrency(selectedReport.usd_tips)}</strong></p>
-                  <p className="text-slate-500">Mixto <span className="text-amber-600">(no incluido)</span>: <strong className="text-slate-900">{formatCurrency(selectedReport.mixed_tips)}</strong></p>
                 </div>
                 <p className="text-xs mt-2 text-slate-500">Total propinas: <strong className="text-slate-900">{formatCurrency(selectedReport.total_tips)}</strong></p>
               </div>
@@ -505,7 +618,7 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                   <p className="text-slate-500">Cuentas cobradas: <strong className="text-slate-900">{selectedReport.paid_accounts_count}</strong></p>
                   <p className="text-slate-500">Cuenta promedio: <strong className="text-slate-900">{formatCurrency(selectedReport.average_ticket)}</strong></p>
                   <p className="text-slate-500">Subtotal: <strong className="text-slate-900">{formatCurrency(selectedReport.subtotal)}</strong></p>
-                  <p className="text-slate-500">Impuestos (16%): <strong className="text-slate-900">{formatCurrency(selectedReport.tax_amount)}</strong></p>
+                  <p className="text-slate-500">Impuestos ({selectedReport.tax_rate}%): <strong className="text-slate-900">{formatCurrency(selectedReport.tax_amount)}</strong></p>
                 </div>
               </div>
 
@@ -513,8 +626,9 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Reconciliación de efectivo</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <p className="text-slate-500">Efectivo inicial: <strong className="text-slate-900">{formatCurrency(selectedReport.opening_cash)}</strong></p>
-                  <p className="text-slate-500">Ventas en efectivo: <strong className="text-slate-900">{formatCurrency(selectedReport.cash_sales)}</strong></p>
-                  <p className="text-slate-500">Propinas pagadas (efectivo): <strong className="text-slate-900">{formatCurrency(selectedReport.cash_tips)}</strong></p>
+                  <p className="text-slate-500">Depósitos efectivo: <strong className="text-slate-900">{formatCurrency(selectedReport.cash_deposits)}</strong></p>
+                  <p className="text-slate-500">Retiros efectivo (cambio): <strong className="text-slate-900">{formatCurrency(selectedReport.cash_withdrawals)}</strong></p>
+                  <p className="text-slate-500">Propinas pagadas: <strong className="text-slate-900">{formatCurrency(selectedReport.tips_paid)}</strong></p>
                   <p className="text-slate-500">Efectivo esperado: <strong className="text-slate-900">{formatCurrency(selectedReport.expected_cash)}</strong></p>
                   <p className="text-slate-500">Efectivo contado: <strong className="text-slate-900">{formatCurrency(selectedReport.counted_cash ?? 0)}</strong></p>
                 </div>

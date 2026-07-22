@@ -1628,6 +1628,7 @@ export default function MenuPage() {
   const [productRatingsEnabled, setProductRatingsEnabled] = useState(false);
   const [productRatingSummaries, setProductRatingSummaries] = useState<Record<number, ProductRatingSummary>>({});
   const [breakfastEndHour, setBreakfastEndHour] = useState("11:00");
+  const [ivaRate, setIvaRate] = useState(16);
   const [recentOrderItems, setRecentOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingProduct, setAddingProduct] = useState<number | null>(null);
@@ -2065,15 +2066,17 @@ export default function MenuPage() {
     try {
       await setCurrentUserOrder(oid, uid);
       if (currentTableId) await refreshOrder(currentTableId);
-      const [allProducts, recent, cats, hourSetting, checkUi, orderStepsVal] = await Promise.all([
+      const [allProducts, recent, cats, hourSetting, checkUi, orderStepsVal, ivaSetting] = await Promise.all([
         productsService.getProducts(),
         getRecentOrdersItems(tid),
         categoriesService.getActiveCategories(),
         settingsService.getSetting("breakfast_end_hour").catch(() => '11:00'),
         settingsService.getSetting("default_check_ui").catch(() => 'modern'),
         settingsService.getSetting("order_steps").catch(() => null) as Promise<string | null>,
+        settingsService.getSetting("iva_rate").catch(() => null),
       ]);
       setOrderSteps(orderStepsVal);
+      if (ivaSetting) setIvaRate(Number(ivaSetting) || 16);
       setCheckUiMode(checkUi || 'modern');
       if (checkUi) {
         fetch("/api/settings/public")
@@ -4016,8 +4019,8 @@ export default function MenuPage() {
               )}
               {(() => {
                 const overallTotal = groups.reduce((s, g) => s + g.subtotal, 0);
-                const taxRate = 0.08;
-                const overallSubtotal = overallTotal / (1 + taxRate);
+                const taxRateDecimal = ivaRate / 100;
+                const overallSubtotal = overallTotal / (1 + taxRateDecimal);
                 const overallTax = overallTotal - overallSubtotal;
                 return (
                   <div style={{ padding:"16px 20px",borderTop:"1.5px solid var(--border)",marginTop:8 }}>
@@ -4026,7 +4029,7 @@ export default function MenuPage() {
                       <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>${overallSubtotal.toFixed(2)}</span>
                     </div>
                     <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
-                      <span style={{ fontSize:13,color:"var(--muted)" }}>Impuestos (8%):</span>
+                      <span style={{ fontSize:13,color:"var(--muted)" }}>Impuestos ({ivaRate}%):</span>
                       <span style={{ fontSize:13,fontWeight:700,color:"var(--text)" }}>${overallTax.toFixed(2)}</span>
                     </div>
                     <div style={{ display:"flex",justifyContent:"space-between",paddingTop:8,borderTop:"1.5px solid var(--text)" }}>

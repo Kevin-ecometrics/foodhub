@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -7,8 +7,9 @@ import { useOrder } from "@/app/context/OrderContext";
 import { historyService, OrderWithItems, OrderItemWithProduct } from "@/app/lib/supabase/history";
 import { useToast } from "@/app/context/ToastContext";
 import { supabase } from "@/app/lib/supabase/client";
-import { DEFAULT_CONFIG, CheckUiConfig, ModeConfig } from "@/app/lib/checkUiTypes";
+import { DEFAULT_CONFIG, CheckUiConfig, TicketConfig } from "@/app/lib/checkUiTypes";
 import { configToStyles } from "@/app/lib/checkUiRenderer";
+import { numeroALetras } from "@/app/lib/numeroALetras";
 import axios from "axios";
 
 // ─── Design CSS ──────────────────────────────────────────────────────────────
@@ -521,6 +522,7 @@ export default function PaymentPage() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [, setPaymentStatus] = useState({ status: "pending" });
   const [refreshing, setRefreshing] = useState(false);
+  const [waiterName, setWaiterName] = useState("");
   const [tipMode, setTipMode] = useState<"none" | "pct" | "custom">("none");
   const [tipPct, setTipPct] = useState<number>(0);
   const [tipCustom, setTipCustom] = useState<string>("");
@@ -528,6 +530,13 @@ export default function PaymentPage() {
   const [tipSaving, setTipSaving] = useState(false);
   const [checkUiMode, setCheckUiMode] = useState("modern");
   const [checkUiConfig, setCheckUiConfig] = useState<CheckUiConfig | null>(null);
+  const [businessName, setBusinessName] = useState("RioChia7");
+  const [businessOwner, setBusinessOwner] = useState("ELDA CABRERA VERA");
+  const [businessRfc, setBusinessRfc] = useState("CAVE6102187H1");
+  const [businessAddress, setBusinessAddress] = useState("");
+  const [businessSucursal, setBusinessSucursal] = useState("");
+  const [ivaRate, setIvaRate] = useState(16);
+  const [usdRate, setUsdRate] = useState(20.50);
 
   useEffect(() => {
     fetch("/api/settings/public")
@@ -539,11 +548,18 @@ export default function PaymentPage() {
         if (configStr) {
           try { setCheckUiConfig(JSON.parse(configStr)); } catch { /* use defaults */ }
         }
+        if (data["business_name"]) setBusinessName(data["business_name"]);
+        if (data["business_owner"]) setBusinessOwner(data["business_owner"]);
+        if (data["business_rfc"]) setBusinessRfc(data["business_rfc"]);
+        if (data["business_address"]) setBusinessAddress(data["business_address"]);
+        if (data["business_sucursal"]) setBusinessSucursal(data["business_sucursal"]);
+        if (data["iva_rate"]) setIvaRate(parseFloat(data["iva_rate"]) || 16);
+        if (data["usd_rate"]) setUsdRate(parseFloat(data["usd_rate"]) || 20.50);
       })
       .catch(() => {});
   }, []);
 
-  const modeConfig: ModeConfig = checkUiConfig
+  const modeConfig: TicketConfig = checkUiConfig
     ? (checkUiConfig[checkUiMode as keyof CheckUiConfig] ?? DEFAULT_CONFIG[checkUiMode as keyof CheckUiConfig] ?? DEFAULT_CONFIG.modern)
     : DEFAULT_CONFIG[checkUiMode as keyof CheckUiConfig] ?? DEFAULT_CONFIG.modern;
 
@@ -609,6 +625,18 @@ export default function PaymentPage() {
   };
 
   useEffect(() => {
+    const fetchWaiter = async () => {
+      const tid = tableId || currentTableId;
+      if (!tid) return;
+      try {
+        const res = await supabase.from("table_waiter_assignments").select("waiter_name").eq("table_id", parseInt(tid.toString())).order("assigned_at", { ascending: false }).limit(1) as unknown as { data: { waiter_name: string }[] | null };
+        if (res.data?.[0]?.waiter_name) setWaiterName(res.data[0].waiter_name);
+      } catch { /* ignore */ }
+    };
+    fetchWaiter();
+  }, [tableId, currentTableId]);
+
+  useEffect(() => {
     const loadAllOrders = async () => {
       const targetTableId = tableId || currentTableId;
       if (!targetTableId) return;
@@ -647,9 +675,8 @@ export default function PaymentPage() {
         acc.cancelledAmount += item.price * cancelledQty;
         return acc;
       }, { cancelledItemsCount: 0, cancelledUnitsCount: 0, totalAmount: 0, cancelledAmount: 0 });
-      const taxRate = 0.08;
       cs.total += calc.totalAmount;
-      cs.subtotal = cs.total / (1 + taxRate);
+      cs.subtotal = cs.total / (1 + ivaRate / 100);
       cs.taxAmount = cs.total - cs.subtotal;
       cs.cancelledItemsCount += calc.cancelledItemsCount;
       cs.cancelledUnitsCount += calc.cancelledUnitsCount;
@@ -670,13 +697,13 @@ export default function PaymentPage() {
         cancelledUnitsCount += cancelledQty;
       });
     });
-    const taxRate = 0.08;
-    const subtotal = total / (1 + taxRate);
+    const subtotal = total / (1 + ivaRate / 100);
     const taxAmount = total - subtotal;
-    return { subtotal, taxAmount, total, taxRate, cancelledAmount, cancelledUnitsCount };
+    return { subtotal, taxAmount, total, taxRate: ivaRate / 100, cancelledAmount, cancelledUnitsCount };
   };
 
   const customerSummaries = groupOrdersByCustomer();
+  const realCustomerSummaries = customerSummaries.filter(s => !s.customerName.startsWith("Mesero - "));
   const paymentSummary = calculateTotalPaymentSummary();
   const mesaCancelledAmount = customerSummaries.reduce((t, c) => t + c.cancelledAmount, 0);
   const mesaCancelledUnits = customerSummaries.reduce((t, c) => t + c.cancelledUnitsCount, 0);
@@ -737,7 +764,7 @@ export default function PaymentPage() {
   const handleGeneratePDF = async () => {
     try {
       setGeneratingPdf(true);
-      const pdfContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket - Mesa ${tableNumber||tableId||currentTableId}</title><style>body{font-family:Arial,sans-serif;margin:20px;color:#333}.header{text-align:center;background:#1f2937;color:white;padding:20px;margin-bottom:20px}.restaurant-name{font-size:24px;font-weight:bold;margin-bottom:5px}.table-info{font-size:14px;color:#d1d5db}.customer-section{margin-bottom:25px;border-bottom:1px solid #e5e7eb;padding-bottom:15px}.customer-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px}.customer-name{font-size:18px;font-weight:bold;color:#1f2937}.item-row{display:flex;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6}.item-name{font-weight:500}.item-details{font-size:12px;color:#6b7280;margin-top:2px}.notes-section{background:#f9fafb;padding:8px;border-radius:4px;margin-top:5px;font-size:11px}.notes-main{color:#92400e;margin-bottom:4px}.extras-section{color:#065f46;margin-top:4px}.extra-item{display:flex;justify-content:space-between;margin-bottom:2px}.summary-row{display:flex;justify-content:space-between;margin-bottom:5px}.final-total{border-top:2px solid #1f2937;padding-top:15px;margin-top:20px}.total-row{display:flex;justify-content:space-between;font-size:18px;font-weight:bold}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px}</style></head><body><div class="header"><div class="restaurant-name">RESTAURANTE</div><div class="table-info">Mesa ${tableNumber||tableId||currentTableId}</div><div class="table-info">${new Date().toLocaleString("es-MX")}</div></div>${mesaCancelledUnits>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:10px;margin:10px 0;font-size:12px;color:#dc2626;"><strong>Nota:</strong> Se excluyen ${mesaCancelledUnits} unidad(es) cancelada(s) por un total de ${formatCurrency(mesaCancelledAmount)}</div>`:``}${customerSummaries.map(cs=>`<div class="customer-section"><div class="customer-header"><div class="customer-name">${cs.customerName}</div><div style="font-size:16px;font-weight:bold;">${formatCurrency(cs.total)}</div></div>${cs.orders.map(order=>`${order.order_items.map(item=>{const cq=item.cancelled_quantity||0;const aq=item.quantity-cq;return`<div class="item-row"><div><div class="item-name">${item.product_name}${aq===0?` (CANCELADO)`:``}</div><div class="item-details">Cant: ${aq}${cq>0?` (de ${item.quantity}, ${cq} cancelada(s))`:``} • ${formatCurrency(item.price)} c/u${item.notes?`<div class="notes-section">${formatNotesForPDF(item.notes)}</div>`:``}</div></div><div>${formatCurrency(item.price*aq)}</div></div>`;}).join("")}`).join("")}<div style="background:#f8fafc;padding:10px;border-radius:6px;margin-top:10px;"><div class="summary-row"><span>Subtotal:</span><span>${formatCurrency(cs.subtotal)}</span></div><div class="summary-row"><span>IVA (8%):</span><span>${formatCurrency(cs.taxAmount)}</span></div><div class="summary-row" style="font-weight:bold;border-top:1px solid #e2e8f0;padding-top:5px;"><span>Total:</span><span>${formatCurrency(cs.total)}</span></div></div></div>`).join("")}<div class="final-total"><div class="summary-row"><span>Subtotal total:</span><span>${formatCurrency(paymentSummary.subtotal)}</span></div><div class="summary-row"><span>Impuestos (8%):</span><span>${formatCurrency(paymentSummary.taxAmount)}</span></div><div class="total-row"><span>TOTAL GENERAL:</span><span>${formatCurrency(paymentSummary.total)}</span></div></div><div class="footer"><p style="font-weight:bold;margin-bottom:5px;">¡Gracias por su preferencia!</p></div></body></html>`;
+      const pdfContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket - Mesa ${tableNumber||tableId||currentTableId}</title><style>body{font-family:Arial,sans-serif;margin:0;padding:20px;color:#333;font-size:11px;line-height:1.4}.hdr{text-align:center;margin-bottom:12px;font-weight:bold}.hdr div{margin:2px 0}.addr{font-size:10px;color:#666;margin-bottom:8px}.div{height:1px;background:#ccc;margin:8px 0}.r{display:flex;justify-content:space-between;margin:3px 0}.c{text-align:center;color:#666;font-size:10px}.cht{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding:3px 0;font-weight:bold;font-size:9px}.ir{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding:4px 0}.ir .d{flex:1;padding:0 4px}.tn{border-top:2px solid #333;padding-top:5px;margin-top:5px}.cnt{text-align:center;font-size:9px;color:#666;margin:8px 0}.ft{text-align:center;border-top:1px solid #ccc;padding-top:10px;margin-top:10px;font-weight:bold}</style></head><body><div class="hdr"><div style="font-size:14px">${businessName}</div><div>${businessOwner}</div><div>RFC: ${businessRfc}</div></div><div class="addr">${businessAddress}<br>SUCURSAL: ${businessSucursal}</div><div class="div"></div><div class="r"><span><strong>MESA:</strong> ${tableNumber}</span><span><strong>MESERO:</strong> ${waiterName || "—"}</span></div><div class="c">FOLIO: ${(allOrders[0]?.id||"").slice(-8).toUpperCase()}<br>${new Date().toLocaleDateString("es-MX",{year:"numeric",month:"2-digit",day:"2-digit"})}</div><div class="div"></div><div class="r"><span><strong>PERSONAS:</strong> ${realCustomerSummaries.length}</span><span><strong>ORDEN</strong></span></div><div class="div"></div><div class="cht"><span>CANT</span><span style="flex:1;text-align:center">DESCRIPCIÓN</span><span>IMPORTE</span></div>${allOrders.flatMap(o=>o.order_items.filter(i=>i.quantity-(i.cancelled_quantity||0)>0).map(i=>`<div class="ir"><span>${i.quantity-(i.cancelled_quantity||0)}</span><span class="d">${i.product_name}${i.notes?`<br><span style="font-size:9px;color:#999">${i.notes}</span>`:``}</span><span>${formatCurrency(i.price*(i.quantity-(i.cancelled_quantity||0)))}</span></div>`)).join("")}<div style="margin-top:8px"><div class="r"><span>SUBTOTAL</span><span>${formatCurrency(paymentSummary.subtotal)}</span></div><div class="r"><span>IVA (${ivaRate}%)</span><span>${formatCurrency(paymentSummary.taxAmount)}</span></div><div class="r tn"><span><strong>TOTAL</strong></span><span><strong>${formatCurrency(paymentSummary.total)}</strong></span></div>${selectedTipAmount>0?`<div class="r"><span>PROPINA</span><span>${formatCurrency(selectedTipAmount)}</span></div>`:``}<div class="r tn"><span><strong>TOTAL CON PROPINA</strong></span><span><strong>${formatCurrency(totalWithTip)}</strong></span></div><div class="r"><span>TOTAL DLLS</span><span>$${(totalWithTip/usdRate).toFixed(2)} USD</span></div></div><div class="cnt">SON: ${numeroALetras(totalWithTip)}</div>${paymentSummary.cancelledUnitsCount>0?`<div style="text-align:center;font-size:9px;color:#c00;margin:4px 0">${paymentSummary.cancelledUnitsCount} unidad(es) cancelada(s) â€” ${formatCurrency(paymentSummary.cancelledAmount)} excluido(s)</div>`:``}<div class="ft">GRACIAS POR SU PREFERENCIA</div></body></html>`;
       const printWindow = window.open("","_blank");
       if (printWindow) { printWindow.document.write(pdfContent); printWindow.document.close(); printWindow.onload = () => printWindow.print(); }
     } catch (e) { console.error(e); toast("Error al generar el PDF. Intente nuevamente.", "error"); }
@@ -847,7 +874,7 @@ export default function PaymentPage() {
           <p style={{ color:"var(--muted)",marginBottom:24,lineHeight:1.6 }}>Gracias por su preferencia. ¡Esperamos verle pronto!</p>
 
           <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20 }}>
-            {[["Comensales",customerSummaries.length],["Órdenes",allOrders.length],["Total",formatCurrency(totalWithTip)]].map(([label,val]) => (
+            {[["Comensales",realCustomerSummaries.length],["Órdenes",allOrders.length],["Total",formatCurrency(totalWithTip)]].map(([label,val]) => (
               <div key={label as string} style={{ padding:"12px 8px",background:"var(--surface)",borderRadius:10,border:"1px solid var(--border)" }}>
                 <p style={{ fontSize:11,color:"var(--muted)",margin:0,marginBottom:4 }}>{label}</p>
                 <p style={{ fontSize:14,fontWeight:700,color:"var(--text)",margin:0 }}>{val}</p>
@@ -915,7 +942,7 @@ export default function PaymentPage() {
               Mesa {tableNumber} • {session.customerName}
             </p>
             <p style={{ fontSize:11,color:"var(--navy)",margin:0,marginTop:2 }}>
-              {customerSummaries.length} comensal{customerSummaries.length>1?"es":""} • {allOrders.length} orden{allOrders.length>1?"es":""}
+              {realCustomerSummaries.length} comensal{realCustomerSummaries.length>1?"es":""} • {allOrders.length} orden{allOrders.length>1?"es":""}
             </p>
             {mesaCancelledUnits > 0 && <p style={{ fontSize:11,color:"var(--red)",margin:0,marginTop:2 }}>{mesaCancelledUnits} unidad(es) cancelada(s) — {formatCurrency(mesaCancelledAmount)} excluido(s)</p>}
           </div>
@@ -928,196 +955,112 @@ export default function PaymentPage() {
         </header>
 
         <main style={{ maxWidth:540,margin:"0 auto",padding:"20px 16px 32px" }}>
-          {/* Ticket card */}
-          <div
-            style={{
-              display: modeConfig.container.sidebarWidth > 0 ? "flex" : undefined,
-              borderRadius: ticketStyles.container.borderRadius,
-              overflow: "hidden",
-              marginBottom: 20,
-              animation: "pay-fadeup 0.35s ease both",
-            }}
-          >
-            {modeConfig.container.sidebarWidth > 0 && (
-              <div style={{
-                width: modeConfig.container.sidebarWidth,
-                background: modeConfig.container.sidebarColor,
-                flexShrink: 0,
-                borderRadius: `${ticketStyles.container.borderRadius}px 0 0 ${ticketStyles.container.borderRadius}px`,
-              } as React.CSSProperties} />
+          {/* Ticket card — SoftRestaurant format */}
+          <div style={ticketStyles.container as React.CSSProperties}>
+            <div style={ticketStyles.headerBlock as React.CSSProperties}>
+              <div style={ticketStyles.headerLine as React.CSSProperties}>
+                {businessName}<br />{businessOwner}<br />RFC: {businessRfc}
+              </div>
+            </div>
+
+            {businessAddress && (
+              <div style={{ padding: `6px 16px`, fontSize: 9, color: "var(--muted)", lineHeight: 1.5 }}>
+                {businessAddress}
+              </div>
             )}
-            <div style={{
-              flex: modeConfig.container.sidebarWidth > 0 ? 1 : undefined,
-              ...ticketStyles.container,
-              borderRadius: modeConfig.container.sidebarWidth > 0 ? 0 : ticketStyles.container.borderRadius,
-              marginBottom: 0,
-              animation: "none",
-            } as React.CSSProperties}>
-              {/* Header */}
-              <div style={ticketStyles.header as React.CSSProperties}>
-                {modeConfig.header.showDecoration && (
-                  <div style={{ borderTop: "1px solid " + modeConfig.header.textColor, width: "50%", margin: "0 auto 8px", opacity: 0.5 }} />
-                )}
-                {modeConfig.header.showName && <p style={ticketStyles.headerTitle as React.CSSProperties}>RESTAURANTE</p>}
-                {modeConfig.header.showTable && <p style={ticketStyles.headerSubtitle as React.CSSProperties}>Mesa {tableNumber}</p>}
-                {mesaCancelledUnits > 0 && (
-                  <p style={{
-                    fontSize: 11, ...(modeConfig.header.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
-                    color: "var(--red)", margin: "4px 0 0",
-                  }}>{mesaCancelledUnits} unidad(es) cancelada(s) excluida(s)</p>
-                )}
-                {modeConfig.header.showDecoration && (
-                  <div style={{ borderTop: "1px solid " + modeConfig.header.textColor, width: "50%", margin: "8px auto 0", opacity: 0.5 }} />
-                )}
+
+            {businessSucursal && (
+              <div style={{ padding: `0 16px 6px`, fontSize: 8, color: "var(--muted)", lineHeight: 1.4 }}>
+                SUCURSAL: {businessSucursal}
               </div>
+            )}
 
-              <div style={ticketStyles.customerSection as React.CSSProperties}>
-                {customerSummaries.map((cs, ci) => (
-                  <div key={cs.customerName}>
-                    {/* Customer header */}
-                    <div style={ticketStyles.customerHeader as React.CSSProperties}>
-                      <div style={{ display: "flex", alignItems: "center", gap: modeConfig.customers.showIcons ? 10 : 0 }}>
-                        {modeConfig.customers.showIcons && (
-                          <div style={ticketStyles.customerIconBox as React.CSSProperties}>
-                            <IUser s={modeConfig.container.spacing === "compact" ? 11 : 16} />
-                          </div>
-                        )}
-                        <div>
-                          <p style={ticketStyles.customerName as React.CSSProperties}>{cs.customerName}</p>
-                          <p style={ticketStyles.customerSubtitle as React.CSSProperties}>
-                            {cs.itemsCount} ítem{cs.itemsCount > 1 ? "s" : ""} activo{cs.itemsCount > 1 ? "s" : ""}
-                            {cs.cancelledUnitsCount > 0 && ` • ${cs.cancelledUnitsCount} cancelado(s)`}
-                          </p>
-                        </div>
-                      </div>
-                      <span style={ticketStyles.customerTotal as React.CSSProperties}>{formatCurrency(cs.total)}</span>
-                    </div>
+            <hr style={ticketStyles.divider as React.CSSProperties} />
 
-                    {/* Items */}
-                    {cs.orders.map((order, oi) => (
-                      <div key={order.id}>
-                        {cs.orders.length > 1 && (
-                          <p style={{
-                            fontSize: modeConfig.container.spacing === "compact" ? 9 : 11,
-                            color: "var(--muted)",
-                            padding: modeConfig.container.spacing === "compact" ? "4px 16px 2px" : "8px 24px 4px",
-                            background: "var(--surface)",
-                            margin: 0,
-                            ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
-                          }}>Orden #{order.id.slice(-8)}</p>
-                        )}
-                        {(() => {
-                          const courseGrouped: { [c: number]: typeof order.order_items } = {};
-                          order.order_items.forEach(item => {
-                            const c = (item as any).course || 1;
-                            if (!courseGrouped[c]) courseGrouped[c] = [];
-                            courseGrouped[c].push(item);
-                          });
-                          const sortedCourses = Object.keys(courseGrouped).map(Number).sort();
-                          return sortedCourses.flatMap(course => {
-                            const label = course === 1 ? "Primer tiempo" : course === 2 ? "Segundo tiempo" : "Tercer tiempo";
-                            return [
-                              <div key={`course-${order.id}-${course}`} style={{
-                                padding: modeConfig.container.spacing === "compact" ? "4px 16px 2px" : "6px 24px 3px",
-                                background: "var(--surface)",
-                                fontSize: modeConfig.container.spacing === "compact" ? 9 : 11,
-                                fontWeight: 700,
-                                color: "var(--navy)",
-                                borderBottom: "1px solid var(--border)",
-                                textTransform: "uppercase" as const,
-                                letterSpacing: "0.5px",
-                              }}>⏱ {label}</div>,
-                              ...courseGrouped[course].map(item => renderOrderItem(item, checkUiMode)),
-                            ];
-                          });
-                        })()}
-                        {oi < cs.orders.length - 1 && <div style={ticketStyles.sectionDivider as React.CSSProperties} />}
-                      </div>
-                    ))}
+            <div style={ticketStyles.infoRow as React.CSSProperties}>
+              <p style={ticketStyles.infoLabel as React.CSSProperties}>MESA: {tableNumber}</p>
+              <p style={ticketStyles.infoValue as React.CSSProperties}>MESERO: {waiterName || "—"}</p>
+            </div>
 
-                    {cs.cancelledUnitsCount > 0 && (
-                      <div style={{ padding: modeConfig.container.spacing === "compact" ? "0 16px 8px" : "0 24px 12px" }}>
-                        <p style={{
-                          fontSize: modeConfig.container.spacing === "compact" ? 10 : 11,
-                          color: "var(--red)",
-                          margin: 0,
-                          ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
-                        }}>• {cs.cancelledUnitsCount} unidad(es) cancelada(s) — {formatCurrency(cs.cancelledAmount)} excluido(s)</p>
-                      </div>
-                    )}
-                    {ci < customerSummaries.length - 1 && <div style={ticketStyles.sectionDivider as React.CSSProperties} />}
+            <div style={ticketStyles.centerText as React.CSSProperties}>
+              FOLIO: {allOrders[0]?.id?.slice(-8)?.toUpperCase() || "—"}<br />{new Date().toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" })}
+            </div>
+
+            <div style={ticketStyles.infoRow as React.CSSProperties}>
+              <p style={ticketStyles.infoLabel as React.CSSProperties}>PERSONAS: {realCustomerSummaries.length}</p>
+              <p style={ticketStyles.infoValue as React.CSSProperties}>ORDEN</p>
+            </div>
+
+            <hr style={ticketStyles.divider as React.CSSProperties} />
+
+            <div style={ticketStyles.colHeader as React.CSSProperties}>
+              <span style={ticketStyles.colHeaderCell as React.CSSProperties}>CANT</span>
+              <span style={ticketStyles.colHeaderCell as React.CSSProperties}>DESCRIPCIÓN</span>
+              <span style={{ ...ticketStyles.colHeaderCell as React.CSSProperties, textAlign: "right" }}>IMPORTE</span>
+            </div>
+
+            {allOrders.flatMap(order =>
+              order.order_items
+                .filter(item => item.quantity - (item.cancelled_quantity || 0) > 0)
+                .map((item, idx) => (
+                  <div key={`${order.id}-${idx}`} style={ticketStyles.itemRow as React.CSSProperties}>
+                    <span style={ticketStyles.itemCell as React.CSSProperties}>{item.quantity - (item.cancelled_quantity || 0)}</span>
+                    <span style={ticketStyles.itemCell as React.CSSProperties}>
+                      {item.product_name}
+                      {item.notes && <span style={{ display: "block", fontSize: "8px", color: "var(--muted)", lineHeight: 1.3 }}>{item.notes}</span>}
+                    </span>
+                    <span style={{ ...ticketStyles.itemCell as React.CSSProperties, fontWeight: 700, textAlign: "right" }}>
+                      {formatCurrency(item.price * (item.quantity - (item.cancelled_quantity || 0)))}
+                    </span>
                   </div>
-                ))}
+                ))
+            )}
 
-                {/* Totals */}
-                <div style={ticketStyles.totalSection as React.CSSProperties}>
-                  <div style={{
-                    padding: modeConfig.container.spacing === "compact" ? "8px 0" : "12px 0",
-                    borderBottom: "1px dashed var(--border)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}>
-                    <span style={ticketStyles.totalLabel as React.CSSProperties}>Subtotal total:</span>
-                    <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.subtotal)}</span>
-                  </div>
-                  <div style={{
-                    padding: modeConfig.container.spacing === "compact" ? "6px 0" : "8px 0",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}>
-                    <span style={ticketStyles.totalLabel as React.CSSProperties}>Impuestos (8%):</span>
-                    <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.taxAmount)}</span>
-                  </div>
-                  {selectedTipAmount > 0 && (
-                    <div style={{
-                      padding: modeConfig.container.spacing === "compact" ? "6px 0" : "8px 0",
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                      <span style={ticketStyles.totalLabel as React.CSSProperties}>Propina:</span>
-                      <span style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(selectedTipAmount)}</span>
-                    </div>
-                  )}
-                  <div style={{
-                    padding: modeConfig.container.spacing === "compact" ? "8px 0 0" : "12px 0 0",
-                    borderTop: "2px solid var(--text)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}>
-                    <span style={ticketStyles.totalFinalLabel as React.CSSProperties}>TOTAL GENERAL:</span>
-                    <span style={ticketStyles.totalFinalValue as React.CSSProperties}>{formatCurrency(totalWithTip)}</span>
-                  </div>
-                </div>
-
-                {paymentSummary.cancelledUnitsCount > 0 && (
-                  <div style={ticketStyles.cancelledNotice as React.CSSProperties}>
-                    <p style={{
-                      fontSize: modeConfig.container.spacing === "compact" ? 10 : 12,
-                      color: "var(--red)",
-                      margin: 0,
-                      ...(modeConfig.items.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
-                    }}><strong>Nota:</strong> Se excluyen {paymentSummary.cancelledUnitsCount} unidad(es) cancelada(s) por un total de {formatCurrency(paymentSummary.cancelledAmount)}</p>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div style={ticketStyles.footer as React.CSSProperties}>
-                  {modeConfig.footer.showDecoration && <div style={ticketStyles.footerDecoration as React.CSSProperties} />}
-                  <p style={ticketStyles.footerText as React.CSSProperties}>
-                    {modeConfig.footer.text.split(" — ")[0]}
-                  </p>
-                  {modeConfig.footer.text.includes(" — ") && (
-                    <p style={{
-                      fontSize: modeConfig.container.spacing === "compact" ? 10 : modeConfig.footer.fontFamily === "serif" ? 11 : 12,
-                      color: "var(--muted)",
-                      margin: "2px 0 0",
-                      ...(modeConfig.footer.fontFamily === "serif" ? { fontFamily: "Georgia, serif", fontStyle: "italic" as const } : {}),
-                    }}>
-                      {modeConfig.footer.text.split(" — ")[1]}
-                    </p>
-                  )}
-                </div>
+            <div style={{ padding: `6px 16px` }}>
+              <div style={ticketStyles.totalRow as React.CSSProperties}>
+                <p style={ticketStyles.totalLabel as React.CSSProperties}>SUBTOTAL</p>
+                <p style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.subtotal)}</p>
               </div>
+              <div style={ticketStyles.totalRow as React.CSSProperties}>
+                <p style={ticketStyles.totalLabel as React.CSSProperties}>IVA ({ivaRate}%)</p>
+                <p style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(paymentSummary.taxAmount)}</p>
+              </div>
+              <div style={ticketStyles.totalRow as React.CSSProperties}>
+                <p style={ticketStyles.totalLabel as React.CSSProperties}>TOTAL</p>
+                <p style={{ ...ticketStyles.totalValue as React.CSSProperties, fontSize: (ticketStyles.totalValue as any)?.fontSize || 11, fontWeight: 800, color: modeConfig.accentColor }}>
+                  {formatCurrency(paymentSummary.total)}
+                </p>
+              </div>
+              {selectedTipAmount > 0 && (
+                <div style={ticketStyles.totalRow as React.CSSProperties}>
+                  <p style={ticketStyles.totalLabel as React.CSSProperties}>PROPINA</p>
+                  <p style={ticketStyles.totalValue as React.CSSProperties}>{formatCurrency(selectedTipAmount)}</p>
+                </div>
+              )}
+              <div style={ticketStyles.totalRow as React.CSSProperties}>
+                <p style={{ ...ticketStyles.totalLabel as React.CSSProperties, fontWeight: 800, color: modeConfig.accentColor }}>TOTAL CON PROPINA</p>
+                <p style={{ ...ticketStyles.totalValue as React.CSSProperties, fontSize: (ticketStyles.totalValue as any)?.fontSize || 11, fontWeight: 800, color: modeConfig.accentColor }}>
+                  {formatCurrency(totalWithTip)}
+                </p>
+              </div>
+              <div style={ticketStyles.totalRow as React.CSSProperties}>
+                <p style={ticketStyles.totalLabel as React.CSSProperties}>TOTAL DLLS</p>
+                <p style={ticketStyles.totalValue as React.CSSProperties}>${(totalWithTip / usdRate).toFixed(2)} USD</p>
+              </div>
+            </div>
+
+            <p style={ticketStyles.amountWords as React.CSSProperties}>
+              SON: {numeroALetras(totalWithTip)}
+            </p>
+
+            {paymentSummary.cancelledUnitsCount > 0 && (
+              <p style={{ fontSize: 8, color: "var(--red)", textAlign: "center", padding: "0 16px", margin: "4px 0" }}>
+                {paymentSummary.cancelledUnitsCount} unidad(es) cancelada(s) — {formatCurrency(paymentSummary.cancelledAmount)} excluido(s)
+              </p>
+            )}
+
+            <div style={ticketStyles.footer as React.CSSProperties}>
+              <p style={ticketStyles.footerText as React.CSSProperties}>{modeConfig.footerText}</p>
             </div>
           </div>
 

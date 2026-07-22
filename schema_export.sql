@@ -10,6 +10,7 @@
 --   - waiter_notifications → Waiter (dashboard)
 --   - waiter_sessions → Admin (Dashboard + SessionsView)
 --   - sales_history   → Admin (Dashboard)
+--   - table_waiter_assignments → Customer (assigned waiter display)
 -- =====================================================================
 
 begin;
@@ -118,7 +119,8 @@ create table if not exists public.sales_history (
   item_count integer not null default 0,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   closed_at timestamp with time zone not null default timezone('utc'::text, now()),
-  payment_method character varying
+  payment_method character varying,
+  payment_breakdown jsonb
 );
 
 -- sales_items
@@ -155,9 +157,13 @@ create table if not exists public.tips (
   customer_name text not null,
   amount numeric not null default 0,
   payment_method text,
+  payment_breakdown jsonb,
   waiter_id uuid references public.users(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
+
+comment on column public.sales_history.payment_breakdown is 'Se llena cuando el pago involucra efectivo (payment_method=cash o mixed): {cash, terminal, usd} netos por metodo (para repartir mixed), mas cashTendered (efectivo bruto entregado) y change (cambio devuelto). cash_reports usa cashTendered/change para calcular depositos/retiros de caja automaticamente.';
+comment on column public.tips.payment_breakdown is 'Igual forma que sales_history.payment_breakdown, para propinas pagadas con payment_method=mixed (por ahora normalmente NULL, no se calcula reparto propina/cuenta).';
 
 -- users: cuentas de staff (admin / waiter / super_admin) vinculadas a auth.users.
 -- El rol de autorizacion vive en auth.users.raw_app_meta_data (JWT app_metadata),
@@ -192,8 +198,15 @@ create table if not exists public.waiter_sessions (
   started_at timestamptz not null default now(),
   ended_at timestamptz,
   total_sales numeric not null default 0,
+  tips_collected numeric not null default 0,
+  tips_paid_out numeric not null default 0,
+  tip_distribution_snapshot jsonb,
   created_at timestamptz not null default now()
 );
+
+comment on column public.waiter_sessions.tips_collected is 'Snapshot: total de propinas de la sesion (todas las formas de pago) al momento de cerrar turno.';
+comment on column public.waiter_sessions.tips_paid_out is 'Monto ACUMULADO (no necesariamente pagado ya) en el reparto de propinas al cerrar turno = tips_collected * (suma de porcentajes de tip_distribution_snapshot) / 100. Snapshot informativo: el detalle real por destinatario y si ya se pago vive en tip_ledger_entries/tip_payouts, no aqui.';
+comment on column public.waiter_sessions.tip_distribution_snapshot is 'Copia de app_settings.tip_distribution usada en este cierre de turno, para trazabilidad si el admin cambia los porcentajes despues.';
 
 -- cash_reports: sesion de caja abierta/cerrada (patron started_at/ended_at,
 -- igual que waiter_sessions). "Abierta" = closed_at is null. Snapshot de
@@ -205,25 +218,27 @@ create table if not exists public.cash_reports (
   closed_at timestamp with time zone,
 
   opening_cash numeric not null default 0,
+  cash_deposits numeric not null default 0,
+  cash_withdrawals numeric not null default 0,
   counted_cash numeric,
   notes text,
 
   cash_sales numeric not null default 0,
   terminal_sales numeric not null default 0,
   usd_sales numeric not null default 0,
-  mixed_sales numeric not null default 0,
   total_sales numeric not null default 0,
 
   cash_tips numeric not null default 0,
   terminal_tips numeric not null default 0,
   usd_tips numeric not null default 0,
-  mixed_tips numeric not null default 0,
   total_tips numeric not null default 0,
 
   paid_accounts_count integer not null default 0,
   average_ticket numeric not null default 0,
   subtotal numeric not null default 0,
   tax_amount numeric not null default 0,
+  tax_rate numeric not null default 16,
+  tips_paid numeric not null default 0,
 
   expected_cash numeric not null default 0,
   cash_difference numeric not null default 0,
@@ -233,7 +248,60 @@ create table if not exists public.cash_reports (
   created_at timestamp with time zone not null default now()
 );
 
-comment on column public.cash_reports.mixed_sales is 'Informativo solamente: no se incluye en expected_cash porque no se guarda el desglose efectivo/tarjeta de un pago mixed.';
+-- cash_sales/terminal_sales/usd_sales (y su equivalente _tips) reparten cada
+-- cobro/propina 'mixed' usando payment_breakdown, asi que siempre suman
+-- exactamente total_sales/total_tips: no hace falta una columna "mixed" aparte.
+
+-- cash_tips/terminal_tips/usd_tips/total_tips = propinas RECIBIDAS (informativo,
+-- seccion "Forma de pago propina"). tips_paid = suma de tip_payouts.amount
+-- (pagos REALMENTE marcados como pagados en la pestana Propinas del admin) en
+-- el periodo del corte — es lo que realmente sale de la caja y se usa en
+-- expected_cash. Son conceptos distintos y pueden no coincidir (propina
+-- recibida hoy, pago marcado dias despues).
+
+-- tip_ledger_entries: acumulacion de dinero por repartir de propinas, una fila
+-- por (cierre de turno x destinatario). recipient_type='role' para Barra/
+-- Cocina/etc (recipient_key=nombre del rol de app_settings.tip_distribution),
+-- recipient_type='waiter' para lo que se le debe a un mesero por propinas en
+-- tarjeta/dolares que no recibio en efectivo (recipient_key=users.id).
+create table if not exists public.tip_ledger_entries (
+  id uuid primary key default gen_random_uuid(),
+  waiter_session_id uuid references public.waiter_sessions(id) on delete set null,
+  recipient_type text not null check (recipient_type in ('waiter','role')),
+  recipient_key text not null,
+  recipient_name text not null,
+  amount numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- tip_payouts: eventos de pago real (cuando un admin marca como pagado el
+-- saldo, parcial o total, de un destinatario). Saldo pendiente de un
+-- destinatario = SUM(tip_ledger_entries.amount) - SUM(tip_payouts.amount)
+-- agrupado por (recipient_type, recipient_key) — modelo tipo "cuenta
+-- corriente", sin ligar pagos a acumulaciones especificas.
+create table if not exists public.tip_payouts (
+  id uuid primary key default gen_random_uuid(),
+  recipient_type text not null check (recipient_type in ('waiter','role')),
+  recipient_key text not null,
+  recipient_name text not null,
+  amount numeric not null default 0,
+  paid_at timestamptz not null default now(),
+  paid_by uuid references public.users(id) on delete set null,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.tip_ledger_entries is 'Acumulacion de dinero por repartir de propinas: una fila por (cierre de turno x destinatario). El saldo pendiente de un destinatario = SUM(tip_ledger_entries.amount) - SUM(tip_payouts.amount).';
+comment on table public.tip_payouts is 'Eventos de pago real: cuando un admin marca como pagado el saldo (parcial o total) de un destinatario. Solo estos montos, dentro del periodo del corte de caja, cuentan como cash_reports.tips_paid — mientras no este pagado, el dinero sigue fisicamente en la caja.';
+
+-- table_waiter_assignments: asignacion de mesero a mesa por el cliente
+create table if not exists public.table_waiter_assignments (
+  id bigint generated always as identity primary key,
+  table_id bigint not null references public.tables(id),
+  waiter_id uuid not null,
+  waiter_name text not null,
+  assigned_at timestamptz default now()
+);
 
 -- ---------------------------------------------------------------------
 -- Indices adicionales (fuera de PK/UNIQUE ya creados por las tablas)
@@ -244,6 +312,10 @@ create index if not exists tips_waiter_id_idx on public.tips using btree (waiter
 
 create index if not exists waiter_sessions_waiter_id_idx on public.waiter_sessions (waiter_id);
 create index if not exists waiter_sessions_started_at_idx on public.waiter_sessions (started_at);
+
+create index if not exists tip_ledger_entries_recipient_idx on public.tip_ledger_entries (recipient_type, recipient_key);
+create index if not exists tip_payouts_recipient_idx on public.tip_payouts (recipient_type, recipient_key);
+create index if not exists tip_payouts_paid_at_idx on public.tip_payouts (paid_at);
 
 -- Unico PIN activo a la vez: permite reciclar el PIN de un waiter desactivado.
 create unique index if not exists users_pin_code_unique_idx
@@ -304,8 +376,11 @@ alter table public.customer_feedback enable row level security;
 alter table public.tips enable row level security;
 alter table public.users enable row level security;
 alter table public.waiter_sessions enable row level security;
+alter table public.table_waiter_assignments enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.cash_reports enable row level security;
+alter table public.tip_ledger_entries enable row level security;
+alter table public.tip_payouts enable row level security;
 
 drop policy if exists "Allow all for all roles" on public.categories;
 create policy "Allow all for all roles" on public.categories
@@ -384,6 +459,23 @@ create policy "Allow all for waiter_sessions" on public.waiter_sessions
 drop policy if exists "Allow all for cash_reports" on public.cash_reports;
 create policy "Allow all for cash_reports" on public.cash_reports
   for all to public using (true);
+drop policy if exists "Allow all for tip_ledger_entries" on public.tip_ledger_entries;
+create policy "Allow all for tip_ledger_entries" on public.tip_ledger_entries
+  for all using (true) with check (true);
+drop policy if exists "Allow all for tip_payouts" on public.tip_payouts;
+create policy "Allow all for tip_payouts" on public.tip_payouts
+  for all using (true) with check (true);
+drop policy if exists "Anyone can read table_waiter_assignments" on public.table_waiter_assignments;
+create policy "Anyone can read table_waiter_assignments" on public.table_waiter_assignments
+  for select to public using (true);
+
+drop policy if exists "Anyone can insert table_waiter_assignments" on public.table_waiter_assignments;
+create policy "Anyone can insert table_waiter_assignments" on public.table_waiter_assignments
+  for insert to public with check (true);
+
+drop policy if exists "Anyone can delete table_waiter_assignments" on public.table_waiter_assignments;
+create policy "Anyone can delete table_waiter_assignments" on public.table_waiter_assignments
+  for delete to public using (true);
 
 -- app_settings: lectura publica (customer sin login la necesita), escritura solo admin
 drop policy if exists "app_settings_select_public" on public.app_settings;
@@ -476,6 +568,63 @@ alter table public.customer_feedback
 -- (opened_at/closed_at, "abierta" = closed_at is null). Se eliminan report_date,
 -- cash_deposits, cash_withdrawals (sin dato real detras); created_by -> opened_by;
 -- se agrega closed_by. Cambios ya incluidos en la definicion de la tabla arriba.
+
+-- 2026-07-22: add_payment_breakdown_for_mixed_payments
+-- Columna payment_breakdown jsonb en sales_history y tips (solo se llena cuando
+-- payment_method='mixed'): {cash, terminal, usd} en MXN. cash_reports usa el
+-- desglose para saber cuanto de un cobro mixto fue efectivo real, en vez de
+-- excluir esas cuentas del calculo de caja.
+
+-- 2026-07-22: drop_mixed_columns_from_cash_reports
+-- Se eliminan cash_reports.mixed_sales y mixed_tips: eran solo informativos y
+-- redundantes, ya que cash_sales/terminal_sales/usd_sales (via payment_breakdown)
+-- ya reparten los cobros/propinas mixtos por completo.
+
+-- 2026-07-22: add_cash_deposits_withdrawals_computed
+-- Regresan cash_reports.cash_deposits/cash_withdrawals (se habian quitado antes
+-- por ser inputs manuales sin dato real detras). Ahora se calculan solos al
+-- cerrar la caja: cash_deposits = suma de payment_breakdown.cashTendered
+-- (efectivo bruto entregado), cash_withdrawals = suma de payment_breakdown.change
+-- (cambio devuelto). Formula de expected_cash actualizada:
+-- opening_cash + cash_deposits - cash_withdrawals - cash_tips.
+
+-- 2026-07-22: add_tax_rate_snapshot_to_cash_reports
+-- Columna cash_reports.tax_rate numeric not null default 16. Antes subtotal/
+-- tax_amount se calculaban con un 16% hardcodeado; ahora se lee
+-- app_settings.iva_rate (mismo setting que SettingsManagement.tsx expone en
+-- "IVA y tipo de cambio", ya usado por Payment.tsx/Menu.tsx del lado cliente)
+-- al momento de cerrar la caja, y se guarda el valor usado en tax_rate como
+-- snapshot (un reporte cerrado no cambia si el admin edita iva_rate despues).
+-- Cae a 16 por defecto si el setting falta o no es numerico.
+
+-- 2026-07-22: add_tip_payout_snapshot_to_waiter_sessions
+-- Columnas waiter_sessions.tips_collected/tips_paid_out numeric not null
+-- default 0, tip_distribution_snapshot jsonb. Persisten el reparto de
+-- propinas al cerrar turno (sessionsService.endSession()) — antes
+-- EndShiftModal.tsx solo lo calculaba para mostrarlo y se descartaba.
+-- tips_paid_out = tips_collected * (suma de % de tip_distribution_snapshot) / 100.
+
+-- 2026-07-22: add_tips_paid_to_cash_reports
+-- Columna cash_reports.tips_paid numeric not null default 0: suma de
+-- waiter_sessions.tips_paid_out para sesiones con ended_at en
+-- [opened_at, closed_at] del corte. Corrige el uso anterior de cash_tips
+-- (propinas RECIBIDAS) en "Propinas pagadas" y en expected_cash — la propina
+-- en efectivo sigue fisicamente en la caja hasta que se reparte al cerrar
+-- turno, no en el momento en que se cobra. Formula actualizada:
+-- expected_cash = opening_cash + cash_deposits - cash_withdrawals - tips_paid.
+
+-- 2026-07-22: create_tip_ledger_and_payouts
+-- Tablas nuevas tip_ledger_entries (acumulacion al cerrar turno) y tip_payouts
+-- (pago real marcado desde la pestana Propinas del admin). Corrige la
+-- migracion anterior (add_tips_paid_to_cash_reports): lo acumulado al cerrar
+-- turno (waiter_sessions.tips_paid_out) TAMPOCO sale de la caja en ese
+-- momento — sigue fisicamente ahi hasta que alguien lo entrega de verdad.
+-- cash_reports.tips_paid pasa a sumar tip_payouts.amount (con paid_at en el
+-- periodo del corte) en vez de tips_paid_out. sessionsService.endSession()
+-- ahora inserta en tip_ledger_entries: una fila por rol de tip_distribution
+-- con pct>0, y una fila para el mesero si el efectivo que trae no alcanza a
+-- cubrir su propina en tarjeta/dolares (lo que se le debe). Saldo pendiente
+-- de un destinatario = SUM(tip_ledger_entries.amount) - SUM(tip_payouts.amount).
 
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales
