@@ -20,6 +20,7 @@ import {
   FaTag,
   FaCog,
   FaClock,
+  FaCashRegister,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -38,6 +39,7 @@ import CategoriesManagement from "./components/CategoriesManagement";
 import UsersManagement from "./components/UsersManagement";
 import SettingsManagement from "./components/SettingsManagement";
 import SessionsView from "./components/SessionsView";
+import CashRegisterManagement from "./components/CashRegisterManagement";
 
 export default function AdminPage() {
   const { toast } = useToast();
@@ -972,6 +974,7 @@ export default function AdminPage() {
             { id: "categories" as AdminSection, name: "Gestión de Categorías", icon: FaTag },
             { id: "users" as AdminSection, name: "Usuarios", icon: FaUser },
             { id: "sessions" as AdminSection, name: "Turnos", icon: FaClock },
+            { id: "cashRegister" as AdminSection, name: "Gestión de Caja", icon: FaCashRegister },
           ] as const).map((item) => (
             <button
               key={item.id}
@@ -1076,6 +1079,10 @@ export default function AdminPage() {
 
           {activeSection === "sessions" && (
             <SessionsView />
+          )}
+
+          {activeSection === "cashRegister" && (
+            <CashRegisterManagement onError={handleError} />
           )}
         </div>
       </main>

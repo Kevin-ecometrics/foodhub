@@ -516,6 +516,94 @@ export interface Database {
         }
       }
 
+      // ── cash_reports ───────────────────────────────────────────────────────────
+      cash_reports: {
+        Row: {
+          id: string
+          report_number: number
+          opened_at: string
+          closed_at: string | null
+          opening_cash: number
+          counted_cash: number | null
+          notes: string | null
+          cash_sales: number
+          terminal_sales: number
+          usd_sales: number
+          mixed_sales: number
+          total_sales: number
+          cash_tips: number
+          terminal_tips: number
+          usd_tips: number
+          mixed_tips: number
+          total_tips: number
+          paid_accounts_count: number
+          average_ticket: number
+          subtotal: number
+          tax_amount: number
+          expected_cash: number
+          cash_difference: number
+          opened_by: string | null
+          closed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          report_number?: number
+          opened_at?: string
+          closed_at?: string | null
+          opening_cash?: number
+          counted_cash?: number | null
+          notes?: string | null
+          cash_sales?: number
+          terminal_sales?: number
+          usd_sales?: number
+          mixed_sales?: number
+          total_sales?: number
+          cash_tips?: number
+          terminal_tips?: number
+          usd_tips?: number
+          mixed_tips?: number
+          total_tips?: number
+          paid_accounts_count?: number
+          average_ticket?: number
+          subtotal?: number
+          tax_amount?: number
+          expected_cash?: number
+          cash_difference?: number
+          opened_by?: string | null
+          closed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          report_number?: number
+          opened_at?: string
+          closed_at?: string | null
+          opening_cash?: number
+          counted_cash?: number | null
+          notes?: string | null
+          cash_sales?: number
+          terminal_sales?: number
+          usd_sales?: number
+          mixed_sales?: number
+          total_sales?: number
+          cash_tips?: number
+          terminal_tips?: number
+          usd_tips?: number
+          mixed_tips?: number
+          total_tips?: number
+          paid_accounts_count?: number
+          average_ticket?: number
+          subtotal?: number
+          tax_amount?: number
+          expected_cash?: number
+          cash_difference?: number
+          opened_by?: string | null
+          closed_by?: string | null
+          created_at?: string
+        }
+      }
+
     }
   }
 }
