@@ -90,7 +90,18 @@ export interface Product {
   extras?: ProductExtra[];
 }
 
-export type AdminSection = "dashboard" | "tables" | "products" | "categories" | "users" | "settings";
+export type AdminSection = "dashboard" | "tables" | "products" | "categories" | "users" | "settings" | "sessions";
+
+export interface WaiterSessionWithTips {
+  id: string
+  waiter_id: string
+  waiter_name: string
+  started_at: string
+  ended_at: string | null
+  total_sales: number
+  created_at: string
+  total_tips: number
+}
 
 export interface TableFormData {
   number: string;

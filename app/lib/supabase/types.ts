@@ -290,6 +290,7 @@ export interface Database {
           customer_name: string
           amount: number
           payment_method: string | null
+          waiter_id: string | null
           created_at: string
         }
         Insert: {
@@ -299,6 +300,7 @@ export interface Database {
           customer_name: string
           amount: number
           payment_method?: string | null
+          waiter_id?: string | null
           created_at?: string
         }
         Update: {
@@ -308,6 +310,7 @@ export interface Database {
           customer_name?: string
           amount?: number
           payment_method?: string | null
+          waiter_id?: string | null
           created_at?: string
         }
       }
@@ -482,6 +485,39 @@ export interface Database {
         }
       }
 
+      // ── waiter_sessions ────────────────────────────────────────────────────────
+      waiter_sessions: {
+        Row: {
+          id: string
+          waiter_id: string
+          waiter_name: string
+          started_at: string
+          ended_at: string | null
+          total_sales: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          waiter_id: string
+          waiter_name: string
+          started_at?: string
+          ended_at?: string | null
+          total_sales?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          waiter_id?: string
+          waiter_name?: string
+          started_at?: string
+          ended_at?: string | null
+          total_sales?: number
+          created_at?: string
+        }
+      }
+
     }
   }
 }
+
+export type WaiterSession = Database['public']['Tables']['waiter_sessions']['Row']

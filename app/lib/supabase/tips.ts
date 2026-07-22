@@ -8,6 +8,7 @@ export interface Tip {
   customer_name: string
   amount: number
   payment_method: string | null
+  waiter_id: string | null
   created_at: string
 }
 
@@ -18,6 +19,7 @@ export const tipsService = {
     customer_name: string
     amount: number
     payment_method?: string | null
+    waiter_id?: string | null
   }): Promise<void> {
     const { error } = await (supabase as any).from('tips').insert({
       order_id: tip.order_id ?? null,
@@ -25,6 +27,7 @@ export const tipsService = {
       customer_name: tip.customer_name,
       amount: tip.amount,
       payment_method: tip.payment_method ?? null,
+      waiter_id: tip.waiter_id ?? null,
     }) as { error: Error | null }
     if (error) throw error
   },
@@ -54,6 +57,17 @@ export const tipsService = {
       .select('*')
       .gte('created_at', startISO)
       .lte('created_at', endISO)
+      .order('created_at', { ascending: false }) as { data: Tip[] | null; error: Error | null }
+    if (error) throw error
+    return (data as Tip[]) || []
+  },
+
+  async getTipsByWaiterAndSession(waiterId: string, startedAt: string): Promise<Tip[]> {
+    const { data, error } = await (supabase as any)
+      .from('tips')
+      .select('*')
+      .eq('waiter_id', waiterId)
+      .gte('created_at', startedAt)
       .order('created_at', { ascending: false }) as { data: Tip[] | null; error: Error | null }
     if (error) throw error
     return (data as Tip[]) || []

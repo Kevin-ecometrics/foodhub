@@ -702,9 +702,11 @@ export default function PaymentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, currentTableId]);
 
+  // Realtime subscription para notifications (reemplaza polling)
   useEffect(() => {
     const tid = tableId || currentTableId;
     if (!tid) return;
+    let channelStatus: string | undefined;
     const sub = supabase.channel(`table-${tid}-payments`)
       .on("postgres_changes", { event:"*", schema:"public", table:"waiter_notifications", filter:`table_id=eq.${tid}` }, payload => {
         if (payload.eventType === "UPDATE") {
@@ -714,30 +716,16 @@ export default function PaymentPage() {
             else if (newStatus === "cancelled") setPaymentStatus({ status:"pending" });
           }
         }
-      }).subscribe();
-    return () => { sub.unsubscribe(); };
-  }, [tableId, currentTableId]);
-
-  useEffect(() => {
-    const tid = tableId || currentTableId;
-    if (!tid) return;
-    const interval = setInterval(async () => {
-      try {
-        if (notificationState.hasPendingBill) {
-          const { data: notifications, error } = await supabase
-            .from("waiter_notifications").select("*")
-            .eq("table_id", tid).eq("type","bill_request").in("status",["completed","cancelled"])
-            .order("created_at",{ascending:false}).limit(1);
-          if (!error && notifications && notifications.length > 0) {
-            const latest = notifications[0] as any;
-            if (latest.status === "completed" && !paymentConfirmed) { setPaymentStatus({ status:"verified" }); setPaymentConfirmed(true); setShowSurvey(true); }
-            else if (latest.status === "cancelled") setPaymentStatus({ status:"pending" });
-          }
+      }).subscribe((status) => {
+        const wasDisconnected = channelStatus && ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(channelStatus);
+        channelStatus = status;
+        if (wasDisconnected && status === "SUBSCRIBED") {
+          loadOrders();
         }
-      } catch (e) { console.error(e); }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [tableId, currentTableId, notificationState.hasPendingBill, paymentConfirmed]);
+      });
+    return () => { sub.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId, currentTableId]);
 
   const handleSurveySubmit = async (rating: number, comment: string, productReviews: ProductReviewInput[]) => {
     setCountdown(10);
@@ -1141,11 +1129,10 @@ export default function PaymentPage() {
               {generatingPdf ? <span style={{ animation:"pay-spin 0.9s linear infinite",display:"inline-block" }}>↻</span> : <IDownload />}
               {generatingPdf ? "Generando PDF…" : "Guardar Ticket PDF"}
             </button>
-            <button onClick={() => setIsInvoiceModalOpen(true)} disabled={generatingInvoice}
-              style={{ flex:1,minWidth:140,padding:"13px 16px",borderRadius:11,border:"none",background:"oklch(55% 0.14 300)",color:"white",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:generatingInvoice?0.7:1 }}
+            <button onClick={() => setIsInvoiceModalOpen(true)} disabled={true}
+              style={{ flex:1,minWidth:140,padding:"13px 16px",borderRadius:11,border:"none",background:"oklch(55% 0.14 300)",color:"white",fontSize:13,fontWeight:700,cursor:"not-allowed",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:0.5 }}
             >
-              {generatingInvoice ? <span style={{ animation:"pay-spin 0.9s linear infinite",display:"inline-block" }}>↻</span> : <IInvoice />}
-              {generatingInvoice ? "Procesando Factura…" : "Facturar Compra"}
+              Facturar Compra
             </button>
           </div>
 

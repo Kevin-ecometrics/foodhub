@@ -44,6 +44,19 @@ export default function TablesManagement({ onError }: TablesManagementProps) {
   useEffect(() => {
     loadTables();
     loadLatestLogo();
+
+    const tablesSub = supabase
+      .channel("admin-tables")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tables" },
+        loadTables,
+      )
+      .subscribe();
+
+    return () => {
+      tablesSub.unsubscribe();
+    };
   }, []);
 
   const loadLatestLogo = async () => {

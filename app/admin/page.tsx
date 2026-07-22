@@ -19,6 +19,7 @@ import {
   FaChevronLeft,
   FaTag,
   FaCog,
+  FaClock,
 } from "react-icons/fa";
 import {
   AdminSection,
@@ -36,6 +37,7 @@ import ProductsManagement from "./components/ProductsManagement";
 import CategoriesManagement from "./components/CategoriesManagement";
 import UsersManagement from "./components/UsersManagement";
 import SettingsManagement from "./components/SettingsManagement";
+import SessionsView from "./components/SessionsView";
 
 export default function AdminPage() {
   const { toast } = useToast();
@@ -824,6 +826,59 @@ export default function AdminPage() {
     }
   }, [isAuthenticated, activeSection, selectedDate]);
 
+  // Realtime subscriptions para el Dashboard
+  useEffect(() => {
+    if (!isAuthenticated || activeSection !== "dashboard") return;
+
+    const refreshDashboard = () => {
+      loadDailyData(selectedDate);
+      loadSalesData(selectedDate);
+    };
+
+    const ordersSub = supabase
+      .channel("admin-dashboard-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        refreshDashboard,
+      )
+      .subscribe();
+
+    const orderItemsSub = supabase
+      .channel("admin-dashboard-order-items")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_items" },
+        refreshDashboard,
+      )
+      .subscribe();
+
+    const sessionsSub = supabase
+      .channel("admin-dashboard-sessions")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiter_sessions" },
+        refreshDashboard,
+      )
+      .subscribe();
+
+    const salesSub = supabase
+      .channel("admin-dashboard-sales")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "sales_history" },
+        refreshDashboard,
+      )
+      .subscribe();
+
+    return () => {
+      ordersSub.unsubscribe();
+      orderItemsSub.unsubscribe();
+      sessionsSub.unsubscribe();
+      salesSub.unsubscribe();
+    };
+  }, [isAuthenticated, activeSection, selectedDate]);
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setIsAuthenticated(false);
@@ -909,39 +964,15 @@ export default function AdminPage() {
         </div>
 
         {/* Navegación vertical */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {[
-            {
-              id: "dashboard" as AdminSection,
-              name: "Dashboard",
-              icon: FaChartBar,
-            },
-            {
-              id: "tables" as AdminSection,
-              name: "Gestión de Mesas",
-              icon: FaTable,
-            },
-            {
-              id: "products" as AdminSection,
-              name: "Gestión de Productos",
-              icon: FaBox,
-            },
-            {
-              id: "categories" as AdminSection,
-              name: "Gestión de Categorías",
-              icon: FaTag,
-            },
-            {
-              id: "users" as AdminSection,
-              name: "Usuarios",
-              icon: FaUser,
-            },
-            {
-              id: "settings" as AdminSection,
-              name: "Configuración",
-              icon: FaCog,
-            },
-          ].map((item) => (
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+          {([
+            { id: "dashboard" as AdminSection, name: "Dashboard", icon: FaChartBar },
+            { id: "tables" as AdminSection, name: "Gestión de Mesas", icon: FaTable },
+            { id: "products" as AdminSection, name: "Gestión de Productos", icon: FaBox },
+            { id: "categories" as AdminSection, name: "Gestión de Categorías", icon: FaTag },
+            { id: "users" as AdminSection, name: "Usuarios", icon: FaUser },
+            { id: "sessions" as AdminSection, name: "Turnos", icon: FaClock },
+          ] as const).map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
@@ -967,6 +998,19 @@ export default function AdminPage() {
           >
             <FaUser className="w-3.5 h-3.5 flex-shrink-0" />
             {!sidebarCollapsed && <span className="truncate">Waiter</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveSection("settings")}
+            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-2 px-3"} py-2.5 text-[13px] border-l-[2.5px] -ml-px transition-all ${
+              activeSection === "settings"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent-light)] font-bold"
+                : "border-transparent text-slate-500 font-medium hover:text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+            }`}
+            title={sidebarCollapsed ? "Configuración" : undefined}
+          >
+            <FaCog className="text-[12px] flex-shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Configuración</span>}
           </button>
 
           <button
@@ -1028,6 +1072,10 @@ export default function AdminPage() {
               logoImageUrl={logoUrl}
               onOpenLogoUpload={() => setShowUploadModal(true)}
             />
+          )}
+
+          {activeSection === "sessions" && (
+            <SessionsView />
           )}
         </div>
       </main>

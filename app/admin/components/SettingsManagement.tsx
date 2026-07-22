@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import { settingsService } from "@/app/lib/supabase/settings";
-import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette, FaList } from "react-icons/fa";
+import { FaCog, FaSpinner, FaImage, FaClock, FaChevronDown, FaEye, FaEyeSlash, FaSearch, FaPalette, FaList, FaPercentage } from "react-icons/fa";
 import CheckUiPreview from "./CheckUiPreview";
 import CheckUiCustomizer from "./CheckUiCustomizer";
 import CheckUiCustomizerColor from "./CheckUiCustomizerColor";
@@ -21,8 +21,10 @@ interface SettingDef {
   key: string;
   label: string;
   description: string;
-  type: "toggle" | "time" | "select" | "cover" | "password";
+  type: "toggle" | "time" | "select" | "cover" | "password" | "action";
   options?: { label: string; value: string }[];
+  actionLabel?: string;
+  actionIcon?: React.ReactNode;
 }
 
 const SETTINGS: SettingDef[] = [
@@ -87,6 +89,24 @@ const SETTINGS: SettingDef[] = [
       "PIN que el mesero debe ingresar para autorizar el cierre de una mesa. Déjalo vacío para no requerir PIN.",
     type: "password",
   },
+  {
+    key: "order_steps",
+    label: "Pasos del pedido",
+    description:
+      "Personaliza las etiquetas, íconos y colores de cada estado del pedido (Ordenado → Preparación → Listo → Servido).",
+    type: "action",
+    actionLabel: "Personalizar",
+    actionIcon: <FaPalette className="text-[10px]" />,
+  },
+  {
+    key: "tip_distribution",
+    label: "Distribución de propinas",
+    description:
+      "Porcentaje que recibe cada rol del total de propinas recolectadas al cierre del turno del mesero.",
+    type: "action",
+    actionLabel: "Editar",
+    actionIcon: <FaPercentage className="text-[10px]" />,
+  },
 ];
 
 export default function SettingsManagement({
@@ -113,6 +133,8 @@ export default function SettingsManagement({
   const [showOrderStepsEditor, setShowOrderStepsEditor] = useState(false);
   const [orderStepsRaw, setOrderStepsRaw] = useState<string | null>(null);
   const [orderStepsForm, setOrderStepsForm] = useState<Record<string, OrderStep>>({});
+  const [showTipDistributionEditor, setShowTipDistributionEditor] = useState(false);
+  const [tipDistributionForm, setTipDistributionForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadSettings();
@@ -131,6 +153,17 @@ export default function SettingsManagement({
       const stepsRaw = data["order_steps"] || null;
       setOrderStepsRaw(stepsRaw);
       setOrderStepsForm(structuredClone(parseOrderSteps(stepsRaw)));
+      const tipRaw = data["tip_distribution"];
+      if (tipRaw) {
+        try {
+          const parsed = JSON.parse(tipRaw) as Record<string, number>;
+          const strMap: Record<string, string> = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            strMap[k] = String(v);
+          }
+          setTipDistributionForm(strMap);
+        } catch { /* ignore */ }
+      }
     } catch {
       onError("Error cargando la configuración");
     } finally {
@@ -240,6 +273,8 @@ export default function SettingsManagement({
         return <FaChevronDown className="text-[oklch(62%_0.18_32)] text-sm" />;
       case "cover":
         return <FaImage className="text-[oklch(62%_0.18_32)] text-sm" />;
+      case "action":
+        return <FaPalette className="text-[oklch(62%_0.18_32)] text-sm" />;
       default:
         return <FaCog className="text-[oklch(62%_0.18_32)] text-sm" />;
     }
@@ -360,6 +395,25 @@ export default function SettingsManagement({
       );
     }
 
+    if (setting.type === "action") {
+      return (
+        <button
+          onClick={() => {
+            if (setting.key === "order_steps") {
+              setOrderStepsForm(structuredClone(parseOrderSteps(orderStepsRaw)));
+              setShowOrderStepsEditor(true);
+            } else if (setting.key === "tip_distribution") {
+              setShowTipDistributionEditor(true);
+            }
+          }}
+          className="px-4 py-2 rounded-[9px] bg-[oklch(62%_0.18_32)] text-xs font-bold text-white hover:brightness-110 transition cursor-pointer flex items-center gap-1.5 flex-shrink-0"
+        >
+          {setting.actionIcon}
+          {setting.actionLabel}
+        </button>
+      );
+    }
+
     if (setting.type === "cover") {
       const isLogo = setting.key === "logo";
       const imageUrl = isLogo ? logoImageUrl : coverImageUrl;
@@ -431,36 +485,6 @@ export default function SettingsManagement({
               {renderControl(setting)}
             </div>
           ))}
-        </div>
-      )}
-
-      {!loading && (
-        <div className="bg-white border border-slate-200 rounded-[14px]">
-          <div className="flex items-center justify-between gap-4 p-5">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                <FaList className="text-[oklch(62%_0.18_32)] text-sm" />
-              </div>
-              <div>
-                <p className="text-[14px] font-bold text-slate-900">
-                  Pasos del pedido
-                </p>
-                <p className="text-[12px] text-slate-500 mt-0.5 max-w-xl">
-                  Personaliza las etiquetas y colores de cada estado del pedido (Ordenado → Preparación → Listo → Servido).
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setOrderStepsForm(structuredClone(parseOrderSteps(orderStepsRaw)));
-                setShowOrderStepsEditor(true);
-              }}
-              className="px-4 py-2 rounded-[9px] bg-[oklch(62%_0.18_32)] text-xs font-bold text-white hover:brightness-110 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <FaPalette className="text-[10px]" />
-              Personalizar
-            </button>
-          </div>
         </div>
       )}
 
@@ -652,6 +676,125 @@ export default function SettingsManagement({
                   setOrderStepsRaw(JSON.stringify(merged));
                   toast("Pasos guardados", "success");
                   setShowOrderStepsEditor(false);
+                }}
+                className="flex-1 py-3 rounded-xl border-none text-sm font-bold text-white bg-[oklch(62%_0.18_32)] cursor-pointer hover:brightness-110 transition-colors"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTipDistributionEditor && (
+        <div
+          onClick={() => setShowTipDistributionEditor(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[18px] overflow-hidden shadow-2xl animate-[wr-scalein_0.22s_ease]"
+            style={{ width: "min(94vw, 420px)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+          >
+            <div className="flex items-center justify-between p-5 pb-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-[10px] bg-[oklch(96%_0.05_32)] flex items-center justify-center">
+                  <FaPercentage className="text-[oklch(62%_0.18_32)] text-sm" />
+                </div>
+                <p className="text-[17px] font-extrabold text-slate-900">
+                  Distribución de propinas
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTipDistributionEditor(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer bg-white flex-shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto" style={{ flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {Object.entries(tipDistributionForm).map(([role, pct]) => (
+                  <div
+                    key={role}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      border: "1.5px solid oklch(88% 0.01 260)",
+                      borderRadius: 10,
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                      {role}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={pct}
+                        onChange={(e) =>
+                          setTipDistributionForm((prev) => ({
+                            ...prev,
+                            [role]: e.target.value,
+                          }))
+                        }
+                        style={{
+                          width: 70,
+                          padding: "8px 10px",
+                          border: "1.5px solid oklch(88% 0.01 260)",
+                          borderRadius: 8,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          textAlign: "right",
+                          fontFamily: "inherit",
+                          outline: "none",
+                        }}
+                      />
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--muted)" }}>%</span>
+                    </div>
+                  </div>
+                ))}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "12px 14px",
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: "var(--text)",
+                    borderTop: "1px solid oklch(88% 0.01 260)",
+                  }}
+                >
+                  <span>Total</span>
+                  <span>
+                    {Object.values(tipDistributionForm).reduce((s, v) => s + (parseFloat(v) || 0), 0).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 pt-0">
+              <button
+                onClick={() => setShowTipDistributionEditor(false)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  const numericMap: Record<string, number> = {};
+                  for (const [k, v] of Object.entries(tipDistributionForm)) {
+                    numericMap[k] = parseFloat(v) || 0;
+                  }
+                  await settingsService.updateSetting("tip_distribution", JSON.stringify(numericMap));
+                  toast("Distribución de propinas guardada", "success");
+                  setShowTipDistributionEditor(false);
                 }}
                 className="flex-1 py-3 rounded-xl border-none text-sm font-bold text-white bg-[oklch(62%_0.18_32)] cursor-pointer hover:brightness-110 transition-colors"
               >

@@ -14,14 +14,17 @@ import { supabase } from "@/app/lib/supabase/client";
 import { useToast } from "@/app/context/ToastContext";
 import Header from "./components/Header";
 import Tabs from "./components/Tabs";
+import TipsTab from "./components/TipsTab";
 import NotificationsTab from "./components/NotificationsTab";
 import TablesTab from "./components/TablesTab";
 import ProductsManagement from "./components/ProductsManagement";
 import LoadingScreen from "./components/LoadingScreen";
 
 import { tipsService } from "@/app/lib/supabase/tips";
+import { sessionsService } from "@/app/lib/supabase/sessions";
 import { settingsService } from "@/app/lib/supabase/settings";
 import { usersService } from "@/app/lib/supabase/users";
+import EndShiftModal from "./components/EndShiftModal";
 
 // Clave para localStorage
 const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
@@ -242,6 +245,7 @@ function PaymentCalculator({
   totalAmount,
   tableNumber,
   initialTip = 0,
+  liveCustomerTip = 0,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -258,6 +262,7 @@ function PaymentCalculator({
   totalAmount: number;
   tableNumber: number;
   initialTip?: number;
+  liveCustomerTip?: number;
 }) {
   const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
@@ -283,6 +288,7 @@ function PaymentCalculator({
   const [tipMode, setTipMode] = useState<"none" | "pct" | "custom">("none");
   const [tipPct, setTipPct] = useState<number>(0);
   const [tipCustom, setTipCustom] = useState<string>("");
+  const waiterModifiedRef = useRef(false);
 
   const tipAmount = tipMode === "pct" ? totalAmount * tipPct
     : tipMode === "custom" ? (parseFloat(tipCustom) || 0)
@@ -302,6 +308,7 @@ function PaymentCalculator({
 
   useEffect(() => {
     if (isOpen) {
+      waiterModifiedRef.current = false;
       setCashAmount(0);
       setTerminalAmount(0);
       setUsdAmount(0);
@@ -320,6 +327,16 @@ function PaymentCalculator({
       }
     }
   }, [isOpen]);
+
+  // Actualiza propina en vivo si el cliente cambia la sugerencia y el mesero no ha modificado
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!waiterModifiedRef.current && liveCustomerTip > 0) {
+      setTipMode("custom");
+      setTipCustom(liveCustomerTip.toFixed(2));
+      setTipPct(0);
+    }
+  }, [liveCustomerTip, isOpen]);
 
   const handleCashChange = (value: string) => {
     const numValue = parseFloat(value) || 0;
@@ -722,9 +739,9 @@ function PaymentCalculator({
           <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
               <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>Propina</p>
-              {initialTip > 0 && (
+              {(initialTip > 0 || liveCustomerTip > 0) && (
                 <span style={{ fontSize:10,fontWeight:700,color:"var(--blue)",background:"var(--blue-light)",padding:"2px 8px",borderRadius:6 }}>
-                  💬 Cliente sugirió ${initialTip.toFixed(2)}
+                  💬 Cliente sugirió ${liveCustomerTip.toFixed(2)}
                 </span>
               )}
             </div>
@@ -741,13 +758,14 @@ function PaymentCalculator({
                   : opt.mode === "custom"
                     ? tipMode === "custom"
                     : tipMode === "pct" && tipPct === opt.pct;
-                return (
-                  <button key={opt.label}
-                    onClick={() => {
-                      if (opt.mode === "none") { setTipMode("none"); setTipPct(0); }
-                      else if (opt.mode === "custom") { setTipMode("custom"); setTipPct(0); }
-                      else { setTipMode("pct"); setTipPct(opt.pct); }
-                    }}
+                  return (
+                    <button key={opt.label}
+                      onClick={() => {
+                        waiterModifiedRef.current = true;
+                        if (opt.mode === "none") { setTipMode("none"); setTipPct(0); }
+                        else if (opt.mode === "custom") { setTipMode("custom"); setTipPct(0); }
+                        else { setTipMode("pct"); setTipPct(opt.pct); }
+                      }}
                     style={{
                       padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
                       border:`1.5px solid ${isActive?"var(--accent)":"var(--border)"}`,
@@ -766,7 +784,7 @@ function PaymentCalculator({
               <div style={{ display:"flex",alignItems:"center",border:"1.5px solid var(--accent)",borderRadius:8,padding:"8px 12px",gap:8,background:"var(--accent-light)",marginTop:8 }}>
                 <span style={{ fontSize:13,fontWeight:700,color:"var(--accent)" }}>$</span>
                 <input type="number" min="0" step="1" value={tipCustom}
-                  onChange={e => setTipCustom(e.target.value)}
+                  onChange={e => { waiterModifiedRef.current = true; setTipCustom(e.target.value); }}
                   placeholder="0.00"
                   autoFocus
                   style={{ flex:1,border:"none",outline:"none",background:"transparent",fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"inherit" }}
@@ -2101,9 +2119,10 @@ export default function WaiterDashboard() {
   const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [tables, setTables] = useState<TableWithOrder[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "notifications" | "tables" | "products"
+    "notifications" | "tables" | "products" | "tips"
   >("notifications");
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [waiterName, setWaiterName] = useState("Mesero");
   const [orderSteps, setOrderSteps] = useState<string | null>(null);
@@ -2140,6 +2159,7 @@ export default function WaiterDashboard() {
     total: number;
     customerTip?: number;
   } | null>(null);
+  const [liveCustomerTip, setLiveCustomerTip] = useState(0);
   const [showSeparatePayments, setShowSeparatePayments] = useState(false);
   const [selectedTableForSeparate, setSelectedTableForSeparate] = useState<{
     id: number;
@@ -2166,6 +2186,19 @@ export default function WaiterDashboard() {
   } | null>(null);
   const [cerrarTargetPin, setCerrarTargetPin] = useState("");
 
+  const [activeSession, setActiveSession] = useState<{
+    id: string;
+    waiter_id: string;
+    total_sales: number;
+    started_at: string;
+  } | null>(null);
+  const [showEndShiftModal, setShowEndShiftModal] = useState(false);
+  const [endShiftData, setEndShiftData] = useState<{
+    totalSales: number;
+    totalTips: number;
+    distribution: Record<string, number>;
+  } | null>(null);
+
   const scrollPositionRef = useRef(0);
   const isUpdatingRef = useRef(false);
   const isLoadingRef = useRef(false);
@@ -2174,7 +2207,17 @@ export default function WaiterDashboard() {
   useEffect(() => {
     usersService
       .getCurrentUser()
-      .then((user) => { if (user?.name) setWaiterName(user.name); })
+      .then(async (user) => {
+        if (user?.name) setWaiterName(user.name);
+        if (user?.id) {
+          try {
+            const session = await sessionsService.getActiveSession(user.id);
+            if (session) setActiveSession(session);
+          } catch (e) {
+            console.error("Error cargando sesión activa:", e);
+          }
+        }
+      })
       .catch((error) => console.error("Error cargando usuario actual:", error));
   }, []);
 
@@ -2182,24 +2225,8 @@ export default function WaiterDashboard() {
     loadData();
     const unsubscribe = setupRealtimeSubscription();
 
-    const interval = setInterval(() => {
-      if (isUpdatingRef.current || modalOpenRef.current) return;
-
-      isUpdatingRef.current = true;
-      scrollPositionRef.current =
-        window.scrollY || document.documentElement.scrollTop;
-
-      loadData().finally(() => {
-        setTimeout(() => {
-          window.scrollTo(0, scrollPositionRef.current);
-          isUpdatingRef.current = false;
-        }, 100);
-      });
-    }, 120000);
-
     return () => {
       unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 
@@ -2216,9 +2243,67 @@ export default function WaiterDashboard() {
   }, [showPaymentCalculator, showSeparatePayments]);
 
   const handleLogout = async () => {
+    if (!activeSession) {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/waiter/login");
+      return;
+    }
+    try {
+      const [totalTips, distribution] = await Promise.all([
+        sessionsService.getTipsForSession(activeSession.id),
+        sessionsService.getTipDistributionConfig(),
+      ]);
+      setEndShiftData({ totalSales: activeSession.total_sales, totalTips, distribution });
+      setShowEndShiftModal(true);
+    } catch (e) {
+      console.error("Error obteniendo datos de cierre:", e);
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/waiter/login");
+    }
+  };
+
+  const handleEndShiftConfirm = async () => {
+    if (!activeSession) return;
+    try {
+      await sessionsService.endSession(activeSession.id);
+    } catch (e) {
+      console.error("Error cerrando sesión:", e);
+    }
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/waiter/login");
   };
+
+  // Realtime: actualiza liveCustomerTip mientras el modal de cobro está abierto
+  useEffect(() => {
+    if (!showPaymentCalculator || !selectedTableForPayment) return;
+    setLiveCustomerTip(selectedTableForPayment.customerTip ?? 0);
+
+    const tableId = selectedTableForPayment.id;
+    let channelStatus: string | undefined;
+    const sub = supabase
+      .channel(`modal-tip-${tableId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "waiter_notifications", filter: `table_id=eq.${tableId}` },
+        (payload) => {
+          const notif = payload.new as any;
+          if (notif.type === "bill_request" && typeof notif.tip_amount === "number") {
+            setLiveCustomerTip(notif.tip_amount);
+          }
+        },
+      )
+      .subscribe((status) => {
+        const prev = channelStatus;
+        channelStatus = status;
+        if (prev && ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(prev) && status === "SUBSCRIBED") {
+          // on reconnect, setLiveCustomerTip from the static value — nothing extra needed
+        }
+      });
+
+    return () => {
+      sub.unsubscribe();
+    };
+  }, [showPaymentCalculator, selectedTableForPayment]);
 
   const loadData = async () => {
     // Prevenir llamadas simultáneas
@@ -2270,8 +2355,11 @@ export default function WaiterDashboard() {
           ? prev
           : processedTables,
       );
+
+      if (initialLoading) setInitialLoading(false);
     } catch (error) {
       console.error("Error cargando datos:", error);
+      if (initialLoading) setInitialLoading(false);
       setLoading(false);
     } finally {
       isLoadingRef.current = false;
@@ -2288,6 +2376,29 @@ export default function WaiterDashboard() {
   };
 
   const setupRealtimeSubscription = () => {
+    const reloadData = () => {
+      if (isUpdatingRef.current || modalOpenRef.current) return;
+      isUpdatingRef.current = true;
+      scrollPositionRef.current =
+        window.scrollY || document.documentElement.scrollTop;
+      loadData().finally(() => {
+        setTimeout(() => {
+          window.scrollTo(0, scrollPositionRef.current);
+          isUpdatingRef.current = false;
+        }, 100);
+      });
+    };
+
+    const channelStatusRef: Record<string, string> = {};
+    const onStatus = (name: string, status: string) => {
+      const prev = channelStatusRef[name];
+      channelStatusRef[name] = status;
+      const disconnected = ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"];
+      if (prev && disconnected.includes(prev) && status === "SUBSCRIBED") {
+        reloadData();
+      }
+    };
+
     const notificationsSub = supabase
       .channel("waiter-notifications")
       .on(
@@ -2297,20 +2408,9 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "waiter_notifications",
         },
-        () => {
-          if (isUpdatingRef.current || modalOpenRef.current) return;
-          isUpdatingRef.current = true;
-          scrollPositionRef.current =
-            window.scrollY || document.documentElement.scrollTop;
-          loadData().finally(() => {
-            setTimeout(() => {
-              window.scrollTo(0, scrollPositionRef.current);
-              isUpdatingRef.current = false;
-            }, 100);
-          });
-        },
+        reloadData,
       )
-      .subscribe();
+      .subscribe((status) => onStatus("notifications", status));
 
     const ordersSub = supabase
       .channel("waiter-orders")
@@ -2321,20 +2421,9 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "orders",
         },
-        () => {
-          if (isUpdatingRef.current || modalOpenRef.current) return;
-          isUpdatingRef.current = true;
-          scrollPositionRef.current =
-            window.scrollY || document.documentElement.scrollTop;
-          loadData().finally(() => {
-            setTimeout(() => {
-              window.scrollTo(0, scrollPositionRef.current);
-              isUpdatingRef.current = false;
-            }, 100);
-          });
-        },
+        reloadData,
       )
-      .subscribe();
+      .subscribe((status) => onStatus("orders", status));
 
     const orderItemsSub = supabase
       .channel("waiter-order-items")
@@ -2345,20 +2434,9 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "order_items",
         },
-        () => {
-          if (isUpdatingRef.current || modalOpenRef.current) return;
-          isUpdatingRef.current = true;
-          scrollPositionRef.current =
-            window.scrollY || document.documentElement.scrollTop;
-          loadData().finally(() => {
-            setTimeout(() => {
-              window.scrollTo(0, scrollPositionRef.current);
-              isUpdatingRef.current = false;
-            }, 100);
-          });
-        },
+        reloadData,
       )
-      .subscribe();
+      .subscribe((status) => onStatus("orderItems", status));
 
     const tablesSub = supabase
       .channel("waiter-tables")
@@ -2369,20 +2447,9 @@ export default function WaiterDashboard() {
           schema: "public",
           table: "tables",
         },
-        () => {
-          if (isUpdatingRef.current || modalOpenRef.current) return;
-          isUpdatingRef.current = true;
-          scrollPositionRef.current =
-            window.scrollY || document.documentElement.scrollTop;
-          loadData().finally(() => {
-            setTimeout(() => {
-              window.scrollTo(0, scrollPositionRef.current);
-              isUpdatingRef.current = false;
-            }, 100);
-          });
-        },
+        reloadData,
       )
-      .subscribe();
+      .subscribe((status) => onStatus("tables", status));
 
     return () => {
       notificationsSub.unsubscribe();
@@ -2773,9 +2840,20 @@ export default function WaiterDashboard() {
             customer_name: `Mesa ${selectedTableForPayment.number}`,
             amount: paymentData.tip,
             payment_method: paymentMethod,
+            waiter_id: activeSession?.waiter_id ?? null,
           });
         } catch (tipErr) {
           console.error("Error guardando propina:", tipErr);
+        }
+      }
+
+      if (activeSession) {
+        try {
+          await sessionsService.addSessionSale(activeSession.id, selectedTableForPayment.total);
+          const refreshed = await sessionsService.getActiveSession(activeSession.waiter_id);
+          if (refreshed) setActiveSession(refreshed);
+        } catch (e) {
+          console.error("Error actualizando ventas de sesión:", e);
         }
       }
 
@@ -2802,7 +2880,7 @@ export default function WaiterDashboard() {
     toast(error, "error");
   };
 
-  if (loading) {
+  if (initialLoading) {
     return <LoadingScreen />;
   }
 
@@ -2903,6 +2981,14 @@ export default function WaiterDashboard() {
           {activeTab === "products" && (
             <ProductsManagement onError={handleError} />
           )}
+
+          {activeTab === "tips" && activeSession && (
+            <TipsTab
+              waiterId={activeSession.waiter_id}
+              sessionStartedAt={activeSession.started_at}
+              waiterName={waiterName}
+            />
+          )}
         </div>
       </div>
 
@@ -2961,6 +3047,7 @@ export default function WaiterDashboard() {
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
         initialTip={selectedTableForPayment?.customerTip ?? 0}
+        liveCustomerTip={liveCustomerTip}
       />
 
       <SeparatePaymentsModal
@@ -2973,6 +3060,22 @@ export default function WaiterDashboard() {
         tableOrders={selectedTableForSeparate?.orders || []}
         tableNumber={selectedTableForSeparate?.number || 0}
         totalAmount={selectedTableForSeparate?.total || 0}
+      />
+
+      <EndShiftModal
+        isOpen={showEndShiftModal}
+        onClose={() => {
+          setShowEndShiftModal(false);
+          setEndShiftData(null);
+        }}
+        onConfirm={handleEndShiftConfirm}
+        session={{
+          waiterName,
+          startedAt: activeSession?.started_at || "",
+          totalSales: endShiftData?.totalSales || 0,
+          totalTips: endShiftData?.totalTips || 0,
+        }}
+        distribution={endShiftData?.distribution || {}}
       />
     </div>
   );

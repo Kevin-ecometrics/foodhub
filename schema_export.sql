@@ -2,6 +2,14 @@
 -- FoodHub - Exportacion de estructura de base de datos (schema only)
 -- Generado desde el proyecto Supabase de origen para replicar en otro
 -- proyecto Supabase. No incluye datos, solo estructura.
+--
+-- TABLAS CON SUPABASE REALTIME (postgres_changes):
+--   - tables          → Admin (TablesManagement), Waiter (dashboard)
+--   - orders          → Admin (Dashboard), Waiter (dashboard)
+--   - order_items     → Admin (Dashboard), Waiter (dashboard)
+--   - waiter_notifications → Waiter (dashboard)
+--   - waiter_sessions → Admin (Dashboard + SessionsView)
+--   - sales_history   → Admin (Dashboard)
 -- =====================================================================
 
 begin;
@@ -147,6 +155,7 @@ create table if not exists public.tips (
   customer_name text not null,
   amount numeric not null default 0,
   payment_method text,
+  waiter_id uuid references public.users(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
 
@@ -175,11 +184,26 @@ create table if not exists public.app_settings (
   updated_at timestamp with time zone not null default timezone('utc', now())
 );
 
+-- waiter_sessions: rastreo de turno por mesero para cierre y distribucion de propinas
+create table if not exists public.waiter_sessions (
+  id uuid primary key default gen_random_uuid(),
+  waiter_id uuid not null references public.users(id) on delete cascade,
+  waiter_name text not null,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz,
+  total_sales numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- ---------------------------------------------------------------------
 -- Indices adicionales (fuera de PK/UNIQUE ya creados por las tablas)
 -- ---------------------------------------------------------------------
 create index if not exists tips_created_at_idx on public.tips using btree (created_at);
 create index if not exists tips_table_id_idx on public.tips using btree (table_id);
+create index if not exists tips_waiter_id_idx on public.tips using btree (waiter_id);
+
+create index if not exists waiter_sessions_waiter_id_idx on public.waiter_sessions (waiter_id);
+create index if not exists waiter_sessions_started_at_idx on public.waiter_sessions (started_at);
 
 -- Unico PIN activo a la vez: permite reciclar el PIN de un waiter desactivado.
 create unique index if not exists users_pin_code_unique_idx
@@ -234,6 +258,7 @@ alter table public.sales_items enable row level security;
 alter table public.customer_feedback enable row level security;
 alter table public.tips enable row level security;
 alter table public.users enable row level security;
+alter table public.waiter_sessions enable row level security;
 alter table public.app_settings enable row level security;
 
 drop policy if exists "Allow all for all roles" on public.categories;
@@ -306,6 +331,10 @@ create policy "users_delete" on public.users
   for delete to authenticated
   using (public.current_role() in ('admin', 'super_admin'));
 
+drop policy if exists "Allow all for waiter_sessions" on public.waiter_sessions;
+create policy "Allow all for waiter_sessions" on public.waiter_sessions
+  for all to public using (true);
+
 -- app_settings: lectura publica (customer sin login la necesita), escritura solo admin
 drop policy if exists "app_settings_select_public" on public.app_settings;
 create policy "app_settings_select_public" on public.app_settings
@@ -372,8 +401,8 @@ alter table public.app_settings alter column value set default 'false'::text;
 -- 2026-07-21: add_course_to_order_items
 -- Agrega columna course a order_items para tiempos de comida (1=Primer, 2=Segundo, 3=Tercer)
 alter table public.order_items add column if not exists course smallint not null default 1
-  check (course >= 1 and course <= 3)
-  
+  check (course >= 1 and course <= 3);
+
 -- 2026-07-21: add_feedback_type_to_customer_feedback
 -- Distingue reseñas generales de reseñas por producto en la encuesta post-pago
 alter table public.customer_feedback
@@ -382,6 +411,12 @@ alter table public.customer_feedback
   add column if not exists product_id integer;
 alter table public.customer_feedback
   add column if not exists product_name character varying;
+
+-- 2026-07-21: add_waiter_sessions
+-- Tabla + columna waiter_id en tips + indices + seed ya incluidos arriba.
+-- Migration aplicada: creacion de waiter_sessions, tips.waiter_id, indices y seed tip_distribution.
+-- 2026-07-21: add_tips_waiter_id
+-- 2026-07-21: add_waiter_sessions_indexes
 
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales
@@ -408,6 +443,10 @@ on conflict (key) do nothing;
 
 insert into public.app_settings (key, value)
 values ('close_table_pin', '1234')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('tip_distribution', '{"Barra":1.2,"Cocina":3.0,"Garrotero":0,"Capitan":0,"Staff":1.0,"Caja":1.2,"Empaque":0}')
 on conflict (key) do nothing;
 
 -- ---------------------------------------------------------------------

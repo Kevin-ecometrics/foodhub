@@ -585,9 +585,244 @@ app/
 - [ ] Tracking en `orders` y `sales_history` de qué mesero atendió
 - [ ] Vista en Admin de rendimiento por mesero (órdenes, propinas, ventas)
 
-### 5. Sistema de Reservaciones
+### 6. Sistema de Reservaciones
 - [ ] Tabla `reservations` (id, table_id, customer_name, phone, date, time, party_size, status)
 - [ ] Vista en Admin para crear/ver/cancelar reservaciones
 - [ ] Vista en Waiter — agenda del día con reservas pendientes
 - [ ] Al llegar la hora, cambiar mesa a `occupied` automáticamente
 - [ ] Opcional: link público para que el cliente reserve sin QR
+
+### 7. Cierre de Turno / Distribución de Propinas
+
+Rastrea la sesión de cada mesero y muestra un modal al cerrar turno con la distribución de propinas recolectadas según porcentajes configurables.
+
+#### SQL aplicado en Supabase (`hewsvtyerwmntekkmyav`)
+- ✅ `waiter_sessions` tabla creada con FK a `users`
+- ✅ `tips.waiter_id` columna agregada con FK a `users`
+- ✅ Índices: `waiter_sessions_waiter_id_idx`, `waiter_sessions_started_at_idx`, `tips_waiter_id_idx`
+- ✅ Seed `tip_distribution` insertado en `app_settings`
+
+#### Esquema
+
+**Nueva tabla:** `waiter_sessions`
+
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| id | uuid PK | gen_random_uuid() |
+| waiter_id | uuid FK→users | CASCADE |
+| waiter_name | text | snapshot al iniciar sesión |
+| started_at | timestamptz | default now() |
+| ended_at | timestamptz | nullable, se llena al cerrar turno |
+| total_sales | numeric | default 0, se acumula al cobrar cada mesa |
+| created_at | timestamptz | default now() |
+
+**Columna agregada:** `tips.waiter_id` (uuid FK→users, nullable)
+
+**Setting en `app_settings`:** `tip_distribution`
+
+```json
+{
+  "Barra": 1.2,
+  "Cocina": 3.0,
+  "Garrotero": 0,
+  "Capitan": 0,
+  "Staff": 1.0,
+  "Caja": 1.2,
+  "Empaque": 0
+}
+```
+
+#### Ciclo de Vida
+
+| Paso | Acción |
+|------|--------|
+| Login exitoso (PIN o email) | `INSERT waiter_sessions { waiter_id, waiter_name, started_at: now() }` |
+| Cobro exitoso | `UPDATE waiter_sessions SET total_sales = total_sales + $monto WHERE id = session_activa` |
+| Cobro con propina | `INSERT tips { ..., waiter_id }` con el ID del mesero que cobró |
+| Click "Salir" | En vez de logout inmediato → abre `EndShiftModal` |
+| Modal → "Cerrar Sesión" | `UPDATE waiter_sessions SET ended_at = now()` → logout |
+| Modal → "Cancelar" | Cierra modal, permanece en el dashboard |
+
+#### EndShiftModal
+
+Al hacer click en "Salir", se muestra un modal con:
+
+- **Encabezado:** Logo / nombre del restaurante, fecha actual
+- **Sesión:** Inicio y fin del turno, nombre del mesero
+- **Ventas:** Total de ventas procesadas (con impuestos) en el turno
+- **Propinas:** Total de propinas recolectadas en el turno
+- **Distribución:** Tabla con cada rol, su porcentaje y el monto calculado
+- **Total %:** Suma de todos los porcentajes (ej. 6.4%)
+- **Botones:** "Cerrar Sesión" (confirma y hace logout) / "Cancelar" (vuelve al dashboard)
+
+#### Cálculo
+
+```
+totalTips = SUM(tips.amount) WHERE waiter_id = ? AND created_at BETWEEN session.started_at AND NOW()
+por cada rol en tip_distribution:
+    monto = totalTips * (porcentaje / 100)
+```
+
+#### Archivos modificados ✅
+
+| Archivo | Cambio |
+|---------|--------|
+| `schema_export.sql` | Tabla `waiter_sessions`, columna `tips.waiter_id`, índices, seed `tip_distribution` |
+| `app/lib/supabase/types.ts` | Tipo `WaiterSession`, `waiter_id` en `Tip` |
+| `app/lib/supabase/tips.ts` | `insertTip` acepta `waiter_id` |
+| `app/lib/supabase/sessions.ts` | **Nuevo** — service layer completo |
+| `app/api/auth/waiter-login/route.ts` | Crea `waiter_sessions` al iniciar sesión |
+| `app/waiter/page.tsx` | `handleLogout` → abre modal; al cobrar actualiza `total_sales` + pasa `waiter_id` |
+
+#### Archivos nuevos ✅
+
+| Archivo | Propósito |
+|---------|-----------|
+| `app/waiter/components/EndShiftModal.tsx` | Modal de cierre de turno con distribución |
+| `app/admin/components/SessionsView.tsx` | Vista de turnos en Admin con histórico de ventas y propinas |
+| `app/admin/types.ts` | Tipo `AdminSection` incluye `"sessions"`, nuevo `WaiterSessionWithTips` |
+| `app/lib/supabase/sessions.ts` | `getAllSessionsWithTips()` — lista todas las sesiones con sus propinas |
+
+#### Settings en Admin ✅
+
+Editor JSON para `tip_distribution` en `SettingsManagement.tsx` para modificar porcentajes de cada rol.
+
+#### Admin — Turnos (nueva sección, abajo del sidebar)
+
+Sidebar agrega **Turnos** separado del resto por un divider `<hr>`, al final del menú de navegación.
+
+| Columna | Descripción |
+|---------|-------------|
+| Mesero | Nombre del waiter |
+| Inicio | Fecha y hora de login |
+| Fin | Fecha y hora de logout (o badge "Activo") |
+| Ventas | `total_sales` de la sesión |
+| Propinas | Suma de `tips.amount` filtrada por `waiter_id` entre `started_at` y `ended_at` |
+| Duración | Minutos/horas entre inicio y fin |
+
+Tres tarjetas de resumen arriba: Total ventas, Total propinas, Turnos registrados.
+
+---
+## 8. Waiter — Realtime heartbeat (sin polling)
+
+Eliminado el `setInterval` de 2 min que hacía polling de datos. Ahora el waiter se actualiza 100% vía Realtime:
+
+- 4 canales Supabase: `waiter-notifications`, `waiter-orders`, `order-items`, `tables`
+- Lógica de recarga centralizada en `reloadData()` (antes duplicada 4 veces)
+- Detección automática de reconexión: cada canal monitorea su estado (`SUBSCRIBED` / `CHANNEL_ERROR` / `TIMED_OUT` / `CLOSED`). Si se reconecta tras una caída, ejecuta `reloadData()` automáticamente.
+
+### Archivos modificados ✅
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/waiter/page.tsx` | Eliminado `setInterval` de 120s; centralizado `reloadData()`; agregado `onStatus()` para detectar reconexiones y refrescar datos |
+
+### Beneficios
+
+- Sin requests periódicas innecesarias
+- Datos siempre frescos vía WebSocket
+- Cobertura ante caídas de conexión (recarga al reconectar)
+
+---
+## 9. Admin — Realtime en vivo
+
+Agregado Realtime a las secciones del Admin que más se benefician de actualizaciones en vivo:
+
+| Sección | Canales Supabase | Comportamiento |
+|---------|-----------------|----------------|
+| Dashboard | `orders`, `order_items`, `waiter_sessions`, `sales_history` | Al recibir cualquier cambio (`INSERT`/`UPDATE`/`DELETE`), recarga `loadDailyData()` + `loadSalesData()` automáticamente |
+| Gestión de Mesas | `tables` | Recarga la lista de mesas cuando un waiter cambia el estado |
+| Turnos | `waiter_sessions` | Refresca la tabla de turnos cuando alguien inicia/cierra sesión |
+
+### Archivos modificados ✅
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/admin/page.tsx` | Nuevo `useEffect` con 4 canales Realtime que recargan el Dashboard en vivo |
+| `app/admin/components/TablesManagement.tsx` | Agregado canal `admin-tables` que recarga mesas al cambiar |
+| `app/admin/components/SessionsView.tsx` | Agregado canal `admin-sessions` que recarga turnos al cambiar |
+
+### Documentación
+
+`schema_export.sql` incluye comentario al inicio listando las 6 tablas que usan Realtime (`tables`, `orders`, `order_items`, `waiter_notifications`, `waiter_sessions`, `sales_history`).
+
+---
+## 10. Stripe + pagos con tarjeta (futuro — no urgente)
+
+Si se quisiera agregar cobro con tarjeta, la arquitectura ya lo soporta sin backend adicional:
+
+### Componentes necesarios
+
+1. **Edge Function `create-checkout-session`** — crea sesión de Stripe Checkout con los items del carrito
+2. **Edge Function `stripe-webhook`** — recibe el webhook de Stripe, verifica la firma, y escribe en DB con `SUPABASE_SERVICE_ROLE_KEY`
+3. **Frontend** — redirige a Stripe Checkout y maneja el `success_url`/`cancel_url`
+
+### Ventajas de Edge Functions para Stripe
+
+- `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` se guardan como secrets de Edge Function
+- `SUPABASE_SERVICE_ROLE_KEY` permite escribir en DB sin RLS (necesario para confirmar pagos)
+- No requiere servidor propio, certificado SSL, ni despliegue aparte
+
+### Cuándo tendría sentido
+
+- Cuando el restaurant quiera aceptar tarjetas además de efectivo
+- Se puede mantener el cobro en efectivo existente + agregar Stripe como alternativa sin migración
+
+---
+## 11. Waiter — Pestaña de Propinas en vivo
+
+Nueva pestaña **Propinas** en el panel del mesero (junto a Notificaciones, Mesas, Productos) que muestra las propinas acumuladas durante la sesión activa:
+
+### Componentes
+
+| Archivo | Propósito |
+|---------|-----------|
+| `app/waiter/components/TipsTab.tsx` | **Nuevo** — tarjeta con total, distribución por rol, y lista de últimas propinas |
+| `app/waiter/components/Tabs.tsx` | Agregado tab `"tips"` con label "Propinas" |
+| `app/lib/supabase/tips.ts` | Nuevo método `getTipsByWaiterAndSession(waiterId, startedAt)` |
+
+### Datos mostrados
+
+- **Total de propinas** en la sesión activa (con Realtime — se actualiza al cobrar)
+- **Distribución por rol** (`tip_distribution` desde settings) con montos calculados
+- **Últimas 20 propinas**: mesa, cliente, monto, hora
+
+### Realtime
+
+Canal `waiter-tips` escucha `INSERT` en `tips` con filtro `waiter_id=eq.${waiterId}` + detección de reconexión.
+
+### Archivos modificados ✅
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/waiter/page.tsx` | Import de `TipsTab`; union type incluye `"tips"`; render condicional |
+| `app/waiter/components/Tabs.tsx` | Tab `"tips"` agregado a `TABS` y `TabsProps` |
+| `app/waiter/components/TipsTab.tsx` | **Nuevo** — componente completo |
+| `app/lib/supabase/tips.ts` | `getTipsByWaiterAndSession()` agregado |
+
+---
+## 12. Settings UI — Unificado + Fixes finales
+
+### Settings — UI consistente
+
+"Pasos del pedido" y "Distribución de propinas" se integraron al array `SETTINGS` principal con tipo `"action"` (vs. standalone cards separados), usando el mismo patrón de ícono + label + descripción + control que el resto de settings. Ya no son tarjetas sueltas con estilo distinto.
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/admin/components/SettingsManagement.tsx` | `SETTINGS` ahora incluye `order_steps` y `tip_distribution` con `type: "action"`; `renderControl` añade caso `"action"` que renderiza un botón "Personalizar"/"Editar" igual que los demás controles; eliminadas las 2 secciones standalone duplicadas |
+
+### Customer Realtime — Fix currentTableId
+
+El `useEffect` de Realtime para actualizar la cuenta del customer en vivo usaba `tableId` directamente, pero cuando el customer entra vía QR session el valor real está en `currentTableId` (localStorage). Ahora usa `const tid = tableId || currentTableId;` como el resto de subscriptions, con `[tableId, currentTableId]` en dependencias.
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/customer/components/Menu.tsx` | Subscription Realtime corregida: `tid = tableId \|\| currentTableId`, dependencias incluyen ambos |
+
+### Waiter — Badge de course eliminado
+
+El badge azul `T1`/`T2`/`T3` que aparecía al lado del nombre del producto en el panel del mesero fue removido. El course se sigue viendo en la agrupación por tiempo dentro de cada cliente (`CustomerOrderSection.tsx`).
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/waiter/components/OrderItem.tsx` | Eliminado `<span>` del badge de course T1/T2/T3 (líneas 87-91) |

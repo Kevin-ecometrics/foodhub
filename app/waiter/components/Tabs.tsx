@@ -1,7 +1,7 @@
 // app/waiter/components/Tabs.tsx
 interface TabsProps {
-  activeTab: "notifications" | "tables" | "products";
-  onTabChange: (tab: "notifications" | "tables" | "products") => void;
+  activeTab: "notifications" | "tables" | "products" | "tips";
+  onTabChange: (tab: "notifications" | "tables" | "products" | "tips") => void;
   notificationsCount: number;
   occupiedTablesCount: number;
 }
@@ -10,6 +10,7 @@ const TABS = [
   { id: "notifications" as const, label: "Notificaciones", countKey: "notifs" },
   { id: "tables"        as const, label: "Mesas",           countKey: "tables" },
   { id: "products"      as const, label: "Productos",       countKey: null },
+  { id: "tips"          as const, label: "Propinas",        countKey: null },
 ];
 
 export default function Tabs({ activeTab, onTabChange, notificationsCount, occupiedTablesCount }: TabsProps) {

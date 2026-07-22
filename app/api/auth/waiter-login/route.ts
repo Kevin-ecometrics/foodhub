@@ -23,6 +23,35 @@ export async function POST(request: Request) {
   return NextResponse.json({ error: "Modo de login inválido" }, { status: 400 })
 }
 
+async function ensureWaiterSession(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return
+
+  const supabaseAdmin = createAdminClient()
+  const { data: waiter } = await (supabaseAdmin as any)
+    .from('users')
+    .select('id, name')
+    .eq('email', user.email)
+    .eq('role', 'waiter')
+    .maybeSingle() as { data: { id: string; name: string } | null }
+
+  if (!waiter) return
+
+  const { data: existing } = await (supabaseAdmin as any)
+    .from('waiter_sessions')
+    .select('id')
+    .eq('waiter_id', waiter.id)
+    .is('ended_at', null)
+    .maybeSingle()
+
+  if (existing) return
+
+  await (supabaseAdmin as any).from('waiter_sessions').insert({
+    waiter_id: waiter.id,
+    waiter_name: waiter.name,
+  })
+}
+
 async function loginWithPin(
   supabase: Awaited<ReturnType<typeof createClient>>,
   pinRaw: string,
@@ -78,6 +107,8 @@ async function loginWithPin(
     return NextResponse.json({ error: "No se pudo iniciar sesión" }, { status: 500 })
   }
 
+  await ensureWaiterSession(supabase)
+
   return NextResponse.json({ ok: true })
 }
 
@@ -107,6 +138,8 @@ async function loginWithPassword(
       { status: 403 },
     )
   }
+
+  await ensureWaiterSession(supabase)
 
   return NextResponse.json({ ok: true })
 }

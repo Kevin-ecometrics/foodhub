@@ -1832,6 +1832,40 @@ export default function MenuPage() {
     };
   }, [tableId, currentTableId, hasCheckedSession]);
 
+  // Realtime: actualiza el historial de la cuenta cuando cambian las órdenes
+  useEffect(() => {
+    const tid = tableId || currentTableId;
+    if (!tid) return;
+    let lastUpdate = 0;
+    const debouncedLoad = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 2000) {
+        lastUpdate = now;
+        loadHistory();
+      }
+    };
+    const ordersSub = supabase
+      .channel(`menu-orders-${tid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `table_id=eq.${tid}` },
+        debouncedLoad,
+      )
+      .subscribe();
+    const itemsSub = supabase
+      .channel(`menu-order-items-${tid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_items" },
+        debouncedLoad,
+      )
+      .subscribe();
+    return () => {
+      ordersSub.unsubscribe();
+      itemsSub.unsubscribe();
+    };
+  }, [tableId, currentTableId]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Session initialization
   // ─────────────────────────────────────────────────────────────────────────
