@@ -166,6 +166,28 @@ All tables have RLS enabled.
 
 > Feature flags configurables desde `/admin` → Configuración. Soporta tipos: toggle (`'true'`/`'false'`), time (`"HH:MM"`), select (string), JSON (`check_ui_customization` — diseño de cuenta personalizado, `order_steps` — etiquetas/colores de estados). Lectura pública (RLS `select` abierto), escritura solo admin/super_admin.
 
+### `cash_reports`
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| report_number | integer | identity (always) | numeración secuencial propia del reporte, para mostrar "Corte de caja #N" |
+| opened_at | timestamptz | now() | cuándo se abrió la caja — inicio del periodo que cubre el reporte |
+| closed_at | timestamptz | — | nullable; **"abierta" = `closed_at is null"`** (mismo patrón que `waiter_sessions.started_at/ended_at`) |
+| opening_cash | numeric | 0 | entrada manual del cajero al **abrir** |
+| counted_cash | numeric | — | nullable hasta el cierre; entrada manual del cajero al **cerrar** |
+| notes | text | — | nullable, capturado al cerrar |
+| cash_sales / terminal_sales / usd_sales / mixed_sales / total_sales | numeric | 0 | snapshot calculado al cerrar, agregando `sales_history` (`closed_at` de la venta) en `[opened_at, closed_at]` por `payment_method` |
+| cash_tips / terminal_tips / usd_tips / mixed_tips / total_tips | numeric | 0 | snapshot calculado al cerrar, agregando `tips` (`created_at`) en el mismo rango |
+| paid_accounts_count | integer | 0 | conteo de filas de `sales_history` en el periodo ("cuentas normal") |
+| average_ticket | numeric | 0 | `total_sales / paid_accounts_count` ("cuenta promedio") |
+| subtotal / tax_amount | numeric | 0 | sobre `total_sales`, tasa fija 16% (ver nota abajo) |
+| expected_cash | numeric | 0 | `opening_cash + cash_sales - cash_tips` — **automático**, sin depósitos/retiros manuales (no hay dato real detrás) |
+| cash_difference | numeric | 0 | `counted_cash - expected_cash` (sobrante +/faltante -) |
+| opened_by / closed_by | uuid | — | nullable, FK→users, `on delete set null` |
+| created_at | timestamptz | now() | |
+
+> Índice único parcial `cash_reports_single_open_idx on ((closed_at is null)) where closed_at is null` — solo puede haber una caja abierta a la vez (mismo truco que `users_pin_code_unique_idx`). Sin FK hacia `sales_history`/`tips` — es un snapshot congelado al cerrar. RLS "allow all" (mismo patrón que `sales_history`/`tips`). **Nota de tasa de impuesto:** este reporte usa 16% (igual que `TableCard.tsx`, vista de mesas del mesero); el resto de la app (ticket cliente, historial, Dashboard admin) usa 8% — inconsistencia preexistente no resuelta aquí. **`mixed_sales`/`mixed_tips` son solo informativos** — no entran en `expected_cash` porque `handlePaymentConfirm` (`app/waiter/page.tsx:2809-2833`) nunca guarda cuánto de un pago `mixed` fue efectivo vs. tarjeta. **El "cambio" (vuelto) nunca se persiste** — es efímero, solo se muestra en un `toast`; no hace falta restarlo porque `sales_history.total_amount` ya es el monto de la cuenta (neto de cambio) para ventas 100% en efectivo. **Campos del ticket físico de corte de caja que NO se implementaron** por no existir la feature/dato detrás: vales/"otros" como método de pago, venta por tipo de producto (alimentos/bebidas/otros — categorías son texto libre sin bucket fijo), venta por tipo de servicio (comedor/domicilio/rápido — la app es 100% para comer en mesa), descuentos y cortesías (no existe el mecanismo), folio de órdenes (usan UUID, no numeración secuencial), comensales/consumo promedio por comensal (no se persiste conteo de comensales), cuentas canceladas (`waiterService.resetTable()` no deja rastro).
+
 ---
 
 ## Realtime Channels
@@ -257,6 +279,7 @@ app/
     │       ├── CheckUiCustomizer.tsx   # Editor completo de diseño de cuenta (3 modos)
     │       ├── CheckUiCustomizerColor.tsx  # Color picker con paleta webapp + nativo + texto
     │       ├── CheckUiPreview.tsx      # Preview visual de diseños de cuenta
+    │       ├── CashRegisterManagement.tsx  # Gestión de Caja: generar/ver corte de caja diario
     │       └── StarRating.tsx
 │
 ├── customer/
@@ -310,7 +333,8 @@ app/
     │   │   ├── history.ts              # requestBill, sales archival, historial
     │   │   ├── settings.ts             # settingsService — getSetting, getAllSettings, updateSetting
     │   │   ├── tips.ts                 # insertTip, getTipsTotal, getTipsByDateRange
-    │   │   └── feedback.ts             # getProductRatingSummaries, getGoodGeneralReviews
+    │   │   ├── feedback.ts             # getProductRatingSummaries, getGoodGeneralReviews
+    │   │   └── cashRegister.ts         # getOpenReport, openRegister, previewClose, closeRegister, getAllReports, deleteReport
     │   ├── checkUiTypes.ts             # Tipos: ModeConfig, CheckUiConfig, DEFAULT_CONFIG, SPACING_MAP, etc.
     │   ├── checkUiRenderer.ts          # configToStyles() → TicketStyles con CSSProperties
     │   └── orderSteps.ts               # Tipos: OrderStep, OrderStepsConfig, DEFAULT_ORDER_STEPS, parseOrderSteps()
@@ -400,6 +424,7 @@ app/
   - [x] Password: PIN para cerrar mesa (input enmascarado + toggle visibilidad + auto-save)
 - [x] Upload de logo (Supabase Storage bucket `logo`) — ahora desde Configuración
 - [x] Upload de cover (Supabase Storage bucket `cover-image`) — ahora desde Configuración
+- [x] **Gestión de Caja** (`CashRegisterManagement.tsx`, 2026-07-22) — nueva pestaña: genera y guarda un corte de caja diario (tabla `cash_reports`), lista de reportes anteriores con detalle. Ver sección dedicada abajo.
 
 ### Check UI Customization (Diseño de Cuenta)
 - [x] `app/lib/checkUiTypes.ts` — Tipos (`ModeConfig`, `CheckUiConfig`), defaults para 3 modos, `SPACING_MAP`, `BORDER_RADIUS_MAP`, `FONT_MAP`
@@ -421,12 +446,23 @@ app/
   - [x] `OrderItem.tsx` reemplaza `STATUS_LABEL/BG/COLOR/NEXT` hardcodeados por `parseOrderSteps(orderSteps)` dinámico
 - [x] **Customer Menu.tsx** — carga `order_steps` en `loadInitialData()`; badges en Cuenta tab reemplazados por render dinámico; **agregado badge `ready` que faltaba** en modo compact y normal
 
+### Gestión de Caja (Corte de Caja Diario, 2026-07-22)
+- [x] Tabla `cash_reports` — modelo **abrir/cerrar caja** (`opened_at`/`closed_at`, "abierta" = `closed_at is null`, índice único parcial garantiza una sola caja abierta a la vez). Snapshot de `sales_history`/`tips` del periodo calculado **al cerrar**. Ver detalle de columnas en "Database Schema" arriba.
+- [x] `app/lib/supabase/cashRegister.ts` — `getOpenReport` (caja abierta actual), `openRegister` (solo efectivo inicial), `previewClose` (agrega `sales_history`/`tips` desde `opened_at` hasta ahora, sin guardar; reutiliza `tipsService.getTipsByDateRange`), `closeRegister` (calcula `expected_cash`/`cash_difference` y guarda), `getAllReports` (cerrados), `deleteReport`
+- [x] `app/admin/components/CashRegisterManagement.tsx` — tarjeta "Abrir Caja" (solo efectivo inicial) cuando no hay caja abierta; tarjeta "Caja Abierta" persistente con botón "Cerrar Caja" que muestra preview en vivo (ventas/propinas por método de pago, cuentas, promedio) + input de efectivo contado + `expected_cash`/`cash_difference` recalculados al escribir; lista de reportes cerrados con badge sobrante/faltante/exacto y detalle en modal, eliminar con confirmación
+- [x] **Entrada/salida de dinero 100% automática** (2026-07-22, corrección post-implementación): se eliminaron los campos manuales `cash_deposits`/`cash_withdrawals` — no había dato real detrás. El único monto en efectivo durante el turno se calcula solo de `sales_history` (`payment_method='cash'`) y `tips` (`payment_method='cash'`) en el rango `[opened_at, closed_at]`
+- [x] Nueva pestaña "Gestión de Caja" en el sidebar admin (`app/admin/types.ts` `AdminSection`, `app/admin/page.tsx`)
+- [x] Verificado a pedido del usuario: el "cambio" (vuelto) que se le da al cliente **nunca se guarda** en la BD (`app/waiter/page.tsx:300`, solo se calcula en memoria y se muestra en un `toast`) — no afecta el cálculo porque `sales_history.total_amount` ya es neto de cambio para ventas 100% en efectivo. Para pagos `mixed` no se guarda el desglose efectivo/tarjeta, por eso `mixed_sales`/`mixed_tips` quedan fuera de `expected_cash` (solo informativos)
+- [x] Decisiones de alcance (confirmadas con el usuario): reporte diario vía abrir/cerrar (no ligado a `waiter_sessions` de un mesero), tasa de impuesto fija 16% para este reporte (inconsistente con el 8% del resto de la app, documentado no resuelto), "cuentas canceladas" excluido (`resetTable()` no deja rastro hoy)
+- [x] Campos del ticket físico de corte de caja NO implementados por falta de feature/dato real: vales, venta por tipo de producto/servicio, descuentos/cortesías, folio de órdenes, comensales/consumo promedio, cuentas canceladas
+
 ### Service Layer
 - [x] `tips.ts` — insertTip, getTipsTotal, getTipsByDateRange
 - [x] `history.ts` — requestBill (con tip_amount), archival de ventas
 - [x] `waiter.ts` — freeTableAndClean, resetTable, moveOrderItemToCustomer (reasignación de producto entre clientes de una mesa)
 - [x] `notifications.ts` — creación de alertas
 - [x] `feedback.ts` — getProductRatingSummaries (promedio/conteo por producto), getGoodGeneralReviews (reseñas generales 4-5★)
+- [x] `cashRegister.ts` — getOpenReport, openRegister, previewClose, closeRegister, getAllReports, deleteReport
 - [x] Todos los servicios CRUD de entidades
 
 ### TypeScript & Code Quality (2026-06-15)
@@ -469,6 +505,8 @@ app/
 | 2026-07-21 | — | SettingsManagement.tsx: agregado editor de pasos del pedido (modal con label, shortLabel, bg, text color por paso) |
 | 2026-07-21 | `add_feedback_type_to_customer_feedback` | Columnas `feedback_type text NOT NULL DEFAULT 'general' CHECK (IN ('general','product'))`, `product_id integer` (sin FK), `product_name character varying` en `customer_feedback` — distingue reseña general de reseña por producto |
 | 2026-07-21 | `seed_product_ratings_enabled_setting` | Seed `product_ratings_enabled = 'false'` en `app_settings` — toggle para mostrar calificación de productos en el menú |
+| 2026-07-22 | `create_cash_reports_table` | Tabla `cash_reports` inicial (corte de caja diario por fecha manual) — versión reemplazada el mismo día, ver fila siguiente |
+| 2026-07-22 | `cash_reports_open_close_flow` | Rediseño a sesión abrir/cerrar: se eliminan `report_date`, `cash_deposits`, `cash_withdrawals`; se agregan `opened_at`, `closed_at`, `closed_by` (`created_by` → `opened_by`); índice único parcial `cash_reports_single_open_idx` garantiza una sola caja abierta a la vez |
 
 ---
 

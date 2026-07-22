@@ -195,6 +195,46 @@ create table if not exists public.waiter_sessions (
   created_at timestamptz not null default now()
 );
 
+-- cash_reports: sesion de caja abierta/cerrada (patron started_at/ended_at,
+-- igual que waiter_sessions). "Abierta" = closed_at is null. Snapshot de
+-- ventas/propinas del periodo [opened_at, closed_at] calculado al cerrar.
+create table if not exists public.cash_reports (
+  id uuid primary key default gen_random_uuid(),
+  report_number integer generated always as identity,
+  opened_at timestamp with time zone not null default now(),
+  closed_at timestamp with time zone,
+
+  opening_cash numeric not null default 0,
+  counted_cash numeric,
+  notes text,
+
+  cash_sales numeric not null default 0,
+  terminal_sales numeric not null default 0,
+  usd_sales numeric not null default 0,
+  mixed_sales numeric not null default 0,
+  total_sales numeric not null default 0,
+
+  cash_tips numeric not null default 0,
+  terminal_tips numeric not null default 0,
+  usd_tips numeric not null default 0,
+  mixed_tips numeric not null default 0,
+  total_tips numeric not null default 0,
+
+  paid_accounts_count integer not null default 0,
+  average_ticket numeric not null default 0,
+  subtotal numeric not null default 0,
+  tax_amount numeric not null default 0,
+
+  expected_cash numeric not null default 0,
+  cash_difference numeric not null default 0,
+
+  opened_by uuid references public.users(id) on delete set null,
+  closed_by uuid references public.users(id) on delete set null,
+  created_at timestamp with time zone not null default now()
+);
+
+comment on column public.cash_reports.mixed_sales is 'Informativo solamente: no se incluye en expected_cash porque no se guarda el desglose efectivo/tarjeta de un pago mixed.';
+
 -- ---------------------------------------------------------------------
 -- Indices adicionales (fuera de PK/UNIQUE ya creados por las tablas)
 -- ---------------------------------------------------------------------
@@ -210,6 +250,11 @@ create unique index if not exists users_pin_code_unique_idx
   on public.users (pin_code)
   where pin_code is not null and is_active = true;
 create index if not exists users_role_idx on public.users (role);
+
+-- Solo una caja abierta a la vez.
+create unique index if not exists cash_reports_single_open_idx
+  on public.cash_reports ((closed_at is null))
+  where closed_at is null;
 
 -- ---------------------------------------------------------------------
 -- Funciones
@@ -260,6 +305,7 @@ alter table public.tips enable row level security;
 alter table public.users enable row level security;
 alter table public.waiter_sessions enable row level security;
 alter table public.app_settings enable row level security;
+alter table public.cash_reports enable row level security;
 
 drop policy if exists "Allow all for all roles" on public.categories;
 create policy "Allow all for all roles" on public.categories
@@ -333,6 +379,10 @@ create policy "users_delete" on public.users
 
 drop policy if exists "Allow all for waiter_sessions" on public.waiter_sessions;
 create policy "Allow all for waiter_sessions" on public.waiter_sessions
+  for all to public using (true);
+
+drop policy if exists "Allow all for cash_reports" on public.cash_reports;
+create policy "Allow all for cash_reports" on public.cash_reports
   for all to public using (true);
 
 -- app_settings: lectura publica (customer sin login la necesita), escritura solo admin
@@ -417,6 +467,15 @@ alter table public.customer_feedback
 -- Migration aplicada: creacion de waiter_sessions, tips.waiter_id, indices y seed tip_distribution.
 -- 2026-07-21: add_tips_waiter_id
 -- 2026-07-21: add_waiter_sessions_indexes
+
+-- 2026-07-22: create_cash_reports_table
+-- Tabla cash_reports (corte de caja diario) ya incluida arriba.
+
+-- 2026-07-22: cash_reports_open_close_flow
+-- Rediseno de "un reporte por fecha con inputs manuales" a sesion abierta/cerrada
+-- (opened_at/closed_at, "abierta" = closed_at is null). Se eliminan report_date,
+-- cash_deposits, cash_withdrawals (sin dato real detras); created_by -> opened_by;
+-- se agrega closed_by. Cambios ya incluidos en la definicion de la tabla arriba.
 
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales
