@@ -192,14 +192,22 @@ export const cashRegisterService = {
     return data
   },
 
-  /** Abre una caja nueva con el efectivo inicial capturado por el cajero. */
-  async openRegister(openingCash: number, openedBy: string | null): Promise<CashReport> {
+  /**
+   * Abre una caja nueva. `openedAt` es opcional: se usa al encadenar la
+   * apertura automática desde `closeRegister` (misma hora que el cierre
+   * anterior); si no se pasa, usa el default de la columna (now()).
+   */
+  async openRegister(openingCash: number, openedBy: string | null, openedAt?: string): Promise<CashReport> {
     const existing = await this.getOpenReport()
     if (existing) throw new Error('Ya hay una caja abierta')
 
     const { data, error } = await (supabase as any)
       .from('cash_reports')
-      .insert({ opening_cash: openingCash, opened_by: openedBy })
+      .insert({
+        opening_cash: openingCash,
+        opened_by: openedBy,
+        ...(openedAt ? { opened_at: openedAt } : {}),
+      })
       .select()
       .single() as { data: CashReport | null; error: Error | null }
 
@@ -212,21 +220,29 @@ export const cashRegisterService = {
     return aggregate(report.opened_at, new Date().toISOString())
   },
 
-  /** Cierra la caja: calcula el snapshot del periodo y guarda el efectivo contado. */
+  /**
+   * Cierra la caja y ABRE la siguiente automáticamente: siempre debe haber
+   * una caja activa, para que no dependa de que alguien se acuerde de abrirla
+   * al empezar el día. La hora de cierre de una es la hora de apertura de la
+   * siguiente, y el efectivo CONTADO (fisico, no el teorico expected_cash) es
+   * el efectivo inicial de la nueva — cualquier diferencia ya queda
+   * registrada en cash_difference del reporte que se cierra.
+   */
   async closeRegister(
     report: CashReport,
     countedCash: number,
     notes: string | null,
     closedBy: string | null,
-  ): Promise<CashReport> {
+  ): Promise<{ closed: CashReport; opened: CashReport }> {
     const preview = await this.previewClose(report)
     const expected_cash = report.opening_cash + preview.cash_deposits - preview.cash_withdrawals - preview.tips_paid
     const cash_difference = countedCash - expected_cash
+    const closedAt = new Date().toISOString()
 
     const { data, error } = await (supabase as any)
       .from('cash_reports')
       .update({
-        closed_at: new Date().toISOString(),
+        closed_at: closedAt,
         counted_cash: countedCash,
         notes,
         ...preview,
@@ -239,7 +255,10 @@ export const cashRegisterService = {
       .single() as { data: CashReport | null; error: Error | null }
 
     if (error) throw error
-    return data as CashReport
+
+    const opened = await this.openRegister(countedCash, closedBy, closedAt)
+
+    return { closed: data as CashReport, opened }
   },
 
   async deleteReport(id: string): Promise<void> {

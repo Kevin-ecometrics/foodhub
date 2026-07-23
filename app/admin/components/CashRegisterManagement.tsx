@@ -143,15 +143,15 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
     }
     setClosing(true);
     try {
-      await cashRegisterService.closeRegister(
+      const { opened } = await cashRegisterService.closeRegister(
         openReport,
         numOr0(countedCash),
         closeNotes.trim() || null,
         currentUserId,
       );
-      toast("Caja cerrada", "success");
+      toast("Caja cerrada. Se abrió la siguiente automáticamente", "success");
       setShowCloseForm(false);
-      setOpenReport(null);
+      setOpenReport(opened);
       setClosePreview(null);
       setCountedCash("");
       setCloseNotes("");

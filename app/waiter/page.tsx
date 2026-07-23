@@ -245,7 +245,9 @@ function PaymentCalculator({
   totalAmount,
   tableNumber,
   initialTip = 0,
+  initialTipPercentage = null,
   liveCustomerTip = 0,
+  liveCustomerTipPercentage = null,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -262,7 +264,9 @@ function PaymentCalculator({
   totalAmount: number;
   tableNumber: number;
   initialTip?: number;
+  initialTipPercentage?: number | null;
   liveCustomerTip?: number;
+  liveCustomerTipPercentage?: number | null;
 }) {
   const { toast } = useToast();
   // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
@@ -288,7 +292,19 @@ function PaymentCalculator({
   const [tipMode, setTipMode] = useState<"none" | "pct" | "custom">("none");
   const [tipPct, setTipPct] = useState<number>(0);
   const [tipCustom, setTipCustom] = useState<string>("");
-  const waiterModifiedRef = useRef(false);
+
+  // La propina la define el cliente desde su pantalla de pago — el mesero
+  // solo la ve, no la puede modificar. Reconstruye el modo exacto a partir
+  // del porcentaje guardado (0/10/15/20) en vez de adivinar comparando montos,
+  // asi el boton correcto queda resaltado en vez de caer siempre en "Otro".
+  const resolveTipSelection = (amount: number, percentage: number | null | undefined) => {
+    if (percentage === 0) return { mode: "none" as const, pct: 0, custom: "" };
+    if (percentage === 10 || percentage === 15 || percentage === 20) {
+      return { mode: "pct" as const, pct: percentage / 100, custom: "" };
+    }
+    if (amount > 0) return { mode: "custom" as const, pct: 0, custom: amount.toFixed(2) };
+    return { mode: "none" as const, pct: 0, custom: "" };
+  };
 
   const tipAmount = tipMode === "pct" ? totalAmount * tipPct
     : tipMode === "custom" ? (parseFloat(tipCustom) || 0)
@@ -308,7 +324,6 @@ function PaymentCalculator({
 
   useEffect(() => {
     if (isOpen) {
-      waiterModifiedRef.current = false;
       setCashAmount(0);
       setTerminalAmount(0);
       setUsdAmount(0);
@@ -316,27 +331,21 @@ function PaymentCalculator({
       setUsdRate(currentRate);
       setTempRate(currentRate.toString());
       setShowRateInput(false);
-      if (initialTip > 0) {
-        setTipMode("custom");
-        setTipCustom(initialTip.toFixed(2));
-        setTipPct(0);
-      } else {
-        setTipMode("none");
-        setTipPct(0);
-        setTipCustom("");
-      }
+      const selection = resolveTipSelection(initialTip, initialTipPercentage);
+      setTipMode(selection.mode);
+      setTipPct(selection.pct);
+      setTipCustom(selection.custom);
     }
   }, [isOpen]);
 
-  // Actualiza propina en vivo si el cliente cambia la sugerencia y el mesero no ha modificado
+  // Sincroniza la propina en vivo si el cliente la cambia mientras el modal esta abierto.
   useEffect(() => {
     if (!isOpen) return;
-    if (!waiterModifiedRef.current && liveCustomerTip > 0) {
-      setTipMode("custom");
-      setTipCustom(liveCustomerTip.toFixed(2));
-      setTipPct(0);
-    }
-  }, [liveCustomerTip, isOpen]);
+    const selection = resolveTipSelection(liveCustomerTip, liveCustomerTipPercentage);
+    setTipMode(selection.mode);
+    setTipPct(selection.pct);
+    setTipCustom(selection.custom);
+  }, [liveCustomerTip, liveCustomerTipPercentage, isOpen]);
 
   const handleCashChange = (value: string) => {
     const numValue = parseFloat(value) || 0;
@@ -735,10 +744,10 @@ function PaymentCalculator({
             )}
           </div>
 
-          {/* Propina */}
+          {/* Propina — la define el cliente desde su pantalla de pago, el mesero solo la ve */}
           <div style={{ border:"1.5px solid var(--border)",borderRadius:10,padding:"12px 14px" }}>
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
-              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>Propina</p>
+              <p style={{ fontSize:12,fontWeight:600,color:"var(--text)",margin:0 }}>Propina (elegida por el cliente)</p>
               {(initialTip > 0 || liveCustomerTip > 0) && (
                 <span style={{ fontSize:10,fontWeight:700,color:"var(--blue)",background:"var(--blue-light)",padding:"2px 8px",borderRadius:6 }}>
                   💬 Cliente sugirió ${liveCustomerTip.toFixed(2)}
@@ -759,36 +768,27 @@ function PaymentCalculator({
                     ? tipMode === "custom"
                     : tipMode === "pct" && tipPct === opt.pct;
                   return (
-                    <button key={opt.label}
-                      onClick={() => {
-                        waiterModifiedRef.current = true;
-                        if (opt.mode === "none") { setTipMode("none"); setTipPct(0); }
-                        else if (opt.mode === "custom") { setTipMode("custom"); setTipPct(0); }
-                        else { setTipMode("pct"); setTipPct(opt.pct); }
-                      }}
+                    <div key={opt.label}
                     style={{
-                      padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+                      padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"default",fontFamily:"inherit",
                       border:`1.5px solid ${isActive?"var(--accent)":"var(--border)"}`,
                       background:isActive?"var(--accent-light)":"var(--surface)",
                       color:isActive?"var(--accent)":"var(--muted)",
-                      transition:"all 0.12s",
+                      opacity:isActive?1:0.55,
                     }}
                   >
                     {opt.label}
                     {opt.pct > 0 && <span style={{ opacity:0.75,marginLeft:3 }}>(${(totalAmount*opt.pct).toFixed(0)})</span>}
-                  </button>
+                  </div>
                 );
               })}
             </div>
             {tipMode === "custom" && (
               <div style={{ display:"flex",alignItems:"center",border:"1.5px solid var(--accent)",borderRadius:8,padding:"8px 12px",gap:8,background:"var(--accent-light)",marginTop:8 }}>
                 <span style={{ fontSize:13,fontWeight:700,color:"var(--accent)" }}>$</span>
-                <input type="number" min="0" step="1" value={tipCustom}
-                  onChange={e => { waiterModifiedRef.current = true; setTipCustom(e.target.value); }}
-                  placeholder="0.00"
-                  autoFocus
-                  style={{ flex:1,border:"none",outline:"none",background:"transparent",fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"inherit" }}
-                />
+                <span style={{ flex:1,fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"inherit" }}>
+                  {parseFloat(tipCustom || "0").toFixed(2)}
+                </span>
               </div>
             )}
             {tipAmount > 0 && (
@@ -2158,8 +2158,10 @@ export default function WaiterDashboard() {
     number: number;
     total: number;
     customerTip?: number;
+    customerTipPercentage?: number | null;
   } | null>(null);
   const [liveCustomerTip, setLiveCustomerTip] = useState(0);
+  const [liveCustomerTipPercentage, setLiveCustomerTipPercentage] = useState<number | null>(null);
   const [showSeparatePayments, setShowSeparatePayments] = useState(false);
   const [selectedTableForSeparate, setSelectedTableForSeparate] = useState<{
     id: number;
@@ -2176,6 +2178,7 @@ export default function WaiterDashboard() {
     number: number;
     total: number;
     customerTip: number;
+    customerTipPercentage: number | null;
   } | null>(null);
   const [closeTableTargetPin, setCloseTableTargetPin] = useState("");
 
@@ -2298,6 +2301,7 @@ export default function WaiterDashboard() {
   useEffect(() => {
     if (!showPaymentCalculator || !selectedTableForPayment) return;
     setLiveCustomerTip(selectedTableForPayment.customerTip ?? 0);
+    setLiveCustomerTipPercentage(selectedTableForPayment.customerTipPercentage ?? null);
 
     const tableId = selectedTableForPayment.id;
     let channelStatus: string | undefined;
@@ -2310,6 +2314,7 @@ export default function WaiterDashboard() {
           const notif = payload.new as any;
           if (notif.type === "bill_request" && typeof notif.tip_amount === "number") {
             setLiveCustomerTip(notif.tip_amount);
+            setLiveCustomerTipPercentage(typeof notif.tip_percentage === "number" ? notif.tip_percentage : null);
           }
         },
       )
@@ -2690,10 +2695,11 @@ export default function WaiterDashboard() {
     const tableTotal = table ? calculateTableTotal(table) : 0;
 
     let customerTip = 0;
+    let customerTipPercentage: number | null = null;
     try {
       const { data: billNotif } = await supabase
         .from("waiter_notifications")
-        .select("tip_amount")
+        .select("tip_amount, tip_percentage")
         .eq("table_id", tableId)
         .eq("type", "bill_request")
         .eq("status", "pending")
@@ -2702,6 +2708,9 @@ export default function WaiterDashboard() {
       if (_notif?.tip_amount != null) {
         customerTip = parseFloat(String(_notif.tip_amount)) || 0;
       }
+      if (_notif?.tip_percentage != null) {
+        customerTipPercentage = parseFloat(String(_notif.tip_percentage));
+      }
     } catch (e) { console.error(e); }
 
     // Verificar si hay PIN configurado para cerrar mesa
@@ -2709,7 +2718,7 @@ export default function WaiterDashboard() {
       const pinSetting = await settingsService.getSetting("close_table_pin");
       if (pinSetting && pinSetting !== 'false' && pinSetting.length > 0) {
         setCloseTableTargetPin(pinSetting);
-        setPendingCloseTable({ id: tableId, number: tableNumber, total: tableTotal, customerTip });
+        setPendingCloseTable({ id: tableId, number: tableNumber, total: tableTotal, customerTip, customerTipPercentage });
         setShowClosePinModal(true);
         return;
       }
@@ -2720,6 +2729,7 @@ export default function WaiterDashboard() {
       number: tableNumber,
       total: tableTotal,
       customerTip,
+      customerTipPercentage,
     });
     setShowPaymentCalculator(true);
   };
@@ -2731,6 +2741,7 @@ export default function WaiterDashboard() {
       number: pendingCloseTable.number,
       total: pendingCloseTable.total,
       customerTip: pendingCloseTable.customerTip,
+      customerTipPercentage: pendingCloseTable.customerTipPercentage,
     });
     setShowPaymentCalculator(true);
     setPendingCloseTable(null);
@@ -3087,7 +3098,9 @@ export default function WaiterDashboard() {
         totalAmount={selectedTableForPayment?.total || 0}
         tableNumber={selectedTableForPayment?.number || 0}
         initialTip={selectedTableForPayment?.customerTip ?? 0}
+        initialTipPercentage={selectedTableForPayment?.customerTipPercentage ?? null}
         liveCustomerTip={liveCustomerTip}
+        liveCustomerTipPercentage={liveCustomerTipPercentage}
       />
 
       <SeparatePaymentsModal

@@ -105,8 +105,11 @@ create table if not exists public.waiter_notifications (
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now()),
   payment_method character varying,
-  tip_amount numeric default 0
+  tip_amount numeric default 0,
+  tip_percentage numeric
 );
+
+comment on column public.waiter_notifications.tip_percentage is 'Porcentaje de propina elegido por el cliente en Payment.tsx: 0 = sin propina, 10/15/20 = boton de porcentaje, null = monto personalizado ("Otro"). El mesero solo puede VER esto, no modificarlo — lo usa PaymentCalculator (app/waiter/page.tsx) para resaltar el boton correcto en vez de mostrar siempre "Otro".';
 
 -- sales_history
 create table if not exists public.sales_history (
@@ -625,6 +628,15 @@ alter table public.customer_feedback
 -- con pct>0, y una fila para el mesero si el efectivo que trae no alcanza a
 -- cubrir su propina en tarjeta/dolares (lo que se le debe). Saldo pendiente
 -- de un destinatario = SUM(tip_ledger_entries.amount) - SUM(tip_payouts.amount).
+
+-- 2026-07-23: add_tip_percentage_to_waiter_notifications
+-- Columna waiter_notifications.tip_percentage numeric (nullable). Antes solo
+-- se guardaba tip_amount (el monto en pesos), asi que la vista del mesero no
+-- podia saber si el cliente eligio un boton de % o un monto personalizado y
+-- siempre mostraba "Otro". Ahora Payment.tsx guarda tambien tip_percentage
+-- (0=sin propina, 10/15/20=boton de %, null=personalizado) y el mesero lo usa
+-- solo para mostrar/resaltar la seleccion — no puede modificarla, la propina
+-- la define unicamente el cliente desde su pantalla de pago.
 
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales

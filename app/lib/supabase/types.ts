@@ -252,6 +252,7 @@ export interface Database {
           status: NotificationStatus
           payment_method: string | null
           tip_amount: number | null
+          tip_percentage: number | null
           created_at: string
           updated_at: string | null
         }
@@ -264,6 +265,7 @@ export interface Database {
           status?: NotificationStatus
           payment_method?: string | null
           tip_amount?: number | null
+          tip_percentage?: number | null
           created_at?: string
           updated_at?: string | null
         }
@@ -276,6 +278,7 @@ export interface Database {
           status?: NotificationStatus
           payment_method?: string | null
           tip_amount?: number | null
+          tip_percentage?: number | null
           created_at?: string
           updated_at?: string | null
         }

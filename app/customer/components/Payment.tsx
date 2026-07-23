@@ -799,13 +799,13 @@ export default function PaymentPage() {
     : 0;
   const totalWithTip = paymentSummary.total + selectedTipAmount;
 
-  const saveTip = async (amount: number) => {
+  const saveTip = async (amount: number, percentage: number | null) => {
     const notifId = (notificationState.billNotification as any)?.id;
     if (!notifId) return;
     setTipSaved(false);
     setTipSaving(true);
     try {
-      await supabase.from("waiter_notifications").update({ tip_amount: amount } as never).eq("id", notifId);
+      await supabase.from("waiter_notifications").update({ tip_amount: amount, tip_percentage: percentage } as never).eq("id", notifId);
       setTipSaved(true);
     } catch (e) { console.error(e); }
     finally { setTipSaving(false); }
@@ -1100,8 +1100,8 @@ export default function PaymentPage() {
                     return (
                       <button key={opt.label}
                         onClick={() => {
-                          if (opt.mode === "none") { setTipMode("none"); setTipPct(0); saveTip(0); }
-                          else { setTipMode("pct"); setTipPct(opt.val); saveTip(paymentSummary.total * opt.val); }
+                          if (opt.mode === "none") { setTipMode("none"); setTipPct(0); saveTip(0, 0); }
+                          else { setTipMode("pct"); setTipPct(opt.val); saveTip(paymentSummary.total * opt.val, opt.val * 100); }
                         }}
                         style={{ padding:"10px 4px",borderRadius:10,border:`1.5px solid ${isActive?"var(--accent)":"var(--border)"}`,background:isActive?"var(--accent-light)":"var(--surface)",fontSize:12,fontWeight:700,color:isActive?"var(--accent)":"var(--muted)",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",textAlign:"center" }}
                       >
@@ -1121,7 +1121,7 @@ export default function PaymentPage() {
                     />
                   </div>
                   <button
-                    onClick={() => { if (tipMode === "custom") saveTip(parseFloat(tipCustom) || 0); }}
+                    onClick={() => { if (tipMode === "custom") saveTip(parseFloat(tipCustom) || 0, null); }}
                     disabled={tipMode !== "custom" || tipSaving}
                     style={{ padding:"10px 16px",borderRadius:10,border:"none",background:tipMode==="custom"?"var(--accent)":"var(--border)",color:"white",fontSize:13,fontWeight:700,cursor:tipMode==="custom"?"pointer":"not-allowed",fontFamily:"inherit",opacity:tipSaving?0.7:1,transition:"all 0.15s",whiteSpace:"nowrap" }}
                   >
