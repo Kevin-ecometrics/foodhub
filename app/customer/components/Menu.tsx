@@ -1674,6 +1674,7 @@ export default function MenuPage() {
   const [currentUrl, setCurrentUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [coverCollapsed, setCoverCollapsed] = useState(false);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers
@@ -2004,11 +2005,18 @@ export default function MenuPage() {
       if (active !== selectedCategoryRef.current) setSelectedCategory(active);
     };
 
+    // Collapses the cover banner once the list is scrolled down, so the
+    // header sticks right at the top instead of competing with the cover
+    // for space; runs unconditionally (unlike onScroll above, which bails
+    // out early in some cases) so it always reflects the real scrollTop.
+    const updateCoverCollapsed = () => setCoverCollapsed(container.scrollTop > 4);
+
     let ticking = false;
     const throttled = () => {
       if (!ticking) {
         requestAnimationFrame(() => {
           onScroll();
+          updateCoverCollapsed();
           ticking = false;
         });
         ticking = true;
@@ -2031,6 +2039,7 @@ export default function MenuPage() {
       passive: true,
     });
     onScroll(); // run once on mount
+    updateCoverCollapsed();
     return () => {
       container.removeEventListener("scroll", throttled);
       container.removeEventListener("touchstart", clearClickScrolling);
@@ -2689,7 +2698,13 @@ export default function MenuPage() {
         {coverImageUrl && (
           <div
             ref={coverBannerRef}
-            style={{ flexShrink: 0, height: 200, overflow: "hidden", position: "relative" }}
+            style={{
+              flexShrink: 0,
+              height: coverCollapsed ? 40 : 200,
+              overflow: "hidden",
+              position: "relative",
+              transition: "height 0.3s ease",
+            }}
           >
             <img
               src={coverImageUrl}
@@ -2705,22 +2720,26 @@ export default function MenuPage() {
               style={{
                 position: "absolute",
                 inset: 0,
-                background:
-                  "linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0.15) 55%, transparent 80%)",
+                background: coverCollapsed
+                  ? "rgba(0,0,0,0.4)"
+                  : "linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0.15) 55%, transparent 80%)",
                 pointerEvents: "none",
+                transition: "background 0.3s ease",
               }}
             />
             <p
               style={{
                 position: "absolute",
                 left: 20,
-                bottom: 14,
+                bottom: coverCollapsed ? "50%" : 14,
+                transform: coverCollapsed ? "translateY(50%)" : "none",
                 margin: 0,
-                fontSize: 20,
+                fontSize: coverCollapsed ? 14 : 20,
                 fontWeight: 800,
                 color: "white",
                 letterSpacing: "-0.3px",
                 textShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                transition: "font-size 0.3s ease, bottom 0.3s ease",
               }}
             >
               RioChia7
