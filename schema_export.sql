@@ -175,6 +175,29 @@ comment on column public.tips.payment_breakdown is 'Igual que sales_history.paym
 -- users: cuentas de staff (admin / waiter / super_admin) vinculadas a auth.users.
 -- El rol de autorizacion vive en auth.users.raw_app_meta_data (JWT app_metadata),
 -- no en esta tabla, para permitir checks de rol sin round-trip a public.users.
+--
+-- IMPORTANTE — super admin (app/api/auth/login/route.ts, syncSuperAdmin()):
+-- el login con ADMIN_USERNAME/ADMIN_PASSWORD (env vars) NO crea una cuenta
+-- nueva cada vez; busca en public.users una fila con role='super_admin'. Si
+-- la encuentra, actualiza esa cuenta existente en auth.users (updateUserById).
+-- Si NO la encuentra, intenta CREAR una cuenta nueva en auth.users con el
+-- email fijo superadmin@internal.local.
+--
+-- Por eso, si alguna vez truncas/borras public.users (p.ej. reset de datos
+-- para un cliente nuevo) pero NO borras tambien auth.users, el login se
+-- rompe: syncSuperAdmin ya no encuentra la fila en public.users, intenta
+-- crear un auth.users nuevo con ese mismo email, Supabase Auth lo rechaza
+-- porque el email ya existe, y el endpoint responde "Error de configuración
+-- del servidor" (500). La cuenta admin/waiter creada desde el panel
+-- (app/api/admin/users/route.ts) no tiene este problema porque cada una usa
+-- un email nuevo — solo el super admin reutiliza siempre el mismo email fijo.
+--
+-- Arreglo si esto pasa: recuperar el id del auth.users existente y volver a
+-- insertar su fila en public.users (no se necesita tocar auth.users):
+--   select id from auth.users where email = 'superadmin@internal.local';
+--   insert into public.users (id, email, name, role, is_active)
+--   values ('<ese id>', 'superadmin@internal.local', 'Super Admin', 'super_admin', true)
+--   on conflict (id) do nothing;
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null unique,
