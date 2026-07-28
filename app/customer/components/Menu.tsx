@@ -3529,6 +3529,7 @@ export default function MenuPage() {
       return Array.from(map.values());
     };
     const groups = groupedByCustomer();
+    const hasSentOrder = orderHistory.length > 0;
 
     return (
       <>
@@ -3539,11 +3540,12 @@ export default function MenuPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            gap: 12,
             background: "white",
             flexShrink: 0,
           }}
         >
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p
               style={{
                 fontSize: 17,
@@ -3554,32 +3556,44 @@ export default function MenuPage() {
             >
               Historial de Pedidos
             </p>
-            <p style={{ fontSize: 11, color: "var(--muted)" }}>
+            <p
+              style={{
+                fontSize: 11,
+                color: "var(--muted)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               Mesa {tableNumber} • {customerName} •{" "}
               <span style={{ color: "var(--green)", fontWeight: 600 }}>
                 ● Ocupada
               </span>
             </p>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             <button
               onClick={handleHistoryRefresh}
+              title="Actualizar"
+              aria-label="Actualizar"
               style={{
+                width: 46,
+                height: 40,
                 background: historyRefreshed
                   ? "var(--green-light)"
                   : "var(--accent-light)",
                 color: historyRefreshed ? "var(--green)" : "var(--accent)",
                 border: "1.5px solid var(--border)",
-                borderRadius: 9,
-                padding: "8px 14px",
+                borderRadius: 10,
                 cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 700,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: 6,
+                justifyContent: "center",
+                gap: 2,
                 fontFamily: "inherit",
                 transition: "all 0.2s",
+                flexShrink: 0,
               }}
             >
               <span
@@ -3589,48 +3603,63 @@ export default function MenuPage() {
                 }}
               >
                 <IRefresh />
-              </span>{" "}
-              Actualizar
+              </span>
+              <span style={{ fontSize: 8.5, fontWeight: 700, lineHeight: 1 }}>
+                Actualizar
+              </span>
             </button>
             <button
               onClick={handleAssistanceRequest}
               disabled={assistanceLoading}
+              title="Ayuda"
+              aria-label="Ayuda"
               style={{
+                width: 46,
+                height: 40,
                 background: "var(--amber-light)",
                 color: "var(--amber)",
                 border: "1.5px solid oklch(88% 0.1 70)",
-                borderRadius: 9,
-                padding: "8px 14px",
+                borderRadius: 10,
                 cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 700,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: 6,
+                justifyContent: "center",
+                gap: 2,
                 fontFamily: "inherit",
+                opacity: assistanceLoading ? 0.7 : 1,
+                flexShrink: 0,
               }}
             >
-              <IHelp /> Ayuda
+              <IHelp />
+              <span style={{ fontSize: 8.5, fontWeight: 700, lineHeight: 1 }}>
+                Ayuda
+              </span>
             </button>
-            <button
-              onClick={() => setShowBillModal(true)}
-              style={{
-                background: "var(--red-light)",
-                color: "var(--red)",
-                border: "1.5px solid oklch(88% 0.08 20)",
-                borderRadius: 9,
-                padding: "8px 14px",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontFamily: "inherit",
-              }}
-            >
-              <IReceipt s={15} /> Cuenta
-            </button>
+            {hasSentOrder && (
+              <button
+                onClick={() => setShowBillModal(true)}
+                style={{
+                  background: "var(--red-light)",
+                  color: "var(--red)",
+                  border: "1.5px solid oklch(88% 0.08 20)",
+                  borderRadius: 10,
+                  padding: "0 14px",
+                  height: 40,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: "inherit",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                <IReceipt s={15} /> Cuenta
+              </button>
+            )}
           </div>
         </header>
 

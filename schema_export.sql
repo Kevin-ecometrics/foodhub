@@ -3,14 +3,13 @@
 -- Generado desde el proyecto Supabase de origen para replicar en otro
 -- proyecto Supabase. No incluye datos, solo estructura.
 --
--- TABLAS CON SUPABASE REALTIME (postgres_changes):
+-- TABLAS CON SUPABASE REALTIME (postgres_changes) — confirmado contra
+-- pg_publication_tables del proyecto de origen, solo estas 4 tablas estan
+-- agregadas a la publicacion supabase_realtime:
 --   - tables          → Admin (TablesManagement), Waiter (dashboard)
 --   - orders          → Admin (Dashboard), Waiter (dashboard)
 --   - order_items     → Admin (Dashboard), Waiter (dashboard)
 --   - waiter_notifications → Waiter (dashboard)
---   - waiter_sessions → Admin (Dashboard + SessionsView)
---   - sales_history   → Admin (Dashboard)
---   - table_waiter_assignments → Customer (assigned waiter display)
 -- =====================================================================
 
 begin;
@@ -123,6 +122,7 @@ create table if not exists public.sales_history (
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   closed_at timestamp with time zone not null default timezone('utc'::text, now()),
   payment_method character varying,
+  waiter_name text,
   payment_breakdown jsonb
 );
 
@@ -165,8 +165,12 @@ create table if not exists public.tips (
   created_at timestamp with time zone not null default now()
 );
 
-comment on column public.sales_history.payment_breakdown is 'Se llena cuando el pago involucra efectivo (payment_method=cash o mixed): {cash, terminal, usd} netos por metodo (para repartir mixed), mas cashTendered (efectivo bruto entregado) y change (cambio devuelto). cash_reports usa cashTendered/change para calcular depositos/retiros de caja automaticamente.';
-comment on column public.tips.payment_breakdown is 'Igual forma que sales_history.payment_breakdown, para propinas pagadas con payment_method=mixed (por ahora normalmente NULL, no se calcula reparto propina/cuenta).';
+comment on column public.customer_feedback.feedback_type is 'general = overall service review, product = review of a single ordered item';
+comment on column public.customer_feedback.product_id is 'Only set when feedback_type = product. No FK to keep historical feedback intact if the product is later deleted.';
+comment on column public.customer_feedback.product_name is 'Snapshot of the product name at review time, only set when feedback_type = product.';
+
+comment on column public.sales_history.payment_breakdown is 'Solo cuando payment_method=mixed: {cash, terminal, usd} en MXN, neto de cambio (se asume que el cambio sale de la parte en efectivo). Usado por cash_reports para saber cuanto de una venta mixta fue efectivo real.';
+comment on column public.tips.payment_breakdown is 'Igual que sales_history.payment_breakdown, para propinas pagadas con payment_method=mixed.';
 
 -- users: cuentas de staff (admin / waiter / super_admin) vinculadas a auth.users.
 -- El rol de autorizacion vive en auth.users.raw_app_meta_data (JWT app_metadata),
@@ -208,7 +212,7 @@ create table if not exists public.waiter_sessions (
 );
 
 comment on column public.waiter_sessions.tips_collected is 'Snapshot: total de propinas de la sesion (todas las formas de pago) al momento de cerrar turno.';
-comment on column public.waiter_sessions.tips_paid_out is 'Monto ACUMULADO (no necesariamente pagado ya) en el reparto de propinas al cerrar turno = tips_collected * (suma de porcentajes de tip_distribution_snapshot) / 100. Snapshot informativo: el detalle real por destinatario y si ya se pago vive en tip_ledger_entries/tip_payouts, no aqui.';
+comment on column public.waiter_sessions.tips_paid_out is 'Monto realmente entregado en el reparto de propinas al cerrar turno = tips_collected * (suma de porcentajes de tip_distribution_snapshot) / 100. Esto es lo que cash_reports.tips_paid usa para calcular expected_cash (sale fisicamente de la caja).';
 comment on column public.waiter_sessions.tip_distribution_snapshot is 'Copia de app_settings.tip_distribution usada en este cierre de turno, para trazabilidad si el admin cambia los porcentajes despues.';
 
 -- cash_reports: sesion de caja abierta/cerrada (patron started_at/ended_at,
@@ -250,6 +254,14 @@ create table if not exists public.cash_reports (
   closed_by uuid references public.users(id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
+
+comment on table public.cash_reports is 'Corte de caja diario: snapshot de ventas/propinas del día + reconciliación manual de efectivo (entrada del cajero).';
+comment on column public.cash_reports.opened_at is 'Momento en que el cajero abrió la caja (inicio del período que cubre el reporte).';
+comment on column public.cash_reports.closed_at is 'Momento en que el cajero cerró la caja. NULL mientras la caja está abierta (solo puede haber una fila con closed_at NULL a la vez).';
+comment on column public.cash_reports.cash_deposits is 'Calculado al cerrar: suma de efectivo bruto entregado por clientes (antes de dar cambio) en el periodo, leido de payment_breakdown.cashTendered.';
+comment on column public.cash_reports.cash_withdrawals is 'Calculado al cerrar: suma del cambio entregado a clientes en el periodo, leido de payment_breakdown.change.';
+comment on column public.cash_reports.tax_rate is 'Tasa de IVA (%) usada para este reporte, tomada de app_settings.iva_rate al momento de cerrar la caja (snapshot, no cambia si el setting cambia despues).';
+comment on column public.cash_reports.tips_paid is 'Propinas pagadas: suma de waiter_sessions.tips_paid_out para sesiones cuyo ended_at cae en [opened_at, closed_at] del corte de caja. Usado en expected_cash y en la seccion CAJA del ticket. Distinto de cash_tips/terminal_tips/usd_tips/total_tips, que son propinas RECIBIDAS (informativo, seccion FORMA DE PAGO PROPINA).';
 
 -- cash_sales/terminal_sales/usd_sales (y su equivalente _tips) reparten cada
 -- cobro/propina 'mixed' usando payment_breakdown, asi que siempre suman
@@ -638,6 +650,11 @@ alter table public.customer_feedback
 -- solo para mostrar/resaltar la seleccion — no puede modificarla, la propina
 -- la define unicamente el cliente desde su pantalla de pago.
 
+-- 2026-07-28: add_waiter_name_to_sales_history
+-- Columna sales_history.waiter_name text (nullable). Guarda el nombre del
+-- mesero que atendio la mesa al momento de cerrarla, para el reporte de
+-- propinas por mesero (WaiterReportTips / TipsTab).
+
 -- ---------------------------------------------------------------------
 -- Seed data: feature flags iniciales
 -- ---------------------------------------------------------------------
@@ -667,6 +684,47 @@ on conflict (key) do nothing;
 
 insert into public.app_settings (key, value)
 values ('tip_distribution', '{"Barra":1.2,"Cocina":3.0,"Garrotero":0,"Capitan":0,"Staff":1.0,"Caja":1.2,"Empaque":0}')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------
+-- Seed data: datos del negocio, IVA/tipo de cambio y personalizacion del
+-- ticket/pasos del pedido (app_settings.key adicionales, agregados via
+-- SettingsManagement.tsx en el admin; no estaban en el seed original).
+-- ---------------------------------------------------------------------
+insert into public.app_settings (key, value)
+values ('business_name', 'RioChia7')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('business_owner', 'ELDA CABRERA VERA')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('business_rfc', 'CAVE6102187H1')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('business_address', 'Independencia Num. 6213, Col. Castillo, Tijuana, Baja California, México CP 22050')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('business_sucursal', 'Independencia Num. 6213, Col. Castillo, Tijuana, B.C.')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('iva_rate', '16')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('usd_rate', '19.5')
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('order_steps', $$ {"ordered":{"label":"Ordenado","shortLabel":"Ord.","color":"var(--red)","bg":"var(--red-light)","icon":"●","next":"preparing"},"preparing":{"label":"En preparación","shortLabel":"Prep.","color":"var(--amber)","bg":"oklch(96% 0.06 70)","icon":"⏳","next":"ready"},"ready":{"label":"Listo","shortLabel":"Listo","color":"var(--blue)","bg":"var(--blue-light)","icon":"✓","next":"served"},"served":{"label":"Servido","shortLabel":"Serv.","color":"var(--green)","bg":"var(--green-light)","icon":"✓","next":"served"},"cancelled":{"label":"Cancelado","shortLabel":"Canc.","color":"var(--muted)","bg":"var(--surface)","icon":"✕","next":"cancelled"}} $$)
+on conflict (key) do nothing;
+
+insert into public.app_settings (key, value)
+values ('check_ui_customization', $$ {"modern":{"containerBg":"#ffffff","containerBorder":"solid","containerRadius":"large","spacing":"normal","headerColor":"#ffffff","headerBg":"oklch(22% 0.04 260)","accentColor":"oklch(20% 0.02 260)","fontFamily":"sans","footerText":"GRACIAS POR SU PREFERENCIA","footerColor":"oklch(52% 0.16 145)"},"classic":{"containerBg":"oklch(98.5% 0.005 80)","containerBorder":"dotted","containerRadius":"small","spacing":"normal","headerColor":"oklch(62% 0.18 32)","headerBg":"transparent","accentColor":"oklch(62% 0.18 32)","fontFamily":"serif","footerText":"GRACIAS POR SU PREFERENCIA","footerColor":"oklch(62% 0.18 32)"},"compact":{"containerBg":"#ffffff","containerBorder":"solid","containerRadius":"medium","spacing":"compact","headerColor":"oklch(22% 0.04 260)","headerBg":"transparent","accentColor":"oklch(20% 0.02 260)","fontFamily":"sans","footerText":"GRACIAS POR SU PREFERENCIA","footerColor":"oklch(55% 0.02 260)"}} $$)
 on conflict (key) do nothing;
 
 -- ---------------------------------------------------------------------
@@ -714,8 +772,11 @@ drop policy if exists "Permitir insercion de cover-image para usuarios autentica
 create policy "Permitir insercion de cover-image para usuarios autenticados" on storage.objects
   for insert to authenticated with check (bucket_id = 'cover-image'::text);
 
-drop policy if exists "Permitir actualizacion de cover-image para usuarios autenticados" on storage.objects;
-create policy "Permitir actualizacion de cover-image para usuarios autenticados" on storage.objects
+-- Nota: el nombre real de esta policy en el proyecto de origen quedo sin la
+-- "s" final ("autenticado", no "autenticados") por un typo original; se deja
+-- igual aqui para que el drop/create de arriba coincida con la policy real.
+drop policy if exists "Permitir actualizacion de cover-image para usuarios autenticado" on storage.objects;
+create policy "Permitir actualizacion de cover-image para usuarios autenticado" on storage.objects
   for update to authenticated using (bucket_id = 'cover-image'::text);
 
 drop policy if exists "Permitir eliminacion de cover-image para usuarios autenticados" on storage.objects;

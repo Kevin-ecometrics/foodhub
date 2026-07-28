@@ -955,6 +955,67 @@ export default function PaymentPage() {
         </header>
 
         <main style={{ maxWidth:540,margin:"0 auto",padding:"20px 16px 32px" }}>
+          {/* Tip selector — visible while bill is pending */}
+          {hasPendingBill && (
+            <div style={{ border:"1.5px solid var(--border)",borderRadius:14,overflow:"hidden",marginBottom:16,animation:"pay-fadeup 0.35s ease both" }}>
+              <div style={{ background:"var(--navy)",padding:"12px 18px" }}>
+                <p style={{ fontSize:13,fontWeight:700,color:"white",margin:0 }}>¿Deseas agregar propina?</p>
+                <p style={{ fontSize:11,color:"oklch(75% 0.01 260)",margin:0,marginTop:2 }}>Opcional — el mesero la verá al momento de cobrar</p>
+              </div>
+              <div style={{ padding:"16px 18px",background:"white" }}>
+                <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12 }}>
+                  {[
+                    { label:"Sin propina", val:0, mode:"none" as const },
+                    { label:"10%",         val:0.10, mode:"pct" as const },
+                    { label:"15%",         val:0.15, mode:"pct" as const },
+                    { label:"20%",         val:0.20, mode:"pct" as const },
+                  ].map(opt => {
+                    const isActive = opt.mode === "none"
+                      ? tipMode === "none"
+                      : tipMode === "pct" && tipPct === opt.val;
+                    return (
+                      <button key={opt.label}
+                        onClick={() => {
+                          if (opt.mode === "none") { setTipMode("none"); setTipPct(0); saveTip(0, 0); }
+                          else { setTipMode("pct"); setTipPct(opt.val); saveTip(paymentSummary.total * opt.val, opt.val * 100); }
+                        }}
+                        style={{ padding:"10px 4px",borderRadius:10,border:`1.5px solid ${isActive?"var(--accent)":"var(--border)"}`,background:isActive?"var(--accent-light)":"var(--surface)",fontSize:12,fontWeight:700,color:isActive?"var(--accent)":"var(--muted)",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",textAlign:"center" }}
+                      >
+                        {opt.label}
+                        {opt.mode !== "none" && <div style={{ fontSize:10,fontWeight:500,marginTop:2 }}>{formatCurrency(paymentSummary.total * opt.val)}</div>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                  <div style={{ flex:1,display:"flex",alignItems:"center",border:`1.5px solid ${tipMode==="custom"?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:"9px 12px",background:tipMode==="custom"?"white":"var(--surface)",transition:"border-color 0.15s" }}>
+                    <span style={{ fontSize:13,color:"var(--muted)",marginRight:4 }}>$</span>
+                    <input type="number" min="0" step="0.50" placeholder="Monto personalizado"
+                      value={tipCustom}
+                      onChange={e => { setTipCustom(e.target.value); setTipMode("custom"); setTipSaved(false); }}
+                      style={{ flex:1,border:"none",outline:"none",background:"transparent",fontSize:13,fontFamily:"inherit",color:"var(--text)" }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => { if (tipMode === "custom") saveTip(parseFloat(tipCustom) || 0, null); }}
+                    disabled={tipMode !== "custom" || tipSaving}
+                    style={{ padding:"10px 16px",borderRadius:10,border:"none",background:tipMode==="custom"?"var(--accent)":"var(--border)",color:"white",fontSize:13,fontWeight:700,cursor:tipMode==="custom"?"pointer":"not-allowed",fontFamily:"inherit",opacity:tipSaving?0.7:1,transition:"all 0.15s",whiteSpace:"nowrap" }}
+                  >
+                    {tipSaving ? "..." : "Confirmar"}
+                  </button>
+                </div>
+                {tipSaved && (
+                  <div style={{ display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"8px 12px",background:"var(--green-light)",borderRadius:9 }}>
+                    <span style={{ color:"var(--green)" }}><ICheck s={13} /></span>
+                    <p style={{ fontSize:12,color:"var(--green)",fontWeight:600,margin:0 }}>
+                      Propina guardada: {formatCurrency(selectedTipAmount)} — el mesero la verá al cobrar
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Ticket card — SoftRestaurant format */}
           <div style={ticketStyles.container as React.CSSProperties}>
             <div style={ticketStyles.headerBlock as React.CSSProperties}>
@@ -1065,7 +1126,7 @@ export default function PaymentPage() {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display:"flex",gap:12,flexWrap:"wrap",marginBottom:12 }}>
+          <div style={{ display:"flex",gap:12,flexWrap:"wrap",marginTop:16,marginBottom:12 }}>
             <button onClick={handleGeneratePDF} disabled={generatingPdf}
               style={{ flex:1,minWidth:140,padding:"13px 16px",borderRadius:11,border:"none",background:"var(--navy)",color:"white",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:generatingPdf?0.7:1 }}
             >
@@ -1078,67 +1139,6 @@ export default function PaymentPage() {
               Facturar Compra
             </button>
           </div>
-
-          {/* Tip selector — visible while bill is pending */}
-          {hasPendingBill && (
-            <div style={{ border:"1.5px solid var(--border)",borderRadius:14,overflow:"hidden",marginBottom:16,animation:"pay-fadeup 0.35s ease both" }}>
-              <div style={{ background:"var(--navy)",padding:"12px 18px" }}>
-                <p style={{ fontSize:13,fontWeight:700,color:"white",margin:0 }}>¿Deseas agregar propina?</p>
-                <p style={{ fontSize:11,color:"oklch(75% 0.01 260)",margin:0,marginTop:2 }}>Opcional — el mesero la verá al momento de cobrar</p>
-              </div>
-              <div style={{ padding:"16px 18px",background:"white" }}>
-                <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12 }}>
-                  {[
-                    { label:"Sin propina", val:0, mode:"none" as const },
-                    { label:"10%",         val:0.10, mode:"pct" as const },
-                    { label:"15%",         val:0.15, mode:"pct" as const },
-                    { label:"20%",         val:0.20, mode:"pct" as const },
-                  ].map(opt => {
-                    const isActive = opt.mode === "none"
-                      ? tipMode === "none"
-                      : tipMode === "pct" && tipPct === opt.val;
-                    return (
-                      <button key={opt.label}
-                        onClick={() => {
-                          if (opt.mode === "none") { setTipMode("none"); setTipPct(0); saveTip(0, 0); }
-                          else { setTipMode("pct"); setTipPct(opt.val); saveTip(paymentSummary.total * opt.val, opt.val * 100); }
-                        }}
-                        style={{ padding:"10px 4px",borderRadius:10,border:`1.5px solid ${isActive?"var(--accent)":"var(--border)"}`,background:isActive?"var(--accent-light)":"var(--surface)",fontSize:12,fontWeight:700,color:isActive?"var(--accent)":"var(--muted)",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",textAlign:"center" }}
-                      >
-                        {opt.label}
-                        {opt.mode !== "none" && <div style={{ fontSize:10,fontWeight:500,marginTop:2 }}>{formatCurrency(paymentSummary.total * opt.val)}</div>}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                  <div style={{ flex:1,display:"flex",alignItems:"center",border:`1.5px solid ${tipMode==="custom"?"var(--accent)":"var(--border)"}`,borderRadius:10,padding:"9px 12px",background:tipMode==="custom"?"white":"var(--surface)",transition:"border-color 0.15s" }}>
-                    <span style={{ fontSize:13,color:"var(--muted)",marginRight:4 }}>$</span>
-                    <input type="number" min="0" step="0.50" placeholder="Monto personalizado"
-                      value={tipCustom}
-                      onChange={e => { setTipCustom(e.target.value); setTipMode("custom"); setTipSaved(false); }}
-                      style={{ flex:1,border:"none",outline:"none",background:"transparent",fontSize:13,fontFamily:"inherit",color:"var(--text)" }}
-                    />
-                  </div>
-                  <button
-                    onClick={() => { if (tipMode === "custom") saveTip(parseFloat(tipCustom) || 0, null); }}
-                    disabled={tipMode !== "custom" || tipSaving}
-                    style={{ padding:"10px 16px",borderRadius:10,border:"none",background:tipMode==="custom"?"var(--accent)":"var(--border)",color:"white",fontSize:13,fontWeight:700,cursor:tipMode==="custom"?"pointer":"not-allowed",fontFamily:"inherit",opacity:tipSaving?0.7:1,transition:"all 0.15s",whiteSpace:"nowrap" }}
-                  >
-                    {tipSaving ? "..." : "Confirmar"}
-                  </button>
-                </div>
-                {tipSaved && (
-                  <div style={{ display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"8px 12px",background:"var(--green-light)",borderRadius:9 }}>
-                    <span style={{ color:"var(--green)" }}><ICheck s={13} /></span>
-                    <p style={{ fontSize:12,color:"var(--green)",fontWeight:600,margin:0 }}>
-                      Propina guardada: {formatCurrency(selectedTipAmount)} — el mesero la verá al cobrar
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Payment status button */}
           <div style={{ marginBottom:12 }}>

@@ -26,8 +26,28 @@ import { settingsService } from "@/app/lib/supabase/settings";
 import { usersService } from "@/app/lib/supabase/users";
 import EndShiftModal from "./components/EndShiftModal";
 
-// Clave para localStorage
-const USD_RATE_STORAGE_KEY = "usd_exchange_rate";
+// Tipo de cambio de respaldo mientras se consulta el valor configurado por
+// el admin (mismo default usado en el panel de administración).
+const DEFAULT_USD_RATE = 20.5;
+
+// El tipo de cambio USD/MXN ahora se define centralmente desde el admin
+// (Configuración > IVA y tipo de cambio), ya no es editable/persistente por
+// mesero via localStorage. Este hook lo consulta cada vez que se abre un
+// modal de pago, para reflejar cualquier cambio reciente hecho en el admin.
+function useAdminUsdRate(isOpen: boolean): number {
+  const [rate, setRate] = useState(DEFAULT_USD_RATE);
+  useEffect(() => {
+    if (!isOpen) return;
+    settingsService
+      .getSetting("usd_rate")
+      .then((val) => {
+        const parsed = parseFloat(val || "");
+        if (!isNaN(parsed) && parsed > 0) setRate(parsed);
+      })
+      .catch(() => {});
+  }, [isOpen]);
+  return rate;
+}
 
 interface Guest {
   id: string;
@@ -269,24 +289,12 @@ function PaymentCalculator({
   liveCustomerTipPercentage?: number | null;
 }) {
   const { toast } = useToast();
-  // Cargar la tasa de cambio desde localStorage o usar 18.5 por defecto
-  const getInitialUsdRate = (): number => {
-    if (typeof window !== "undefined") {
-      const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
-      if (savedRate) {
-        const parsedRate = parseFloat(savedRate);
-        if (!isNaN(parsedRate) && parsedRate > 0) {
-          return parsedRate;
-        }
-      }
-    }
-    return 18.5;
-  };
+  const adminUsdRate = useAdminUsdRate(isOpen);
 
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [terminalAmount, setTerminalAmount] = useState<number>(0);
   const [usdAmount, setUsdAmount] = useState<number>(0);
-  const [usdRate, setUsdRate] = useState<number>(getInitialUsdRate);
+  const [usdRate, setUsdRate] = useState<number>(DEFAULT_USD_RATE);
   const [showRateInput, setShowRateInput] = useState<boolean>(false);
   const [tempRate, setTempRate] = useState<string>(usdRate.toString());
   const [tipMode, setTipMode] = useState<"none" | "pct" | "custom">("none");
@@ -316,20 +324,18 @@ function PaymentCalculator({
   const change = totalPaid > totalWithTips ? totalPaid - totalWithTips : 0;
   const needsChange = totalPaid > totalWithTips;
 
+  // Sincroniza el tipo de cambio con el valor configurado en el admin en
+  // cuanto se resuelve la consulta (ver useAdminUsdRate más arriba).
   useEffect(() => {
-    if (typeof window !== "undefined" && usdRate > 0) {
-      localStorage.setItem(USD_RATE_STORAGE_KEY, usdRate.toString());
-    }
-  }, [usdRate]);
+    setUsdRate(adminUsdRate);
+    setTempRate(adminUsdRate.toString());
+  }, [adminUsdRate]);
 
   useEffect(() => {
     if (isOpen) {
       setCashAmount(0);
       setTerminalAmount(0);
       setUsdAmount(0);
-      const currentRate = getInitialUsdRate();
-      setUsdRate(currentRate);
-      setTempRate(currentRate.toString());
       setShowRateInput(false);
       const selection = resolveTipSelection(initialTip, initialTipPercentage);
       setTipMode(selection.mode);
@@ -402,6 +408,85 @@ function PaymentCalculator({
   };
 
   if (!isOpen) return null;
+
+  const summaryBlock = (
+    <div
+      style={{
+        background: "var(--surface)",
+        borderRadius: 10,
+        padding: "12px 14px",
+        fontSize: 13,
+      }}
+    >
+      {[
+        ["💵 Efectivo:", `$${cashAmount.toFixed(2)}`, "var(--green)"],
+        ["💳 Terminal:", `$${terminalAmount.toFixed(2)}`, "var(--green)"],
+        ["$ Dólares:", `$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`, "var(--green)"],
+      ].map(([label, val, col]) => (
+        <div key={label as string} style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+          <span style={{ color:"var(--muted)" }}>{label}</span>
+          <span style={{ color: col as string, fontWeight:600 }}>{val}</span>
+        </div>
+      ))}
+      {tipAmount > 0 && (
+        <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+          <span style={{ color:"var(--accent)" }}>Propina:</span>
+          <span style={{ color:"var(--accent)",fontWeight:700 }}>+${tipAmount.toFixed(2)}</span>
+        </div>
+      )}
+      <div style={{ borderTop:"1px solid var(--border)",paddingTop:8,marginTop:4 }}>
+        {tipAmount > 0 && (
+          <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+            <span style={{ fontSize:11,color:"var(--muted)" }}>Consumo:</span>
+            <span style={{ fontSize:11,color:"var(--muted)" }}>${totalAmount.toFixed(2)}</span>
+          </div>
+        )}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ fontWeight: 700, color: "var(--text)" }}>
+            Total {tipAmount > 0 ? "con propina" : "pagado"}:
+          </span>
+          <span
+            style={{
+              fontWeight: 700,
+              color: totalPaid >= totalWithTips ? "var(--green)" : "var(--amber)",
+            }}
+          >
+            ${tipAmount > 0 ? totalWithTips.toFixed(2) : totalPaid.toFixed(2)}
+          </span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontWeight: 700, color: "var(--text)" }}>
+            Falta por pagar:
+          </span>
+          <span style={{ fontWeight: 700, color: "var(--red)" }}>
+            ${Math.max(0, remainingAmount).toFixed(2)}
+          </span>
+        </div>
+        {needsChange && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 4,
+            }}
+          >
+            <span style={{ fontWeight: 700, color: "var(--green)" }}>
+              Cambio a devolver:
+            </span>
+            <span style={{ fontWeight: 700, color: "var(--green)" }}>
+              ${change.toFixed(2)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -505,6 +590,8 @@ function PaymentCalculator({
               ${totalAmount.toFixed(2)}
             </span>
           </div>
+
+          {summaryBlock}
 
           {/* Efectivo */}
           <div
@@ -798,83 +885,7 @@ function PaymentCalculator({
             )}
           </div>
 
-          {/* Summary */}
-          <div
-            style={{
-              background: "var(--surface)",
-              borderRadius: 10,
-              padding: "12px 14px",
-              fontSize: 13,
-            }}
-          >
-            {[
-              ["💵 Efectivo:", `$${cashAmount.toFixed(2)}`, "var(--green)"],
-              ["💳 Terminal:", `$${terminalAmount.toFixed(2)}`, "var(--green)"],
-              ["$ Dólares:", `$${usdAmount.toFixed(2)} USD = $${usdToMxn.toFixed(2)}`, "var(--green)"],
-            ].map(([label, val, col]) => (
-              <div key={label as string} style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-                <span style={{ color:"var(--muted)" }}>{label}</span>
-                <span style={{ color: col as string, fontWeight:600 }}>{val}</span>
-              </div>
-            ))}
-            {tipAmount > 0 && (
-              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-                <span style={{ color:"var(--accent)" }}>Propina:</span>
-                <span style={{ color:"var(--accent)",fontWeight:700 }}>+${tipAmount.toFixed(2)}</span>
-              </div>
-            )}
-            <div style={{ borderTop:"1px solid var(--border)",paddingTop:8,marginTop:4 }}>
-              {tipAmount > 0 && (
-                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
-                  <span style={{ fontSize:11,color:"var(--muted)" }}>Consumo:</span>
-                  <span style={{ fontSize:11,color:"var(--muted)" }}>${totalAmount.toFixed(2)}</span>
-                </div>
-              )}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 4,
-                }}
-              >
-                <span style={{ fontWeight: 700, color: "var(--text)" }}>
-                  Total {tipAmount > 0 ? "con propina" : "pagado"}:
-                </span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: totalPaid >= totalWithTips ? "var(--green)" : "var(--amber)",
-                  }}
-                >
-                  ${tipAmount > 0 ? totalWithTips.toFixed(2) : totalPaid.toFixed(2)}
-                </span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 700, color: "var(--text)" }}>
-                  Falta por pagar:
-                </span>
-                <span style={{ fontWeight: 700, color: "var(--red)" }}>
-                  ${Math.max(0, remainingAmount).toFixed(2)}
-                </span>
-              </div>
-              {needsChange && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: 4,
-                  }}
-                >
-                  <span style={{ fontWeight: 700, color: "var(--green)" }}>
-                    Cambio a devolver:
-                  </span>
-                  <span style={{ fontWeight: 700, color: "var(--green)" }}>
-                    ${change.toFixed(2)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+          {summaryBlock}
         </div>
 
         {/* Footer */}
@@ -984,18 +995,7 @@ function SeparatePaymentsModal({
   totalAmount: number;
 }) {
   const { toast } = useToast();
-  const getInitialUsdRate = (): number => {
-    if (typeof window !== "undefined") {
-      const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
-      if (savedRate) {
-        const parsedRate = parseFloat(savedRate);
-        if (!isNaN(parsedRate) && parsedRate > 0) {
-          return parsedRate;
-        }
-      }
-    }
-    return 18.5;
-  };
+  const adminUsdRate = useAdminUsdRate(isOpen);
 
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
@@ -1020,7 +1020,7 @@ function SeparatePaymentsModal({
             cashAmount: 0,
             terminalAmount: 0,
             usdAmount: 0,
-            usdRate: getInitialUsdRate(),
+            usdRate: adminUsdRate,
             orderId: order.id,
           });
         }
@@ -1664,23 +1664,12 @@ function GuestPaymentModal({
   tableNumber: number;
 }) {
   const { toast } = useToast();
-  const getInitialUsdRate = (): number => {
-    if (typeof window !== "undefined") {
-      const savedRate = localStorage.getItem(USD_RATE_STORAGE_KEY);
-      if (savedRate) {
-        const parsedRate = parseFloat(savedRate);
-        if (!isNaN(parsedRate) && parsedRate > 0) {
-          return parsedRate;
-        }
-      }
-    }
-    return 18.5;
-  };
+  const adminUsdRate = useAdminUsdRate(isOpen);
 
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [terminalAmount, setTerminalAmount] = useState<number>(0);
   const [usdAmount, setUsdAmount] = useState<number>(0);
-  const [usdRate, setUsdRate] = useState<number>(getInitialUsdRate);
+  const [usdRate, setUsdRate] = useState<number>(DEFAULT_USD_RATE);
   const [showRateInput, setShowRateInput] = useState<boolean>(false);
   const [tempRate, setTempRate] = useState<string>(usdRate.toString());
 
@@ -1691,14 +1680,18 @@ function GuestPaymentModal({
   const totalPaid = cashAmount + terminalAmount + usdToMxn;
   const remaining = itemsTotal - totalPaid;
 
+  // Sincroniza el tipo de cambio con el valor configurado en el admin en
+  // cuanto se resuelve la consulta (ver useAdminUsdRate más arriba).
+  useEffect(() => {
+    setUsdRate(adminUsdRate);
+    setTempRate(adminUsdRate.toString());
+  }, [adminUsdRate]);
+
   useEffect(() => {
     if (isOpen && guest) {
       setCashAmount(0);
       setTerminalAmount(0);
       setUsdAmount(0);
-      const currentRate = getInitialUsdRate();
-      setUsdRate(currentRate);
-      setTempRate(currentRate.toString());
     }
   }, [isOpen, guest]);
 
