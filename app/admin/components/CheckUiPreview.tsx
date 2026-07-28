@@ -31,7 +31,7 @@ export default function CheckUiPreview({ mode, customConfig }: Props) {
       <div style={s.container as React.CSSProperties}>
         <div style={s.headerBlock as React.CSSProperties}>
           <div style={s.headerLine as React.CSSProperties}>
-            RIOCHIA7<br />ELDA CABRERA VERA<br />RFC: CAVE6102187H1
+            SCANEAT<br />NOMBRE DEL PROPIETARIO<br />RFC: XXXX000000XX0
           </div>
         </div>
 

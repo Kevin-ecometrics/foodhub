@@ -189,7 +189,7 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
       </head>
       <body>
         <div class="header">
-          <div class="restaurant-name">RIOCHIA7</div>
+          <div class="restaurant-name">SCANEAT</div>
           <div>*** CORTE DE CAJA #${report.report_number} ***</div>
           <div class="period">Del ${formatDateTime(report.opened_at)}${report.closed_at ? ` al ${formatDateTime(report.closed_at)}` : ""}</div>
         </div>
@@ -240,7 +240,7 @@ export default function CashRegisterManagement({ onError }: CashRegisterManageme
 
         <div class="footer">
           <div>*** FIN DEL CORTE ***</div>
-          <div>RioChia7</div>
+          <div>ScanEat</div>
         </div>
       </body>
       </html>

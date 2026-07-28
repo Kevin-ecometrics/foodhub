@@ -18,15 +18,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RioChia7 - Sistema Gestión Meseros",
+  title: "ScanEat - Sistema Gestión Meseros",
   description:
-    "Sistema profesional de gestión para restaurantes RioChia7. Administra pedidos en tiempo real, controla mesas y recibe notificaciones instantáneas. Optimiza tu servicio con nuestro panel mesero.",
+    "Sistema profesional de gestión para restaurantes ScanEat. Administra pedidos en tiempo real, controla mesas y recibe notificaciones instantáneas. Optimiza tu servicio con nuestro panel mesero.",
   keywords:
-    "riochia7, restaurante, mesero, pedidos, gestión restaurante, sistema meseros, ordenes comida, administración mesas",
+    "scaneat, restaurante, mesero, pedidos, gestión restaurante, sistema meseros, ordenes comida, administración mesas",
   authors: [{ name: "Ecommetrica" }],
   publisher: "Ecommetrica",
   robots: "index, follow",
-  metadataBase: new URL("https://riochia7.scaneat.ai/"),
+  metadataBase: new URL("https://scaneat.ai/"),
   alternates: {
     canonical: "/",
   },

@@ -226,7 +226,7 @@ function MiniPreview({ mode }: { mode: TicketConfig; previewStyles: ReturnType<t
     <div style={{ border, borderRadius: radius, overflow: "hidden", background: mode.containerBg, fontFamily: f }}>
       <div style={{ background: mode.headerBg, padding: pad, textAlign: "center" }}>
         <p style={{ fontSize: mode.spacing === "compact" ? 9 : 10, fontWeight: 700, color: mode.headerColor, margin: 0, lineHeight: 1.5 }}>
-          RIOCHIA7<br />ELDA CABRERA VERA<br />RFC: CAVE6102187H1
+          SCANEAT<br />NOMBRE DEL PROPIETARIO<br />RFC: XXXX000000XX0
         </p>
       </div>
       <div style={{ padding: `${pad * 0.5}px ${pad}px`, fontSize: mode.spacing === "compact" ? 8 : 9, color: "oklch(55% 0.02 260)" }}>

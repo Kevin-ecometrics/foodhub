@@ -530,9 +530,9 @@ export default function PaymentPage() {
   const [tipSaving, setTipSaving] = useState(false);
   const [checkUiMode, setCheckUiMode] = useState("modern");
   const [checkUiConfig, setCheckUiConfig] = useState<CheckUiConfig | null>(null);
-  const [businessName, setBusinessName] = useState("RioChia7");
-  const [businessOwner, setBusinessOwner] = useState("ELDA CABRERA VERA");
-  const [businessRfc, setBusinessRfc] = useState("CAVE6102187H1");
+  const [businessName, setBusinessName] = useState("ScanEat");
+  const [businessOwner, setBusinessOwner] = useState("");
+  const [businessRfc, setBusinessRfc] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
   const [businessSucursal, setBusinessSucursal] = useState("");
   const [ivaRate, setIvaRate] = useState(16);
