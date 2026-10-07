@@ -85,8 +85,9 @@ export default function AdminPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast("La imagen debe ser menor a 5MB", "warning");
+    // El logo también se usa como favicon, por eso el límite es más bajo que el de la portada
+    if (file.size > 1 * 1024 * 1024) {
+      toast("El logo debe pesar menos de 1MB", "warning");
       return;
     }
 
