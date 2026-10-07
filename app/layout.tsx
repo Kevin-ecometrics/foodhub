@@ -30,6 +30,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: "/scaneat-logo.png",
+    apple: "/scaneat-logo.png",
+  },
 };
 
 export default function RootLayout({

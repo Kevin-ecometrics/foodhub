@@ -120,6 +120,9 @@ export default function AdminPage() {
         setLogoUrl(urlWithTimestamp);
       }
 
+      // Invalida el caché del favicon del restaurante
+      await fetch("/api/revalidate-logo", { method: "POST" }).catch(() => {});
+
       toast("Logo actualizado exitosamente", "success");
       setShowUploadModal(false);
     } catch (error: any) {
